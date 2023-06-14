@@ -7,7 +7,7 @@ import random
 class GameField:
     def __init__(self):
         self.CELL = {
-            "black": True,
+            "blank": True,
             "position_A": False,
             "position_B": False,
             "open_position_A": False,
