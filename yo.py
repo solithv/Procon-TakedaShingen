@@ -19,7 +19,7 @@ class TicTacToeEnv(gym.Env):
         self.current_player = 1
         self.action_space = gym.spaces.Discrete(BOARD_SIZE**2)
         self.observation_space = gym.spaces.Box(
-            low=0, high=1, shape=(BOARD_SIZE, BOARD_SIZE), dtype=np.int32
+            low=-1, high=1, shape=(BOARD_SIZE, BOARD_SIZE), dtype=np.int32
         )
 
     def reset(self):
@@ -120,6 +120,8 @@ while not done:
 
     action = int(input("Choose an action (0-8): "))
     observation, reward, done, _ = env.step(action)
+    print(observation)
+    print(env.observation_space)
 
     if reward == -10:
         print("Invalid move. Try again.")
