@@ -64,8 +64,12 @@ class GameField:
         pass
 
 
-if __name__ == "__main__":
+def main():
     f = GameField()
     print(f.field)
+
+
+if __name__ == "__main__":
+    main()
     # print(len(f.field), "*", len(f.field[0]))
     # print(f.pieces_A)
