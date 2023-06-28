@@ -129,12 +129,23 @@ class Game(gym.Env):
         self.used = []
         self.set_cell_property("castle")
         [self.set_cell_property("pond") for _ in range(pond_count)]
-        self.workers_A=[self.set_worker_position("worker_A", i + 1) for i in range(self.worker_count)]
-        self.workers_B=[self.set_worker_position("worker_B", i + 1) for i in range(self.worker_count)]
+        self.workers_A = [
+            self.set_worker_position("worker_A", i + 1)
+            for i in range(self.worker_count)
+        ]
+        self.workers_B = [
+            self.set_worker_position("worker_B", i + 1)
+            for i in range(self.worker_count)
+        ]
         return self.board
 
-    def worker_action(self,worker:Worker,action):
-        self.CELL.index(worker.team)
+    def compile_layers(self, *layers):
+        return np.sum(
+            [self.board[:, :, self.CELL.index(layer)] for layer in layers], axis=0
+        )
+
+    # def worker_action(self, worker: Worker, action):
+    #     self.board[self.CELL.index(worker.team)]
 
     def step(self, action):
         pass
@@ -168,4 +179,5 @@ done = False
 #             pygame.quit()
 
 print(f"width:{env.width}, height:{env.height}, workers:{env.worker_count}")
-env.render()
+# env.render()
+print(env.compile_layers("pond", "worker_A", "worker_B"))
