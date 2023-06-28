@@ -107,9 +107,9 @@ class Game(gym.Env):
             )
             if (x, y) not in self.used:
                 break
-        self.board[x][y][self.CELL.index(target)] = count
-        if any(self.board[x][y][1:]):
-            self.board[x][y][0] = 0
+        self.board[x, y, self.CELL.index(target)] = count
+        if any(self.board[x, y, 1:]):
+            self.board[x, y, 0] = 0
         self.used.append((x, y))
         return x, y
 
@@ -155,7 +155,9 @@ class Game(gym.Env):
         for y in range(self.height):
             for x in range(self.width):
                 view[y][x] = [
-                    self.CELL[i] for i, item in enumerate(self.board[x][y]) if item >= 1
+                    self.CELL[i]
+                    for i, item in enumerate(self.board[x, y, :])
+                    if item >= 1
                 ]
         print(np.array(view))
 
