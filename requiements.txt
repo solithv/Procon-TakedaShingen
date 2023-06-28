@@ -6,4 +6,6 @@ pygame
 pillow
 opencv-python
 matplotlib
+
+
 scipy
