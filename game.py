@@ -28,15 +28,21 @@ class Worker:
             self.x = x
             self.y = y
             self.action_log.append("move", (x, y))
+            self.is_action = True
             return True
         else:
             return False
 
     def build(self, x, y):
         self.action_log.append("build", (x, y))
+        self.is_action = True
 
     def break_(self, x, y):
-        self.action_log.append("build", (x, y))
+        self.action_log.append("break", (x, y))
+        self.is_action = True
+
+    def turn_init(self):
+        self.is_action = False
 
 
 class Game(gym.Env):
@@ -105,10 +111,10 @@ class Game(gym.Env):
         if any(self.board[x][y][1:]):
             self.board[x][y][0] = 0
         self.used.append((x, y))
-        return x,y
+        return x, y
 
     def set_worker_position(self, target, count):
-        x,y=self.set_cell_property(target,count)
+        x, y = self.set_cell_property(target, count)
         return Worker(target, x, y)
 
     def reset(self):
@@ -123,9 +129,12 @@ class Game(gym.Env):
         self.used = []
         self.set_cell_property("castle")
         [self.set_cell_property("pond") for _ in range(pond_count)]
-        [self.set_worker_position("worker_A", i + 1) for i in range(self.worker_count)]
-        [self.set_worker_position("worker_B", i + 1) for i in range(self.worker_count)]
+        self.workers_A=[self.set_worker_position("worker_A", i + 1) for i in range(self.worker_count)]
+        self.workers_B=[self.set_worker_position("worker_B", i + 1) for i in range(self.worker_count)]
         return self.board
+
+    def worker_action(self,worker:Worker,action):
+        self.CELL.index(worker.team)
 
     def step(self, action):
         pass
