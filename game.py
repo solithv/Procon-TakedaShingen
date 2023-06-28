@@ -156,53 +156,33 @@ CELL.index(target)] = count
         pygame.display.set_caption("game")
 
         window_surface.fill(WHITE)
-            
+        
         for i in range(self.height):
             for j in range(self.width):
-                if view[i][j] == "castle":
-                    pygame.draw.rect(
-                        window_surface,
-                        YELLOW,
-                        (
-                            j * self.CELL_SIZE,
-                            i * self.CELL_SIZE,
-                            self.CELL_SIZE,
-                            self.CELL_SIZE
-                        )
-                        )
-                if view[i][j] == "worker_A":
-                    pygame.draw.rect(
-                        window_surface,
-                        RED,
-                        (
-                            j * self.CELL_SIZE,
-                            i * self.CELL_SIZE,
-                            self.CELL_SIZE,
-                            self.CELL_SIZE
-                        )
-                        )
-                if view[i][j] == "worker_B":
-                    pygame.draw.rect(
-                        window_surface,
-                        BLUE,
-                        (
-                            j * self.CELL_SIZE,
-                            i * self.CELL_SIZE,
-                            self.CELL_SIZE,
-                            self.CELL_SIZE
-                        )
-                        )
-                if view[i][j] == "pond":
-                    pygame.draw.rect(
-                        window_surface,
-                        GREEN,
-                        (
-                            j * self.CELL_SIZE,
-                            i * self.CELL_SIZE,
-                            self.CELL_SIZE,
-                            self.CELL_SIZE
-                        )
-                        )
+                cellPlacement = (
+                    j * self.CELL_SIZE,
+                    i * self.CELL_SIZE,
+                    self.CELL_SIZE,
+                    self.CELL_SIZE
+                )
+                cellInfo = view[i][j]
+        
+                if cellInfo == "castle":
+                    color = YELLOW
+                elif cellInfo == "worker_A":
+                    color = RED
+                elif cellInfo == "worker_B":
+                    color = BLUE
+                elif cellInfo == "pond":
+                    color = GREEN
+                else:
+                    color = WHITE
+                
+                pygame.draw.rect(
+                    window_surface,
+                    color,
+                    cellPlacement
+                )
         
         # 縦線描画
         for i in range(1, self.width):
