@@ -11,39 +11,6 @@ GREEN = (0, 255, 0)
 BLUE = (0, 0, 255)
 YELLOW = (255, 255, 0)
 
-CELL_SIZE = 32
-CELL = (
-    "blank",  # 論理反転
-    "position_A",
-    "position_B",
-    "open_position_A",
-    "open_position_B",
-    "rampart_A",
-    "rampart_B",
-    "castle",
-    "pond",
-    "worker_A",
-    "worker_B",
-)
-ACTIONS = (
-    "move_N",
-    "move_NE",
-    "move_E",
-    "move_SE",
-    "move_S",
-    "move_SW",
-    "move_W",
-    "move_NW",
-    "build_N",
-    "build_E",
-    "build_S",
-    "build_W",
-    "break_N",
-    "break_E",
-    "break_S",
-    "break_W",
-)
-
 class Worker:
     def __init__(
         self,
@@ -75,6 +42,39 @@ class Worker:
 
 class Game(gym.Env):
 
+    CELL_SIZE = 32
+    CELL = (
+        "blank",  # 論理反転
+        "position_A",
+        "position_B",
+        "open_position_A",
+        "open_position_B",
+        "rampart_A",
+        "rampart_B",
+        "castle",
+        "pond",
+        "worker_A",
+        "worker_B",
+    )
+    ACTIONS = (
+        "move_N",
+        "move_NE",
+        "move_E",
+        "move_SE",
+        "move_S",
+        "move_SW",
+        "move_W",
+        "move_NW",
+        "build_N",
+        "build_E",
+        "build_S",
+        "build_W",
+        "break_N",
+        "break_E",
+        "break_S",
+        "break_W",
+    )
+
     def __init__(self):
         super().__init__()
         self.width = random.randint(11, 25)
@@ -84,20 +84,22 @@ class Game(gym.Env):
         self.board = np.dstack(
             [
                 np.ones((self.width, self.height)),
-                np.zeros((self.width, self.height, len(CELL) - 1)),
+                np.zeros((self.width, self.height, len(self.
+        CELL) - 1)),
             ]
         )
-        self.action_space = gym.spaces.Discrete(len(ACTIONS))
+        self.action_space = gym.spaces.Discrete(len(self.ACTIONS))
         self.observation_space = gym.spaces.Box(
             low=0,
             high=1,
-            shape=(self.width, self.height, len(CELL)),
+            shape=(self.width, self.height, len(self.
+    CELL)),
             dtype=np.int8,
         )
         
-        self.window_size = max(self.width, self.height) * CELL_SIZE
-        self.window_size_x = self.width * CELL_SIZE
-        self.window_size_y = self.height * CELL_SIZE
+        self.window_size = max(self.width, self.height) * self.CELL_SIZE
+        self.window_size_x = self.width * self.CELL_SIZE
+        self.window_size_y = self.height * self.CELL_SIZE
 
     def set_cell_property(self, target, count=1):
         while True:
@@ -106,7 +108,8 @@ class Game(gym.Env):
             )
             if (x, y) not in self.used:
                 break
-        self.board[x][y][CELL.index(target)] = count
+        self.board[x][y][self.
+CELL.index(target)] = count
         if any(self.board[x][y][1:]):
             self.board[x][y][0] = 0
         self.used.append((x, y))
@@ -121,7 +124,8 @@ class Game(gym.Env):
         self.board = np.dstack(
             [
                 np.ones((self.width, self.height)),
-                np.zeros((self.width, self.height, len(CELL) - 1)),
+                np.zeros((self.width, self.height, len(self.
+        CELL) - 1)),
             ]
         )
         pond_count = np.random.randint(1, 5)
@@ -140,7 +144,8 @@ class Game(gym.Env):
         for y in range(self.height):
             for x in range(self.width):
                 view[y][x] = [
-                    CELL[i] for i, item in enumerate(self.board[x][y]) if item >= 1
+                    self.
+            CELL[i] for i, item in enumerate(self.board[x][y]) if item >= 1
                 ]
         
         view = np.array(view)
@@ -159,10 +164,10 @@ class Game(gym.Env):
                         window_surface,
                         YELLOW,
                         (
-                            j * CELL_SIZE,
-                            i * CELL_SIZE,
-                            CELL_SIZE,
-                            CELL_SIZE
+                            j * self.CELL_SIZE,
+                            i * self.CELL_SIZE,
+                            self.CELL_SIZE,
+                            self.CELL_SIZE
                         )
                         )
                 if view[i][j] == "worker_A":
@@ -170,10 +175,10 @@ class Game(gym.Env):
                         window_surface,
                         RED,
                         (
-                            j * CELL_SIZE,
-                            i * CELL_SIZE,
-                            CELL_SIZE,
-                            CELL_SIZE
+                            j * self.CELL_SIZE,
+                            i * self.CELL_SIZE,
+                            self.CELL_SIZE,
+                            self.CELL_SIZE
                         )
                         )
                 if view[i][j] == "worker_B":
@@ -181,10 +186,10 @@ class Game(gym.Env):
                         window_surface,
                         BLUE,
                         (
-                            j * CELL_SIZE,
-                            i * CELL_SIZE,
-                            CELL_SIZE,
-                            CELL_SIZE
+                            j * self.CELL_SIZE,
+                            i * self.CELL_SIZE,
+                            self.CELL_SIZE,
+                            self.CELL_SIZE
                         )
                         )
                 if view[i][j] == "pond":
@@ -192,10 +197,10 @@ class Game(gym.Env):
                         window_surface,
                         GREEN,
                         (
-                            j * CELL_SIZE,
-                            i * CELL_SIZE,
-                            CELL_SIZE,
-                            CELL_SIZE
+                            j * self.CELL_SIZE,
+                            i * self.CELL_SIZE,
+                            self.CELL_SIZE,
+                            self.CELL_SIZE
                         )
                         )
         
@@ -204,8 +209,8 @@ class Game(gym.Env):
             pygame.draw.line(
                 window_surface,
                 BLACK,
-                (i * CELL_SIZE, 0),
-                (i * CELL_SIZE, self.window_size_y),
+                (i * self.CELL_SIZE, 0),
+                (i * self.CELL_SIZE, self.window_size_y),
                 1,
             )
         # 横線描画
@@ -213,8 +218,8 @@ class Game(gym.Env):
             pygame.draw.line(
                 window_surface,
                 BLACK,
-                (0, i * CELL_SIZE),
-                (self.window_size_x, i * CELL_SIZE),
+                (0, i * self.CELL_SIZE),
+                (self.window_size_x, i * self.CELL_SIZE),
                 1,
             )
             
