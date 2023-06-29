@@ -11,17 +11,11 @@ YELLOW = (255, 255, 0)
 
 
 class Worker:
-    def __init__(
-        self,
-        name,
-        x,
-        y,
-        num,
-    ):
+    def __init__(self, name, y, x, num):
         self.name = name
         self.team = name[-1]
-        self.x = x
         self.y = y
+        self.x = x
         self.num = num
         self.is_action = False
         self.action_log = []
@@ -119,9 +113,8 @@ class Game(gym.Env):
     def set_cell_property(self, target, count=1, coordinates=None):
         if not coordinates:
             while True:
-                y, x = np.random.randint(0, self.height - 1), np.random.randint(
-                    0, self.width - 1
-                )
+                y = np.random.randint(0, self.height - 1)
+                x = np.random.randint(0, self.width - 1)
                 if (y, x) not in self.used:
                     break
         else:
@@ -216,19 +209,11 @@ class Game(gym.Env):
         y, x = np.array([worker.y, worker.x]) + direction
         if "move" in self.ACTIONS[action] and self.is_movable(worker, action):
             self.board[self.CELL.index(worker.name), worker.y, worker.x] = 0
-            self.board[
-                self.CELL.index(worker.name),
-                y,
-                x,
-            ] = worker.num
+            self.board[self.CELL.index(worker.name), y, x] = worker.num
             worker.move(y, x)
 
         elif "build" in self.ACTIONS[action] and self.is_buildable(worker, action):
-            self.board[
-                self.CELL.index(f"rampart_{worker.team}"),
-                y,
-                x,
-            ] = 1
+            self.board[self.CELL.index(f"rampart_{worker.team}"), y, x] = 1
             worker.build(y, x)
 
         elif "break" in self.ACTIONS[action] and self.is_breakable(worker, action):
@@ -263,6 +248,7 @@ class Game(gym.Env):
         self.score_A += np.sum(
             self.board[self.CELL.index("rampart_A")] * self.SCORE_MULTIPLIER["rampart"]
         )
+
         self.score_B = np.sum(
             self.board[self.CELL.index("castle")]
             * self.compile_layers("position_B", "open_position_B")
@@ -276,18 +262,21 @@ class Game(gym.Env):
         self.score_B += np.sum(
             self.board[self.CELL.index("rampart_B")] * self.SCORE_MULTIPLIER["rampart"]
         )
+
         print(f"score_A:{self.score_A}, score_B:{self.score_B}")
 
     def get_reward(self, success_actions):
         """報酬更新処理実装予定"""
-        pass
+        if not success_actions:
+            return np.NINF
 
     def is_done(self):
+        """ゲーム終了判定実装予定"""
         if self.turn >= self.end_turn:
             self.done = True
 
     def step(self, actions):
-        assert self.worker_count == len(actions), "input error"
+        assert self.worker_count == len(actions), "input length error"
         success_actions = all(
             [
                 self.worker_action(worker, action)
