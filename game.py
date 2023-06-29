@@ -16,10 +16,12 @@ class Worker:
         team,
         x,
         y,
+        num,
     ):
         self.team = team
         self.x = x
         self.y = y
+        self.num = num
         self.is_action = False
         self.action_log = []
 
@@ -78,7 +80,7 @@ class Game(gym.Env):
         "break_S",
         "break_W",
     )
-    DIRECTION = {
+    DIRECTIONS = {
         "N": np.array([-1, 0]),
         "E": np.array([0, 1]),
         "S": np.array([1, 0]),
@@ -90,13 +92,9 @@ class Game(gym.Env):
         self.width = random.randint(11, 25)
         self.height = random.randint(11, 25)
         self.worker_count = random.randint(2, 6)
+        self.pond_count = np.random.randint(1, 5)
         self.current_player = 1
-        self.board = np.vstack(
-            [
-                np.ones((1, self.height, self.width)),
-                np.zeros((len(self.CELL) - 1, self.height, self.width)),
-            ]
-        )
+        self.board = np.zeros((len(self.CELL), self.height, self.width))
         self.action_space = gym.spaces.Discrete(len(self.ACTIONS))
         self.observation_space = gym.spaces.Box(
             low=0,
@@ -114,27 +112,24 @@ class Game(gym.Env):
             if (x, y) not in self.used:
                 break
         self.board[self.CELL.index(target), y, x] = count
-        if self.board[1:, y, x].any():
-            self.board[0, y, x] = 0
+        # if self.board[1:, y, x].any():
+        #     self.board[0, y, x] = 0
         self.used.append((x, y))
         return x, y
 
     def set_worker_position(self, target, count):
         x, y = self.set_cell_property(target, count)
-        return Worker(target, x, y)
+        return Worker(target, x, y, count)
+
+    def update_blank(self):
+        self.board[0] = 1 - self.board[1:].any(axis=0)
 
     def reset(self):
         self.current_player = 1
-        self.board = np.vstack(
-            [
-                np.ones((1, self.height, self.width)),
-                np.zeros((len(self.CELL) - 1, self.height, self.width)),
-            ]
-        )
-        pond_count = np.random.randint(1, 5)
+        self.board = np.zeros((len(self.CELL), self.height, self.width))
         self.used = []
         self.set_cell_property("castle")
-        [self.set_cell_property("pond") for _ in range(pond_count)]
+        [self.set_cell_property("pond") for _ in range(self.pond_count)]
         self.workers_A = [
             self.set_worker_position("worker_A", i + 1)
             for i in range(self.worker_count)
@@ -143,15 +138,47 @@ class Game(gym.Env):
             self.set_worker_position("worker_B", i + 1)
             for i in range(self.worker_count)
         ]
+        self.update_blank()
         return self.board
 
     def compile_layers(self, *layers):
-        return np.sum(
-            [self.board[self.CELL.index(layer), :, :] for layer in layers], axis=0
-        )
+        return np.sum([self.board[self.CELL.index(layer)] for layer in layers], axis=0)
 
-    # def worker_action(self, worker: Worker, action):
-    #     self.board[self.CELL.index(worker.team)]
+    def is_movable(self, worker, action):
+        pass
+
+    def get_direction(self, action):
+        direction = np.zeros(2)
+        if "N" in self.ACTIONS[action]:
+            direction += self.DIRECTIONS["N"]
+        if "E" in self.ACTIONS[action]:
+            direction += self.DIRECTIONS["E"]
+        if "S" in self.ACTIONS[action]:
+            direction += self.DIRECTIONS["S"]
+        if "W" in self.ACTIONS[action]:
+            direction += self.DIRECTIONS["W"]
+        return direction
+
+    def worker_action(self, worker: Worker, action):
+        if "move" in self.ACTIONS[action]:
+            if self.is_movable(worker, action):
+                direction = self.get_direction(action)
+                self.board[self.CELL.index(worker.team), worker.y, worker.x] = 0
+                self.board[
+                    self.CELL.index(worker.team),
+                    worker.y + direction[0],
+                    worker.x + direction[1],
+                ] = worker.num
+
+        elif "build" in self.ACTIONS[action]:
+            if self.is_buildable(worker, action):
+                direction = self.get_direction(action)
+
+        elif "break" in self.ACTIONS[action]:
+            if self.is_breakable(worker, action):
+                direction = self.get_direction(action)
+
+        self.update_blank()
 
     def step(self, action):
         pass
@@ -188,4 +215,5 @@ done = False
 
 print(f"width:{env.width}, height:{env.height}, workers:{env.worker_count}")
 # env.render()
+print(env.board[0])
 print(env.compile_layers("pond", "worker_A", "worker_B"))
