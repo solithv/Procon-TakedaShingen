@@ -24,22 +24,22 @@ class Worker:
         self.is_action = False
         self.action_log = []
 
-    def move(self, x, y):
+    def move(self, y, x):
         if self.x - 1 <= x <= self.x + 1 and self.y - 1 <= y <= self.y + 1:
             self.x = x
             self.y = y
-            self.action_log.append("move", (x, y))
+            self.action_log.append("move", (y, x))
             self.is_action = True
             return True
         else:
             return False
 
-    def build(self, x, y):
-        self.action_log.append("build", (x, y))
+    def build(self, y, x):
+        self.action_log.append("build", (y, x))
         self.is_action = True
 
-    def break_(self, x, y):
-        self.action_log.append("break", (x, y))
+    def break_(self, y, x):
+        self.action_log.append("break", (y, x))
         self.is_action = True
 
     def turn_init(self):
@@ -88,18 +88,19 @@ class Game(gym.Env):
     }
     SCORE_MULTIPLIER = {"castle": 100, "position": 50, "rampart": 10}
 
-    def __init__(self, end_turn=10, width=None, height=None, worker=None, pond=None):
+    def __init__(self, end_turn=10, width=None, height=None, pond=None, worker=None):
         super().__init__()
         self.end_turn = end_turn
         self.width = width or np.random.randint(11, 25)
         self.height = height or np.random.randint(11, 25)
-        self.worker_count = worker or np.random.randint(2, 6)
         self.pond_count = pond or np.random.randint(1, 5)
+        self.worker_count = worker or np.random.randint(2, 6)
         self.current_player = 1
-        self.board = np.zeros((len(self.CELL), self.height, self.width))
         self.score_A, self.score_B = 0, 0
+        self.previous_score_A, self.previous_score_B = 0, 0
         self.turn = 0
         self.done = False
+        self.board = np.zeros((len(self.CELL), self.height, self.width))
 
         self.action_space = gym.spaces.Discrete(len(self.ACTIONS))
         self.observation_space = gym.spaces.Box(
@@ -127,14 +128,17 @@ class Game(gym.Env):
 
     def set_worker_position(self, target, count, coordinates=None):
         y, x = self.set_cell_property(target, count, coordinates)
-        return Worker(target, x, y, count)
+        return Worker(target, y, x, count)
 
     def update_blank(self):
         self.board[0] = 1 - self.board[1:].any(axis=0)
 
     def reset(self, castle=None, pond=None, worker_A=None, worker_B=None):
         self.current_player = 1
+        self.score_A, self.score_B = 0, 0
+        self.previous_score_A, self.previous_score_B = 0, 0
         self.turn = 0
+        self.done = False
         self.board = np.zeros((len(self.CELL), self.height, self.width))
         self.used = []
 
@@ -210,6 +214,7 @@ class Game(gym.Env):
                 y,
                 x,
             ] = worker.num
+            worker.move(y, x)
 
         elif "build" in self.ACTIONS[action] and self.is_buildable(worker, action):
             self.board[
@@ -217,14 +222,21 @@ class Game(gym.Env):
                 y,
                 x,
             ] = 1
+            worker.build(y, x)
 
         elif "break" in self.ACTIONS[action] and self.is_breakable(worker, action):
             if self.board[self.CELL.index("rampart_A"), y, x]:
                 self.board[self.CELL.index("rampart_A"), y, x] = 0
             else:
                 self.board[self.CELL.index("rampart_B"), y, x] = 0
+            worker.break_(y, x)
+
+        else:
+            print("行動できない入力です")
+            return False
 
         self.update_blank()
+        return True
 
     def update_open_position(self):
         pass
@@ -256,21 +268,32 @@ class Game(gym.Env):
         self.score_B += np.sum(
             self.board[self.CELL.index("rampart_B")] * self.SCORE_MULTIPLIER["rampart"]
         )
+        print(f"score_A:{self.score_A}, score_B:{self.score_B}")
+
+    def get_reward(self, success_actions):
+        pass
 
     def is_done(self):
-        if not self.turn >= self.end_turn:
+        if self.turn >= self.end_turn:
             self.done = True
 
     def step(self, actions):
         assert self.worker_count == len(actions), "input error"
-        for worker, action in zip(
-            self.workers_A if self.current_player > 0 else self.workers_B, actions
-        ):
-            self.worker_action(worker, action)
+        success_actions = all(
+            [
+                self.worker_action(worker, action)
+                for worker, action in zip(
+                    self.workers_A if self.current_player > 0 else self.workers_B,
+                    actions,
+                )
+            ]
+        )
         self.current_player = -self.current_player
         self.turn += 1
         self.calculate_score()
+        reward = self.get_reward(success_actions)
         self.is_done()
+        return self.board, reward, self.done, {}
 
     def render(self):
         view = [["" for _ in range(self.width)] for _ in range(self.height)]
@@ -288,21 +311,21 @@ env = Game()
 
 observation = env.reset()
 done = False
+print(f"width:{env.width}, height:{env.height}, workers:{env.worker_count}")
 
 while not done:
     env.render()
 
-    action = int(input("Choose an action (0-8): "))
-    observation, reward, done, _ = env.step(action)
+    print(f"input team A actions (need {env.worker_count} input) : ")
+    actions = [int(input()) for _ in range(env.worker_count)]
+    observation, reward, done, _ = env.step(actions)
 
-    if reward == -10:
-        print("Invalid move. Try again.")
+    print(f"input team B actions (need {env.worker_count} input) : ")
+    actions = [int(input()) for _ in range(env.worker_count)]
+    observation, reward, done, _ = env.step(actions)
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             pygame.quit()
 
-print(f"width:{env.width}, height:{env.height}, workers:{env.worker_count}")
 # env.render()
-print(env.board[0])
-print(env.compile_layers("pond", "worker_A", "worker_B"))
