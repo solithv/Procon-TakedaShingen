@@ -230,11 +230,50 @@ class Game(gym.Env):
         self.update_blank()
         return True
 
+    def fill_area(self, array):
+        array = np.where(array, 0, 1)
+        # 配列の形状を取得
+        rows, cols = array.shape
+
+        def dfs(row, col):
+            # 配列の外周に達した場合、再帰を終了
+            if not (0 <= row < rows and 0 <= col < cols):
+                return
+
+            # すでに探索済みの要素や外周の要素は処理しない
+            if array[row, col] != 1:
+                return
+
+            # 1を2に置換
+            array[row, col] = 2
+
+            # 上下左右の要素を再帰的に探索
+            dfs(row - 1, col)  # 上
+            dfs(row + 1, col)  # 下
+            dfs(row, col - 1)  # 左
+            dfs(row, col + 1)  # 右
+
+        # 外周の上下左右の要素を探索
+        for i in range(cols):
+            dfs(0, i)  # 上辺
+            dfs(rows - 1, i)  # 下辺
+        for i in range(rows):
+            dfs(i, 0)  # 左辺
+            dfs(i, cols - 1)  # 右辺
+
+        return np.where(array == 1, 1, 0)
+
     def update_open_position(self):
-        """開放陣地更新処理実装予定"""
-        pass
+        self.board[self.CELL.index("open_position_A")] = self.fill_area(
+            self.board[self.CELL.index("position_A")]
+        )
+        self.board[self.CELL.index("open_position_B")] = self.fill_area(
+            self.board[self.CELL.index("position_B")]
+        )
 
     def calculate_score(self):
+        self.previous_score_A, self.previous_score_B = self.score_A, self.score_B
+
         self.score_A = np.sum(
             self.board[self.CELL.index("castle")]
             * self.compile_layers("position_A", "open_position_A")
