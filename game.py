@@ -85,17 +85,17 @@ class Game(gym.Env):
         self.height = random.randint(11, 25)
         self.worker_count = random.randint(2, 6)
         self.current_player = 1
-        self.board = np.dstack(
+        self.board = np.vstack(
             [
-                np.ones((self.width, self.height)),
-                np.zeros((self.width, self.height, len(self.CELL) - 1)),
+                np.ones((1, self.height, self.width)),
+                np.zeros((len(self.CELL) - 1, self.height, self.width)),
             ]
         )
         self.action_space = gym.spaces.Discrete(len(self.ACTIONS))
         self.observation_space = gym.spaces.Box(
             low=0,
             high=1,
-            shape=(self.width, self.height, len(self.CELL)),
+            shape=(len(self.CELL), self.height, self.width),
             dtype=np.int8,
         )
         self.window_size = max(self.width, self.height) * self.CELL_SIZE
@@ -107,9 +107,9 @@ class Game(gym.Env):
             )
             if (x, y) not in self.used:
                 break
-        self.board[x, y, self.CELL.index(target)] = count
-        if any(self.board[x, y, 1:]):
-            self.board[x, y, 0] = 0
+        self.board[self.CELL.index(target), y, x] = count
+        if self.board[1:, y, x].any():
+            self.board[0, y, x] = 0
         self.used.append((x, y))
         return x, y
 
@@ -119,10 +119,10 @@ class Game(gym.Env):
 
     def reset(self):
         self.current_player = 1
-        self.board = np.dstack(
+        self.board = np.vstack(
             [
-                np.ones((self.width, self.height)),
-                np.zeros((self.width, self.height, len(self.CELL) - 1)),
+                np.ones((1, self.height, self.width)),
+                np.zeros((len(self.CELL) - 1, self.height, self.width)),
             ]
         )
         pond_count = np.random.randint(1, 5)
@@ -141,7 +141,7 @@ class Game(gym.Env):
 
     def compile_layers(self, *layers):
         return np.sum(
-            [self.board[:, :, self.CELL.index(layer)] for layer in layers], axis=0
+            [self.board[self.CELL.index(layer), :, :] for layer in layers], axis=0
         )
 
     # def worker_action(self, worker: Worker, action):
