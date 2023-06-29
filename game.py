@@ -188,12 +188,15 @@ class Game(gym.Env):
         return np.sum([self.board[self.CELL.index(layer)] for layer in layers], axis=0)
 
     def is_movable(self, worker, action):
+        """移動判定実装予定"""
         pass
 
     def is_buildable(self, worker, action):
+        """建築判定実装予定"""
         pass
 
     def is_breakable(self, worker, action):
+        """破壊判定実装予定"""
         pass
 
     def get_direction(self, action):
@@ -243,6 +246,7 @@ class Game(gym.Env):
         return True
 
     def update_open_position(self):
+        """開放陣地更新処理実装予定"""
         pass
 
     def calculate_score(self):
@@ -275,6 +279,7 @@ class Game(gym.Env):
         print(f"score_A:{self.score_A}, score_B:{self.score_B}")
 
     def get_reward(self, success_actions):
+        """報酬更新処理実装予定"""
         pass
 
     def is_done(self):
@@ -369,19 +374,6 @@ env = Game()
 
 observation = env.reset()
 done = False
-
-# while not done:
-#     env.render()
-
-#     action = int(input("Choose an action (0-8): "))
-#     observation, reward, done, _ = env.step(action)
-
-#     if reward == -10:
-#         print("Invalid move. Try again.")
-
-#     for event in pygame.event.get():
-#         if event.type == pygame.QUIT:
-#             pygame.quit()
 
 print(f"width:{env.width}, height:{env.height}, workers:{env.worker_count}")
 
