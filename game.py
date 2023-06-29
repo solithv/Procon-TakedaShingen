@@ -147,7 +147,71 @@ class Game(gym.Env):
                     self.CELL[i] for i, item in enumerate(self.board[x][y]) if item >= 1
                 ]
         print(np.array(view))
+    
+    def judge_move(self,worker_pos,move):
+        direct = np.array(0,0)
+        compass = {"N": np.array((0,-1)),
+                  "W": np.array((-1,0)),
+                  "S": np.array((0,1)),
+                  "E": np.array((1,0))}
+        if "N" in self.ACTIONS[move]:
+            direct += compass["N"]
+        if "W" in self.ACTIONS[move]:
+            direct += compass["W"]
+        if "S" in self.ACTIONS[move]:
+            direct += compass["S"]
+        if "E" in self.ACTIONS[move]:
+            direct += compass["E"]
+        direct += np.array(worker_pos)
 
+        if (direct[0] >= 0) and (direct[1] >= 0):
+            if not "rampart" in self.board[direct[0]][direct[1]]:
+                if not "worker" in self.board[direct[0]][direct[1]]:    
+                    if not "pond" in self.board[direct[0]][direct[1]]:
+                        return True
+        return False
+    
+    def judge_build(self,worker_pos,build):
+        direct = np.array(0,0)
+        compass = {"N": np.array((0,-1)),
+                  "W": np.array((-1,0)),
+                  "S": np.array((0,1)),
+                  "E": np.array((1,0))}
+        if "N" in self.ACTIONS[build]:
+            direct += compass["N"]
+        if "W" in self.ACTIONS[build]:
+            direct += compass["W"]
+        if "S" in self.ACTIONS[build]:
+            direct += compass["S"]
+        if "E" in self.ACTIONS[build]:
+            direct += compass["E"]
+        direct += np.array(worker_pos)
+
+        if (direct[0] >= 0) and (direct[1] >= 0):
+            if not "rampart" in self.board[direct[0]][direct[1]]:
+                if not "worker" in self.board[direct[0]][direct[1]]:
+                    return True
+        return False
+    
+    def judge_destroy(self,worker_pos,destroy):
+        direct = np.array(0,0)
+        compass = {"N": np.array((0,-1)),
+                  "W": np.array((-1,0)),
+                  "S": np.array((0,1)),
+                  "E": np.array((1,0))}
+        if "N" in self.ACTIONS[destroy]:
+            direct += compass["N"]
+        if "W" in self.ACTIONS[destroy]:
+            direct += compass["W"]
+        if "S" in self.ACTIONS[destroy]:
+            direct += compass["S"]
+        if "E" in self.ACTIONS[destroy]:
+            direct += compass["E"]
+        direct += np.array(worker_pos)
+
+        if not "rampart" in self.board[direct[0]][direct[1]]:
+            return True
+        return False 
 
 env = Game()
 
