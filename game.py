@@ -156,7 +156,7 @@ class Game(gym.Env):
             for x in range(self.width):
                 view[y][x] = [
                     self.CELL[i]
-                    for i, item in enumerate(self.board[x, y, :])
+                    for i, item in enumerate(self.board[:, y, x])
                     if item >= 1
                 ]
         print(np.array(view))
