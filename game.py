@@ -78,6 +78,12 @@ class Game(gym.Env):
         "break_S",
         "break_W",
     )
+    DIRECTION = {
+        "N": np.array([-1, 0]),
+        "E": np.array([0, 1]),
+        "S": np.array([1, 0]),
+        "W": np.array([0, -1]),
+    }
 
     def __init__(self):
         super().__init__()
