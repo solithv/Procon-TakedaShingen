@@ -5,7 +5,9 @@ import pygame
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 RED = (255, 0, 0)
+GREEN = (0, 255, 0)
 BLUE = (0, 0, 255)
+YELLOW = (255, 255, 0)
 
 
 class Worker:
@@ -47,7 +49,7 @@ class Worker:
 
 
 class Game(gym.Env):
-    CELL_SIZE = 100
+    CELL_SIZE = 32
     CELL = (
         "blank",  # 論理反転
         "position_A",
@@ -111,6 +113,8 @@ class Game(gym.Env):
         )
         self.reward_range = [np.NINF, np.inf]
         self.window_size = max(self.width, self.height) * self.CELL_SIZE
+        self.window_size_x = self.width * self.CELL_SIZE
+        self.window_size_y = self.height * self.CELL_SIZE
 
     def set_cell_property(self, target, count=1, coordinates=None):
         if not coordinates:
@@ -304,13 +308,81 @@ class Game(gym.Env):
                     for i, item in enumerate(self.board[:, y, x])
                     if item >= 1
                 ]
-        print(np.array(view))
+
+        view = np.array(view)
+        # print(view)
+
+        pygame.init()
+        window_surface = pygame.display.set_mode(
+            (self.window_size_x, self.window_size_y)
+        )
+        pygame.display.set_caption("game")
+
+        window_surface.fill(WHITE)
+
+        for i in range(self.height):
+            for j in range(self.width):
+                cellPlacement = (
+                    j * self.CELL_SIZE,
+                    i * self.CELL_SIZE,
+                    self.CELL_SIZE,
+                    self.CELL_SIZE,
+                )
+                cellInfo = view[i][j]
+
+                if cellInfo == "castle":
+                    color = YELLOW
+                elif cellInfo == "worker_A":
+                    color = RED
+                elif cellInfo == "worker_B":
+                    color = BLUE
+                elif cellInfo == "pond":
+                    color = GREEN
+                else:
+                    color = WHITE
+
+                pygame.draw.rect(window_surface, color, cellPlacement)
+
+        # 縦線描画
+        for i in range(1, self.width):
+            pygame.draw.line(
+                window_surface,
+                BLACK,
+                (i * self.CELL_SIZE, 0),
+                (i * self.CELL_SIZE, self.window_size_y),
+                1,
+            )
+        # 横線描画
+        for i in range(1, self.height):
+            pygame.draw.line(
+                window_surface,
+                BLACK,
+                (0, i * self.CELL_SIZE),
+                (self.window_size_x, i * self.CELL_SIZE),
+                1,
+            )
+
+        pygame.display.update()
 
 
 env = Game()
 
 observation = env.reset()
 done = False
+
+# while not done:
+#     env.render()
+
+#     action = int(input("Choose an action (0-8): "))
+#     observation, reward, done, _ = env.step(action)
+
+#     if reward == -10:
+#         print("Invalid move. Try again.")
+
+#     for event in pygame.event.get():
+#         if event.type == pygame.QUIT:
+#             pygame.quit()
+
 print(f"width:{env.width}, height:{env.height}, workers:{env.worker_count}")
 
 while not done:
