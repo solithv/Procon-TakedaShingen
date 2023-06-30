@@ -89,14 +89,19 @@ class Game(gym.Env):
         "W": np.array([0, -1]),
     }
     SCORE_MULTIPLIER = {"castle": 100, "position": 50, "rampart": 10}
+    POND_MIN, POND_MAX = 1, 5
+    FIELD_MIN, FIELD_MAX = 11, 25
+    WORKER_MIN, WORKER_MAX = 2, 6
 
     def __init__(self, end_turn=10, width=None, height=None, pond=None, worker=None):
         super().__init__()
         self.end_turn = end_turn
-        self.width = width or np.random.randint(11, 25)
-        self.height = height or np.random.randint(11, 25)
-        self.pond_count = pond or np.random.randint(1, 5)
-        self.worker_count = worker or np.random.randint(2, 6)
+        self.width = width or np.random.randint(self.FIELD_MIN, self.FIELD_MAX)
+        self.height = height or np.random.randint(self.FIELD_MIN, self.FIELD_MAX)
+        self.pond_count = pond or np.random.randint(self.POND_MIN, self.POND_MAX)
+        self.worker_count = worker or np.random.randint(
+            self.WORKER_MIN, self.WORKER_MAX
+        )
         self.current_player = 1
         self.score_A, self.score_B = 0, 0
         self.previous_score_A, self.previous_score_B = 0, 0
@@ -144,6 +149,10 @@ class Game(gym.Env):
         self.done = False
         self.board = np.zeros((len(self.CELL), self.height, self.width))
         self.used = []
+        # self.width = width or np.random.randint(self.FIELD_MIN, self.FIELD_MAX)
+        # self.height = height or np.random.randint(self.FIELD_MIN, self.FIELD_MAX)
+        # self.pond_count = pond or np.random.randint(self.POND_MIN, self.POND_MAX)
+        # self.worker_count = np.random.randint(self.WORKER_MIN, self.WORKER_MAX)
 
         self.set_cell_property("castle", coordinates=castle)
 
@@ -378,14 +387,17 @@ class Game(gym.Env):
         return self.board, reward, self.done, {}
 
     def render(self):
-        view = [["" for _ in range(self.width)] for _ in range(self.height)]
-        for y in range(self.height):
-            for x in range(self.width):
-                view[y][x] = [
+        view = [
+            [
+                [
                     self.CELL[i]
-                    for i, item in enumerate(self.board[:, y, x])
-                    if item >= 1
+                    for i, item in enumerate(self.board[:, y, x].astype(bool))
+                    if item
                 ]
+                for x in range(self.width)
+            ]
+            for y in range(self.height)
+        ]
 
         view = np.array(view)
         # print(view)
@@ -465,4 +477,4 @@ while not done:
         if event.type == pygame.QUIT:
             pygame.quit()
 
-# env.render()
+env.render()
