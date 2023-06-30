@@ -11,9 +11,12 @@ YELLOW = (255, 255, 0)
 
 
 class Worker:
+    TEAMS = ("A", "B")
+
     def __init__(self, name, y, x, num):
         self.name = name
         self.team = name[-1]
+        self.another_team = self.TEAMS[1 - self.TEAMS.index(self.team)]
         self.y = y
         self.x = x
         self.num = num
@@ -24,19 +27,22 @@ class Worker:
         if self.x - 1 <= x <= self.x + 1 and self.y - 1 <= y <= self.y + 1:
             self.x = x
             self.y = y
-            self.action_log.append("move", (y, x))
+            self.action_log.append(("move", (y, x)))
             self.is_action = True
             return True
         else:
             return False
 
     def build(self, y, x):
-        self.action_log.append("build", (y, x))
+        self.action_log.append(("build", (y, x)))
         self.is_action = True
 
     def break_(self, y, x):
-        self.action_log.append("break", (y, x))
+        self.action_log.append(("break", (y, x)))
         self.is_action = True
+
+    def get_coordinate(self):
+        return self.y, self.x
 
     def turn_init(self):
         self.is_action = False
@@ -180,17 +186,51 @@ class Game(gym.Env):
     def compile_layers(self, *layers):
         return np.sum([self.board[self.CELL.index(layer)] for layer in layers], axis=0)
 
-    def is_movable(self, worker, action):
-        """移動判定実装予定"""
-        pass
+    def get_team_worker_coordinate(self, team):
+        return [
+            worker.get_coordinate()
+            for worker in eval(f"self.workers_{team}")
+            if worker.is_action
+        ]
 
-    def is_buildable(self, worker, action):
-        """建築判定実装予定"""
-        pass
+    def is_movable(self, worker: Worker, y, x):
+        if (
+            0 <= y < self.height
+            and 0 <= x < self.width
+            and not worker.is_action
+            and not self.compile_layers(
+                "rampart_A", "rampart_B", "pond", f"worker_{worker.another_team}"
+            )[y, x]
+            and (y, x) not in self.get_team_worker_coordinate(worker.team)
+        ):
+            return True
+        else:
+            return False
 
-    def is_breakable(self, worker, action):
-        """破壊判定実装予定"""
-        pass
+    def is_buildable(self, worker: Worker, y, x):
+        if (
+            0 <= y < self.height
+            and 0 <= x < self.width
+            and not worker.is_action
+            and not self.compile_layers(
+                "rampart_A", "rampart_B", "castle", f"worker_{worker.another_team}"
+            )[y, x]
+            and (y, x) not in self.get_team_worker_coordinate(worker.team)
+        ):
+            return True
+        else:
+            return False
+
+    def is_breakable(self, worker: Worker, y, x):
+        if (
+            0 <= y < self.height
+            and 0 <= x < self.width
+            and not worker.is_action
+            and self.compile_layers("rampart_A", "rampart_B")[y, x]
+        ):
+            return True
+        else:
+            return False
 
     def get_direction(self, action):
         direction = np.zeros(2)
@@ -206,17 +246,18 @@ class Game(gym.Env):
 
     def worker_action(self, worker: Worker, action):
         direction = self.get_direction(action)
-        y, x = np.array([worker.y, worker.x]) + direction
-        if "move" in self.ACTIONS[action] and self.is_movable(worker, action):
+        y, x = map(int, np.array(worker.get_coordinate()) + direction)
+
+        if "move" in self.ACTIONS[action] and self.is_movable(worker, y, x):
             self.board[self.CELL.index(worker.name), worker.y, worker.x] = 0
             self.board[self.CELL.index(worker.name), y, x] = worker.num
             worker.move(y, x)
 
-        elif "build" in self.ACTIONS[action] and self.is_buildable(worker, action):
+        elif "build" in self.ACTIONS[action] and self.is_buildable(worker, y, x):
             self.board[self.CELL.index(f"rampart_{worker.team}"), y, x] = 1
             worker.build(y, x)
 
-        elif "break" in self.ACTIONS[action] and self.is_breakable(worker, action):
+        elif "break" in self.ACTIONS[action] and self.is_breakable(worker, y, x):
             if self.board[self.CELL.index("rampart_A"), y, x]:
                 self.board[self.CELL.index("rampart_A"), y, x] = 0
             else:
@@ -270,6 +311,7 @@ class Game(gym.Env):
         self.board[self.CELL.index("open_position_B")] = self.fill_area(
             self.board[self.CELL.index("position_B")]
         )
+        self.update_blank()
 
     def calculate_score(self):
         self.previous_score_A, self.previous_score_B = self.score_A, self.score_B
@@ -316,6 +358,8 @@ class Game(gym.Env):
 
     def step(self, actions):
         assert self.worker_count == len(actions), "input length error"
+        [worker.turn_init() for worker in self.workers_A]
+        [worker.turn_init() for worker in self.workers_B]
         success_actions = all(
             [
                 self.worker_action(worker, action)
@@ -325,6 +369,7 @@ class Game(gym.Env):
                 )
             ]
         )
+        self.update_open_position()
         self.current_player = -self.current_player
         self.turn += 1
         self.calculate_score()
