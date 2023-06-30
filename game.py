@@ -193,8 +193,14 @@ class Game(gym.Env):
         self.update_blank()
         return self.board
 
-    def compile_layers(self, *layers):
-        return np.sum([self.board[self.CELL.index(layer)] for layer in layers], axis=0)
+    def compile_layers(self, *layers, one_hot=False):
+        compiled = np.sum(
+            [self.board[self.CELL.index(layer)] for layer in layers], axis=0
+        )
+        if one_hot:
+            return np.where(compiled, 1, 0)
+        else:
+            return compiled
 
     def get_team_worker_coordinate(self, team):
         return [
@@ -331,12 +337,12 @@ class Game(gym.Env):
 
         self.score_A = np.sum(
             self.board[self.CELL.index("castle")]
-            * self.compile_layers("position_A", "open_position_A")
+            * self.compile_layers("position_A", "open_position_A", one_hot=True)
             * self.SCORE_MULTIPLIER["castle"]
         )
         self.score_A += np.sum(
             (1 - self.board[self.CELL.index("castle")])
-            * self.compile_layers("position_A", "open_position_A")
+            * self.compile_layers("position_A", "open_position_A", one_hot=True)
             * self.SCORE_MULTIPLIER["position"]
         )
         self.score_A += np.sum(
@@ -345,12 +351,12 @@ class Game(gym.Env):
 
         self.score_B = np.sum(
             self.board[self.CELL.index("castle")]
-            * self.compile_layers("position_B", "open_position_B")
+            * self.compile_layers("position_B", "open_position_B", one_hot=True)
             * self.SCORE_MULTIPLIER["castle"]
         )
         self.score_B += np.sum(
             (1 - self.board[self.CELL.index("castle")])
-            * self.compile_layers("position_B", "open_position_B")
+            * self.compile_layers("position_B", "open_position_B", one_hot=True)
             * self.SCORE_MULTIPLIER["position"]
         )
         self.score_B += np.sum(
@@ -359,9 +365,9 @@ class Game(gym.Env):
 
         print(f"score_A:{self.score_A}, score_B:{self.score_B}")
 
-    def get_reward(self, success_actions):
+    def get_reward(self, successful):
         """報酬更新処理実装予定"""
-        if not success_actions:
+        if not successful:
             return np.NINF
 
     def is_done(self):
@@ -373,7 +379,7 @@ class Game(gym.Env):
         assert self.worker_count == len(actions), "input length error"
         [worker.turn_init() for worker in self.workers_A]
         [worker.turn_init() for worker in self.workers_B]
-        success_actions = all(
+        successful = all(
             [
                 self.worker_action(worker, action)
                 for worker, action in zip(
@@ -386,7 +392,7 @@ class Game(gym.Env):
         self.current_player = -self.current_player
         self.turn += 1
         self.calculate_score()
-        reward = self.get_reward(success_actions)
+        reward = self.get_reward(successful)
         self.is_done()
         return self.board, reward, self.done, {}
 
