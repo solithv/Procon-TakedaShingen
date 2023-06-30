@@ -147,69 +147,48 @@ class Game(gym.Env):
                     self.CELL[i] for i, item in enumerate(self.board[x][y]) if item >= 1
                 ]
         print(np.array(view))
-    
-    def judge_move(self,worker_pos,move):
+
+    def direction(self,pos,act):
         direct = np.array(0,0)
         compass = {"N": np.array((0,-1)),
                   "W": np.array((-1,0)),
                   "S": np.array((0,1)),
                   "E": np.array((1,0))}
-        if "N" in self.ACTIONS[move]:
+        if "N" in self.ACTIONS[act]:
             direct += compass["N"]
-        if "W" in self.ACTIONS[move]:
+        if "W" in self.ACTIONS[act]:
             direct += compass["W"]
-        if "S" in self.ACTIONS[move]:
+        if "S" in self.ACTIONS[act]:
             direct += compass["S"]
-        if "E" in self.ACTIONS[move]:
+        if "E" in self.ACTIONS[act]:
             direct += compass["E"]
-        direct += np.array(worker_pos)
+        direct += np.array(pos)
 
-        if (direct[0] >= 0) and (direct[1] >= 0):
-            if not "rampart" in self.board[direct[0]][direct[1]]:
-                if not "worker" in self.board[direct[0]][direct[1]]:    
-                    if not "pond" in self.board[direct[0]][direct[1]]:
+        return direct
+    
+    def judge_move(self,worker_pos,move):
+        moved_pos = self.direction(worker_pos,move)
+    
+        if (moved_pos[0] >= 0) and (moved_pos[1] >= 0):
+            if not "rampart" in self.board[moved_pos[0]][moved_pos[1]]:
+                if not "worker" in self.board[moved_pos[0]][moved_pos[1]]:    
+                    if not "pond" in self.board[moved_pos[0]][moved_pos[1]]:
                         return True
         return False
     
     def judge_build(self,worker_pos,build):
-        direct = np.array(0,0)
-        compass = {"N": np.array((0,-1)),
-                  "W": np.array((-1,0)),
-                  "S": np.array((0,1)),
-                  "E": np.array((1,0))}
-        if "N" in self.ACTIONS[build]:
-            direct += compass["N"]
-        if "W" in self.ACTIONS[build]:
-            direct += compass["W"]
-        if "S" in self.ACTIONS[build]:
-            direct += compass["S"]
-        if "E" in self.ACTIONS[build]:
-            direct += compass["E"]
-        direct += np.array(worker_pos)
+        build_pos = self.direction(worker_pos,build)
 
-        if (direct[0] >= 0) and (direct[1] >= 0):
-            if not "rampart" in self.board[direct[0]][direct[1]]:
-                if not "worker" in self.board[direct[0]][direct[1]]:
+        if (build_pos[0] >= 0) and (build_pos[1] >= 0):
+            if not "rampart" in self.board[build_pos[0]][build_pos[1]]:
+                if not "worker" in self.board[build_pos[0]][build_pos[1]]:
                     return True
         return False
     
     def judge_destroy(self,worker_pos,destroy):
-        direct = np.array(0,0)
-        compass = {"N": np.array((0,-1)),
-                  "W": np.array((-1,0)),
-                  "S": np.array((0,1)),
-                  "E": np.array((1,0))}
-        if "N" in self.ACTIONS[destroy]:
-            direct += compass["N"]
-        if "W" in self.ACTIONS[destroy]:
-            direct += compass["W"]
-        if "S" in self.ACTIONS[destroy]:
-            direct += compass["S"]
-        if "E" in self.ACTIONS[destroy]:
-            direct += compass["E"]
-        direct += np.array(worker_pos)
+        destroy_pos = self.direction(worker_pos,destroy)
 
-        if not "rampart" in self.board[direct[0]][direct[1]]:
+        if not "rampart" in self.board[destroy_pos[0]][destroy_pos[1]]:
             return True
         return False 
 
