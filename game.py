@@ -80,6 +80,7 @@ class Game(gym.Env):
         "break_E",
         "break_S",
         "break_W",
+        "stay",
     )
     DIRECTIONS = {
         # y, x
@@ -204,9 +205,9 @@ class Game(gym.Env):
 
     def is_movable(self, worker: Worker, y, x):
         if (
-            0 <= y < self.height
+            not worker.is_action
+            and 0 <= y < self.height
             and 0 <= x < self.width
-            and not worker.is_action
             and not self.compile_layers(
                 "rampart_A", "rampart_B", "pond", f"worker_{worker.another_team}"
             )[y, x]
@@ -218,9 +219,9 @@ class Game(gym.Env):
 
     def is_buildable(self, worker: Worker, y, x):
         if (
-            0 <= y < self.height
+            not worker.is_action
+            and 0 <= y < self.height
             and 0 <= x < self.width
-            and not worker.is_action
             and not self.compile_layers(
                 "rampart_A", "rampart_B", "castle", f"worker_{worker.another_team}"
             )[y, x]
@@ -232,9 +233,9 @@ class Game(gym.Env):
 
     def is_breakable(self, worker: Worker, y, x):
         if (
-            0 <= y < self.height
+            not worker.is_action
+            and 0 <= y < self.height
             and 0 <= x < self.width
-            and not worker.is_action
             and self.compile_layers("rampart_A", "rampart_B")[y, x]
         ):
             return True
@@ -254,6 +255,9 @@ class Game(gym.Env):
         return direction
 
     def worker_action(self, worker: Worker, action):
+        if "stay" == self.ACTIONS[action]:
+            return True
+
         direction = self.get_direction(action)
         y, x = map(int, np.array(worker.get_coordinate()) + direction)
 
