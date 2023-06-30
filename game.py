@@ -49,6 +49,7 @@ class Worker:
 
 
 class Game(gym.Env):
+    metadata = {"render.modes": ["human", "console"]}
     CELL_SIZE = 32
     CELL = (
         "blank",  # 論理反転
@@ -396,7 +397,7 @@ class Game(gym.Env):
         self.is_done()
         return self.board, reward, self.done, {}
 
-    def render(self):
+    def render(self, mode="human"):
         view = [
             [
                 [
@@ -408,69 +409,68 @@ class Game(gym.Env):
             ]
             for y in range(self.height)
         ]
-
-        view = np.array(view)
-        # print(view)
-
         pygame.init()
-        window_surface = pygame.display.set_mode(
-            (self.window_size_x, self.window_size_y)
-        )
-        pygame.display.set_caption("game")
+        if mode == "console":
+            [print(row) for row in view]
+        elif mode == "human":
+            window_surface = pygame.display.set_mode(
+                (self.window_size_x, self.window_size_y)
+            )
+            pygame.display.set_caption("game")
 
-        window_surface.fill(WHITE)
+            window_surface.fill(WHITE)
 
-        for i in range(self.height):
-            for j in range(self.width):
-                cellPlacement = (
-                    j * self.CELL_SIZE,
-                    i * self.CELL_SIZE,
-                    self.CELL_SIZE,
-                    self.CELL_SIZE,
+            for i in range(self.height):
+                for j in range(self.width):
+                    cellPlacement = (
+                        j * self.CELL_SIZE,
+                        i * self.CELL_SIZE,
+                        self.CELL_SIZE,
+                        self.CELL_SIZE,
+                    )
+                    cellInfo = view[i][j]
+
+                    if "castle" in cellInfo:
+                        color = YELLOW
+                    elif "worker_A" in cellInfo:
+                        color = RED
+                    elif "worker_B" in cellInfo:
+                        color = BLUE
+                    elif "pond" in cellInfo:
+                        color = GREEN
+                    else:
+                        color = WHITE
+
+                    pygame.draw.rect(window_surface, color, cellPlacement)
+
+            # 縦線描画
+            for i in range(1, self.width):
+                pygame.draw.line(
+                    window_surface,
+                    BLACK,
+                    (i * self.CELL_SIZE, 0),
+                    (i * self.CELL_SIZE, self.window_size_y),
+                    1,
                 )
-                cellInfo = view[i][j]
+            # 横線描画
+            for i in range(1, self.height):
+                pygame.draw.line(
+                    window_surface,
+                    BLACK,
+                    (0, i * self.CELL_SIZE),
+                    (self.window_size_x, i * self.CELL_SIZE),
+                    1,
+                )
 
-                if cellInfo == "castle":
-                    color = YELLOW
-                elif cellInfo == "worker_A":
-                    color = RED
-                elif cellInfo == "worker_B":
-                    color = BLUE
-                elif cellInfo == "pond":
-                    color = GREEN
-                else:
-                    color = WHITE
-
-                pygame.draw.rect(window_surface, color, cellPlacement)
-
-        # 縦線描画
-        for i in range(1, self.width):
-            pygame.draw.line(
-                window_surface,
-                BLACK,
-                (i * self.CELL_SIZE, 0),
-                (i * self.CELL_SIZE, self.window_size_y),
-                1,
-            )
-        # 横線描画
-        for i in range(1, self.height):
-            pygame.draw.line(
-                window_surface,
-                BLACK,
-                (0, i * self.CELL_SIZE),
-                (self.window_size_x, i * self.CELL_SIZE),
-                1,
-            )
-
-        pygame.display.update()
+            pygame.display.update()
 
 
 env = Game()
 
+print(f"width:{env.width}, height:{env.height}, workers:{env.worker_count}")
+
 observation = env.reset()
 done = False
-
-print(f"width:{env.width}, height:{env.height}, workers:{env.worker_count}")
 
 while not done:
     env.render()
