@@ -191,6 +191,29 @@ class Game(gym.Env):
         if not "rampart" in self.board[destroy_pos[0]][destroy_pos[1]]:
             return True
         return False 
+    
+    def move(self,worker_pos,move):
+        self.board[worker_pos[0]][worker_pos[1]] = self.CELL[0]
+        worker_pos = np.array(worker_pos)
+        worker_pos += self.direction(worker_pos,move)
+        return worker_pos
+    
+    def build(self,worker_pos,build):
+        if "N" in self.ACTIONS[build]:
+            self.board[worker_pos[0]-1][worker_pos[1]] = self.CELL[5]
+        elif "W" in self.ACTIONS[build]:
+            self.board[worker_pos[0]][worker_pos[1]-1] = self.CELL[5]
+        elif "S" in self.ACTIONS[build]:
+            self.board[worker_pos[0]+1][worker_pos[1]] = self.CELL[5]
+        elif "E" in self.ACTIONS[build]:
+            self.board[worker_pos[0]][worker_pos[1]+1] = self.CELL[5]
+    
+    def worker_action(self,worker_pos,act):
+        if self.judge_move(worker_pos,act):
+            self.move(worker_pos)
+        if self.judge_build(worker_pos,act):
+            self.build(worker_pos,act)
+
 
 env = Game()
 
