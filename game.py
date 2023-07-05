@@ -456,15 +456,14 @@ class Game(gym.Env):
 
                     if "castle" in cellInfo:
                         color = YELLOW
-                    elif "worker_A" in cellInfo:
+                    elif eval(" or ".join([f"'worker_A{i}' in cellInfo" for i in range(6)])):
                         color = RED
-                    elif "worker_B" in cellInfo:
+                    elif eval(" or ".join([f"'worker_B{i}' in cellInfo" for i in range(6)])):
                         color = BLUE
                     elif "pond" in cellInfo:
                         color = GREEN
                     else:
                         color = WHITE
-
                     pygame.draw.rect(window_surface, color, cellPlacement)
 
             # 縦線描画
