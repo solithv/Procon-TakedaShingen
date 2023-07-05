@@ -439,7 +439,14 @@ class Game(gym.Env):
                         self.CELL_SIZE,
                     )
                     cellInfo = view[i][j]
-
+                    
+                    # このforループで見ている職人が何番か
+                    currentWorker = ""
+                    if eval(" or ".join([f"('worker_A{i}' in cellInfo) or ('worker_B{i}' in cellInfo)" for i in range(6)])):
+                        for item in cellInfo:
+                            currentWorker = item[-1]
+                    
+                    # 色付き四角を何色にすべきか判定
                     if "castle" in cellInfo:
                         color = YELLOW
                     elif eval(" or ".join([f"'worker_A{i}' in cellInfo" for i in range(6)])):
@@ -450,7 +457,15 @@ class Game(gym.Env):
                         color = GREEN
                     else:
                         color = WHITE
+                    
+                    # 色付き四角の描画
                     pygame.draw.rect(window_surface, color, cellPlacement)
+                    
+                    # 職人番号の描画
+                    font = pygame.font.SysFont(None, 37)
+                    text = font.render(currentWorker, False, (255, 255, 255))
+                    text_rect = text.get_rect(center=(j * self.CELL_SIZE + self.CELL_SIZE / 2, i * self.CELL_SIZE + self.CELL_SIZE / 2))
+                    window_surface.blit(text, text_rect)
 
             # 縦線描画
             for i in range(1, self.width):
