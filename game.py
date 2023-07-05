@@ -49,6 +49,7 @@ class Worker:
 
 
 class Game(gym.Env):
+    metadata = {"render.modes": ["human", "console"]}
     CELL_SIZE = 32
     CELL = (
         "blank",  # 論理反転
@@ -90,6 +91,7 @@ class Game(gym.Env):
         "break_E",
         "break_S",
         "break_W",
+        "stay",
     )
     DIRECTIONS = {
         # y, x
@@ -202,8 +204,14 @@ class Game(gym.Env):
         self.update_blank()
         return self.board
 
-    def compile_layers(self, *layers):
-        return np.sum([self.board[self.CELL.index(layer)] for layer in layers], axis=0)
+    def compile_layers(self, *layers, one_hot=False):
+        compiled = np.sum(
+            [self.board[self.CELL.index(layer)] for layer in layers], axis=0
+        )
+        if one_hot:
+            return np.where(compiled, 1, 0)
+        else:
+            return compiled
 
     def get_team_worker_coordinate(self, team):
         return [
@@ -214,9 +222,9 @@ class Game(gym.Env):
 
     def is_movable(self, worker: Worker, y, x):
         if (
-            0 <= y < self.height
+            not worker.is_action
+            and 0 <= y < self.height
             and 0 <= x < self.width
-            and not worker.is_action
             and not self.compile_layers(
                 "rampart_A", "rampart_B", "pond", f"worker_{worker.another_team}"
             )[y, x]
@@ -228,9 +236,9 @@ class Game(gym.Env):
 
     def is_buildable(self, worker: Worker, y, x):
         if (
-            0 <= y < self.height
+            not worker.is_action
+            and 0 <= y < self.height
             and 0 <= x < self.width
-            and not worker.is_action
             and not self.compile_layers(
                 "rampart_A", "rampart_B", "castle", f"worker_{worker.another_team}"
             )[y, x]
@@ -242,9 +250,9 @@ class Game(gym.Env):
 
     def is_breakable(self, worker: Worker, y, x):
         if (
-            0 <= y < self.height
+            not worker.is_action
+            and 0 <= y < self.height
             and 0 <= x < self.width
-            and not worker.is_action
             and self.compile_layers("rampart_A", "rampart_B")[y, x]
         ):
             return True
@@ -264,6 +272,9 @@ class Game(gym.Env):
         return direction
 
     def worker_action(self, worker: Worker, action):
+        if "stay" == self.ACTIONS[action]:
+            return True
+
         direction = self.get_direction(action)
         y, x = map(int, np.array(worker.get_coordinate()) + direction)
 
@@ -337,12 +348,12 @@ class Game(gym.Env):
 
         self.score_A = np.sum(
             self.board[self.CELL.index("castle")]
-            * self.compile_layers("position_A", "open_position_A")
+            * self.compile_layers("position_A", "open_position_A", one_hot=True)
             * self.SCORE_MULTIPLIER["castle"]
         )
         self.score_A += np.sum(
             (1 - self.board[self.CELL.index("castle")])
-            * self.compile_layers("position_A", "open_position_A")
+            * self.compile_layers("position_A", "open_position_A", one_hot=True)
             * self.SCORE_MULTIPLIER["position"]
         )
         self.score_A += np.sum(
@@ -351,12 +362,12 @@ class Game(gym.Env):
 
         self.score_B = np.sum(
             self.board[self.CELL.index("castle")]
-            * self.compile_layers("position_B", "open_position_B")
+            * self.compile_layers("position_B", "open_position_B", one_hot=True)
             * self.SCORE_MULTIPLIER["castle"]
         )
         self.score_B += np.sum(
             (1 - self.board[self.CELL.index("castle")])
-            * self.compile_layers("position_B", "open_position_B")
+            * self.compile_layers("position_B", "open_position_B", one_hot=True)
             * self.SCORE_MULTIPLIER["position"]
         )
         self.score_B += np.sum(
@@ -365,9 +376,9 @@ class Game(gym.Env):
 
         print(f"score_A:{self.score_A}, score_B:{self.score_B}")
 
-    def get_reward(self, success_actions):
+    def get_reward(self, successful):
         """報酬更新処理実装予定"""
-        if not success_actions:
+        if not successful:
             return np.NINF
 
     def is_done(self):
@@ -379,7 +390,7 @@ class Game(gym.Env):
         assert self.worker_count == len(actions), "input length error"
         [worker.turn_init() for worker in self.workers_A]
         [worker.turn_init() for worker in self.workers_B]
-        success_actions = all(
+        successful = all(
             [
                 self.worker_action(worker, action)
                 for worker, action in zip(
@@ -392,11 +403,11 @@ class Game(gym.Env):
         self.current_player = -self.current_player
         self.turn += 1
         self.calculate_score()
-        reward = self.get_reward(success_actions)
+        reward = self.get_reward(successful)
         self.is_done()
         return self.board, reward, self.done, {}
 
-    def render(self):
+    def render(self, mode="human"):
         view = [
             [
                 [
@@ -408,69 +419,68 @@ class Game(gym.Env):
             ]
             for y in range(self.height)
         ]
-
-        view = np.array(view)
-        # print(view)
-
         pygame.init()
-        window_surface = pygame.display.set_mode(
-            (self.window_size_x, self.window_size_y)
-        )
-        pygame.display.set_caption("game")
+        if mode == "console":
+            [print(row) for row in view]
+        elif mode == "human":
+            window_surface = pygame.display.set_mode(
+                (self.window_size_x, self.window_size_y)
+            )
+            pygame.display.set_caption("game")
 
-        window_surface.fill(WHITE)
+            window_surface.fill(WHITE)
 
-        for i in range(self.height):
-            for j in range(self.width):
-                cellPlacement = (
-                    j * self.CELL_SIZE,
-                    i * self.CELL_SIZE,
-                    self.CELL_SIZE,
-                    self.CELL_SIZE,
+            for i in range(self.height):
+                for j in range(self.width):
+                    cellPlacement = (
+                        j * self.CELL_SIZE,
+                        i * self.CELL_SIZE,
+                        self.CELL_SIZE,
+                        self.CELL_SIZE,
+                    )
+                    cellInfo = view[i][j]
+
+                    if "castle" in cellInfo:
+                        color = YELLOW
+                    elif "worker_A" in cellInfo:
+                        color = RED
+                    elif "worker_B" in cellInfo:
+                        color = BLUE
+                    elif "pond" in cellInfo:
+                        color = GREEN
+                    else:
+                        color = WHITE
+
+                    pygame.draw.rect(window_surface, color, cellPlacement)
+
+            # 縦線描画
+            for i in range(1, self.width):
+                pygame.draw.line(
+                    window_surface,
+                    BLACK,
+                    (i * self.CELL_SIZE, 0),
+                    (i * self.CELL_SIZE, self.window_size_y),
+                    1,
                 )
-                cellInfo = view[i][j]
+            # 横線描画
+            for i in range(1, self.height):
+                pygame.draw.line(
+                    window_surface,
+                    BLACK,
+                    (0, i * self.CELL_SIZE),
+                    (self.window_size_x, i * self.CELL_SIZE),
+                    1,
+                )
 
-                if cellInfo == "castle":
-                    color = YELLOW
-                elif cellInfo == "worker_A":
-                    color = RED
-                elif cellInfo == "worker_B":
-                    color = BLUE
-                elif cellInfo == "pond":
-                    color = GREEN
-                else:
-                    color = WHITE
-
-                pygame.draw.rect(window_surface, color, cellPlacement)
-
-        # 縦線描画
-        for i in range(1, self.width):
-            pygame.draw.line(
-                window_surface,
-                BLACK,
-                (i * self.CELL_SIZE, 0),
-                (i * self.CELL_SIZE, self.window_size_y),
-                1,
-            )
-        # 横線描画
-        for i in range(1, self.height):
-            pygame.draw.line(
-                window_surface,
-                BLACK,
-                (0, i * self.CELL_SIZE),
-                (self.window_size_x, i * self.CELL_SIZE),
-                1,
-            )
-
-        pygame.display.update()
+            pygame.display.update()
 
 
 env = Game()
 
+print(f"width:{env.width}, height:{env.height}, workers:{env.worker_count}")
+
 observation = env.reset()
 done = False
-
-print(f"width:{env.width}, height:{env.height}, workers:{env.worker_count}")
 
 while not done:
     env.render()
