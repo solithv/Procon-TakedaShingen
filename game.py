@@ -1,3 +1,5 @@
+import copy
+
 import gymnasium as gym
 import numpy as np
 import pygame
@@ -228,8 +230,7 @@ class Game(gym.Env):
             and 0 <= y < self.height
             and 0 <= x < self.width
             and not self.compile_layers(
-                "rampart_A",
-                "rampart_B",
+                f"rampart_{worker.another_team}",
                 "pond",
                 *[f"worker_{worker.another_team}{i}" for i in range(self.WORKER_MAX)],
             )[y, x]
@@ -250,7 +251,6 @@ class Game(gym.Env):
                 "castle",
                 *[f"worker_{worker.another_team}{i}" for i in range(self.WORKER_MAX)],
             )[y, x]
-            and (y, x) not in self.get_team_worker_coordinate(worker.team)
         ):
             return True
         else:
@@ -366,7 +366,7 @@ class Game(gym.Env):
             > 0,
             1,
             0,
-        ) - self.compile_layers("rampart_B", "position_B")
+        ) - self.compile_layers("rampart_B", "position_B", one_hot=True)
         self.board[self.CELL.index("open_position_B")] = np.where(
             (
                 self.previous_position_B
@@ -376,7 +376,7 @@ class Game(gym.Env):
             > 0,
             1,
             0,
-        ) - self.compile_layers("rampart_A", "position_A")
+        ) - self.compile_layers("rampart_A", "position_A", one_hot=True)
         self.update_blank()
 
     def calculate_score(self):
@@ -424,15 +424,15 @@ class Game(gym.Env):
 
     def step(self, actions):
         assert self.worker_count == len(actions), "input length error"
-        [worker.turn_init() for worker in self.workers_A]
-        [worker.turn_init() for worker in self.workers_B]
+        current_workers = self.workers_A if self.current_player > 0 else self.workers_B
+        [worker.turn_init() for worker in current_workers]
+        sorted_workers = [(worker, actions[i]) for i, worker in enumerate(current_workers) if "break" in self.ACTIONS[self.CELL.index(actions[i])]]
+        sorted_workers += [(worker, actions[i]) for i, worker in enumerate(current_workers) if "break" not in self.ACTIONS[self.CELL.index(actions[i])]]
+
         successful = all(
             [
                 self.worker_action(worker, action)
-                for worker, action in zip(
-                    self.workers_A if self.current_player > 0 else self.workers_B,
-                    actions,
-                )
+                for worker, action in sorted_workers
             ]
         )
         self.update_position()
