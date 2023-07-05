@@ -13,13 +13,13 @@ YELLOW = (255, 255, 0)
 class Worker:
     TEAMS = ("A", "B")
 
-    def __init__(self, name, y, x, num):
+    def __init__(self, name, y, x):
         self.name = name
-        self.team = name[-1]
+        self.team = name[-2]
+        self.num = name[-1]
         self.another_team = self.TEAMS[1 - self.TEAMS.index(self.team)]
         self.y = y
         self.x = x
-        self.num = num
         self.is_action = False
         self.action_log = []
 
@@ -61,10 +61,21 @@ class Game(gym.Env):
         "rampart_B",
         "castle",
         "pond",
-        "worker_A",
-        "worker_B",
+        "worker_A0",
+        "worker_A1",
+        "worker_A2",
+        "worker_A3",
+        "worker_A4",
+        "worker_A5",
+        "worker_B0",
+        "worker_B1",
+        "worker_B2",
+        "worker_B3",
+        "worker_B4",
+        "worker_B5",
     )
     ACTIONS = (
+        "stay",
         "move_N",
         "move_NE",
         "move_E",
@@ -81,7 +92,6 @@ class Game(gym.Env):
         "break_E",
         "break_S",
         "break_W",
-        "stay",
     )
     DIRECTIONS = {
         # y, x
@@ -123,7 +133,7 @@ class Game(gym.Env):
         self.window_size_x = self.width * self.CELL_SIZE
         self.window_size_y = self.height * self.CELL_SIZE
 
-    def set_cell_property(self, target, count=1, coordinates=None):
+    def set_cell_property(self, target, coordinates=None):
         if not coordinates:
             while True:
                 y = np.random.randint(0, self.height - 1)
@@ -132,13 +142,13 @@ class Game(gym.Env):
                     break
         else:
             y, x = coordinates
-        self.board[self.CELL.index(target), y, x] = count
+        self.board[self.CELL.index(target), y, x] = 1
         self.used.append((y, x))
         return y, x
 
-    def set_worker_position(self, target, count, coordinates=None):
-        y, x = self.set_cell_property(target, count, coordinates)
-        return Worker(target, y, x, count)
+    def set_worker_position(self, target, coordinates=None):
+        y, x = self.set_cell_property(target, coordinates)
+        return Worker(target, y, x)
 
     def update_blank(self):
         self.board[0] = 1 - self.board[1:].any(axis=0)
@@ -170,24 +180,24 @@ class Game(gym.Env):
         if worker_A:
             assert self.worker_count == len(worker_A), "worker_A input error"
             self.workers_A = [
-                self.set_worker_position("worker_A", i + 1, coordinate)
+                self.set_worker_position(f"worker_A{i}", coordinate)
                 for i, coordinate in enumerate(worker_A)
             ]
         else:
             self.workers_A = [
-                self.set_worker_position("worker_A", i + 1)
+                self.set_worker_position(f"worker_A{i}")
                 for i in range(self.worker_count)
             ]
 
         if worker_B:
             assert self.worker_count == len(worker_B), "worker_B input error"
             self.workers_B = [
-                self.set_worker_position("worker_B", i + 1, coordinate)
+                self.set_worker_position(f"worker_B{i}", coordinate)
                 for i, coordinate in enumerate(worker_B)
             ]
         else:
             self.workers_B = [
-                self.set_worker_position("worker_B", i + 1)
+                self.set_worker_position(f"worker_B{i}")
                 for i in range(self.worker_count)
             ]
 
@@ -216,7 +226,10 @@ class Game(gym.Env):
             and 0 <= y < self.height
             and 0 <= x < self.width
             and not self.compile_layers(
-                "rampart_A", "rampart_B", "pond", f"worker_{worker.another_team}"
+                "rampart_A",
+                "rampart_B",
+                "pond",
+                *[f"worker_{worker.another_team}{i}" for i in range(self.WORKER_MAX)],
             )[y, x]
             and (y, x) not in self.get_team_worker_coordinate(worker.team)
         ):
@@ -230,7 +243,10 @@ class Game(gym.Env):
             and 0 <= y < self.height
             and 0 <= x < self.width
             and not self.compile_layers(
-                "rampart_A", "rampart_B", "castle", f"worker_{worker.another_team}"
+                "rampart_A",
+                "rampart_B",
+                "castle",
+                *[f"worker_{worker.another_team}{i}" for i in range(self.WORKER_MAX)],
             )[y, x]
             and (y, x) not in self.get_team_worker_coordinate(worker.team)
         ):
@@ -270,7 +286,7 @@ class Game(gym.Env):
 
         if "move" in self.ACTIONS[action] and self.is_movable(worker, y, x):
             self.board[self.CELL.index(worker.name), worker.y, worker.x] = 0
-            self.board[self.CELL.index(worker.name), y, x] = worker.num
+            self.board[self.CELL.index(worker.name), y, x] = 1
             worker.move(y, x)
 
         elif "build" in self.ACTIONS[action] and self.is_buildable(worker, y, x):
@@ -325,12 +341,20 @@ class Game(gym.Env):
         return np.where(array == 1, 1, 0)
 
     def update_open_position(self):
-        self.board[self.CELL.index("open_position_A")] = self.fill_area(
-            self.board[self.CELL.index("position_A")]
-        )
-        self.board[self.CELL.index("open_position_B")] = self.fill_area(
-            self.board[self.CELL.index("position_B")]
-        )
+        self.previous_open_position_A = self.board[self.CELL.index("open_position_A")]
+        self.previous_open_position_B = self.board[self.CELL.index("open_position_B")]
+        self.board[self.CELL.index("open_position_A")] = np.where(
+            self.fill_area(self.board[self.CELL.index("position_A")])
+            + self.previous_open_position_A,
+            1,
+            0,
+        ) - self.compile_layers("rampart_B", "position_B")
+        self.board[self.CELL.index("open_position_B")] = np.where(
+            self.fill_area(self.board[self.CELL.index("position_B")])
+            + self.previous_open_position_A,
+            1,
+            0,
+        ) - self.compile_layers("rampart_A", "position_A")
         self.update_blank()
 
     def calculate_score(self):
@@ -432,15 +456,14 @@ class Game(gym.Env):
 
                     if "castle" in cellInfo:
                         color = YELLOW
-                    elif "worker_A" in cellInfo:
+                    elif eval(" or ".join([f"'worker_A{i}' in cellInfo" for i in range(6)])):
                         color = RED
-                    elif "worker_B" in cellInfo:
+                    elif eval(" or ".join([f"'worker_B{i}' in cellInfo" for i in range(6)])):
                         color = BLUE
                     elif "pond" in cellInfo:
                         color = GREEN
                     else:
                         color = WHITE
-
                     pygame.draw.rect(window_surface, color, cellPlacement)
 
             # 縦線描画
@@ -541,10 +564,14 @@ done = False
 while not done:
     
     env.render()
+    print(env.board[env.CELL.index("worker_A0")])
 
     print(f"input team A actions (need {env.worker_count} input) : ")
     actions = [int(input()) for _ in range(env.worker_count)]
     observation, reward, done, _ = env.step(actions)
+
+    print(env.board[env.CELL.index("worker_A0")])
+    env.render()
 
     print(f"input team B actions (need {env.worker_count} input) : ")
     actions = [int(input()) for _ in range(env.worker_count)]
