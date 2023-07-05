@@ -340,18 +340,38 @@ class Game(gym.Env):
 
         return np.where(array == 1, 1, 0)
 
+    def update_position(self):
+        self.previous_position_A = self.board[self.CELL.index("position_A")]
+        self.previous_position_B = self.board[self.CELL.index("position_B")]
+        self.board[self.CELL.index("position_A")] = self.fill_area(
+            self.board[self.CELL.index("position_A")]
+        )
+        self.board[self.CELL.index("position_B")] = self.fill_area(
+            self.board[self.CELL.index("position_B")]
+        )
+
+        self.update_blank()
+
     def update_open_position(self):
         self.previous_open_position_A = self.board[self.CELL.index("open_position_A")]
         self.previous_open_position_B = self.board[self.CELL.index("open_position_B")]
         self.board[self.CELL.index("open_position_A")] = np.where(
-            self.fill_area(self.board[self.CELL.index("position_A")])
-            + self.previous_open_position_A,
+            (
+                self.previous_position_A
+                - self.board[self.CELL.index("position_A")]
+                + self.previous_open_position_A
+            )
+            > 0,
             1,
             0,
         ) - self.compile_layers("rampart_B", "position_B")
         self.board[self.CELL.index("open_position_B")] = np.where(
-            self.fill_area(self.board[self.CELL.index("position_B")])
-            + self.previous_open_position_A,
+            (
+                self.previous_position_B
+                - self.board[self.CELL.index("position_B")]
+                + self.previous_open_position_B
+            )
+            > 0,
             1,
             0,
         ) - self.compile_layers("rampart_A", "position_A")
@@ -413,6 +433,7 @@ class Game(gym.Env):
                 )
             ]
         )
+        self.update_position()
         self.update_open_position()
         self.current_player = -self.current_player
         self.turn += 1
@@ -456,9 +477,13 @@ class Game(gym.Env):
 
                     if "castle" in cellInfo:
                         color = YELLOW
-                    elif eval(" or ".join([f"'worker_A{i}' in cellInfo" for i in range(6)])):
+                    elif eval(
+                        " or ".join([f"'worker_A{i}' in cellInfo" for i in range(6)])
+                    ):
                         color = RED
-                    elif eval(" or ".join([f"'worker_B{i}' in cellInfo" for i in range(6)])):
+                    elif eval(
+                        " or ".join([f"'worker_B{i}' in cellInfo" for i in range(6)])
+                    ):
                         color = BLUE
                     elif "pond" in cellInfo:
                         color = GREEN
@@ -497,13 +522,11 @@ done = False
 
 while not done:
     env.render()
-    print(env.board[env.CELL.index("worker_A0")])
 
     print(f"input team A actions (need {env.worker_count} input) : ")
     actions = [int(input()) for _ in range(env.worker_count)]
     observation, reward, done, _ = env.step(actions)
 
-    print(env.board[env.CELL.index("worker_A0")])
     env.render()
 
     print(f"input team B actions (need {env.worker_count} input) : ")
