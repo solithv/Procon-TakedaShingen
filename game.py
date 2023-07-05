@@ -499,11 +499,9 @@ while not done:
     env.render()
     print(env.board[env.CELL.index("worker_A0")])
 
-    print(f"input team A actions (need {env.worker_count} input) : ")
     actions = [int(input()) for _ in range(env.worker_count)]
     observation, reward, done, _ = env.step(actions)
 
-    print(env.board[env.CELL.index("worker_A0")])
     env.render()
 
     print(f"input team B actions (need {env.worker_count} input) : ")
