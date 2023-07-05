@@ -423,17 +423,24 @@ class Game(gym.Env):
             self.done = True
 
     def step(self, actions):
+        print(actions[0])
+        print(type(actions))
         assert self.worker_count == len(actions), "input length error"
         current_workers = self.workers_A if self.current_player > 0 else self.workers_B
         [worker.turn_init() for worker in current_workers]
-        sorted_workers = [(worker, actions[i]) for i, worker in enumerate(current_workers) if "break" in self.ACTIONS[self.CELL.index(actions[i])]]
-        sorted_workers += [(worker, actions[i]) for i, worker in enumerate(current_workers) if "break" not in self.ACTIONS[self.CELL.index(actions[i])]]
+        sorted_workers = [
+            (worker, action)
+            for worker, action in zip(current_workers, actions)
+            if "break" in self.ACTIONS[action]
+        ]
+        sorted_workers += [
+            (worker, action)
+            for worker, action in zip(current_workers, actions)
+            if "break" not in self.ACTIONS[action]
+        ]
 
         successful = all(
-            [
-                self.worker_action(worker, action)
-                for worker, action in sorted_workers
-            ]
+            [self.worker_action(worker, action) for worker, action in sorted_workers]
         )
         self.update_position()
         self.update_open_position()
