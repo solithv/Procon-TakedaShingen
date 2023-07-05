@@ -484,9 +484,23 @@ class Game(gym.Env):
                     )
                     cellInfo = view[i][j]
                     currentWorker = ""
-                    worker_A_exist = eval(" or ".join([f"'worker_A{k}' in cellInfo" for k in range(self.WORKER_MAX)]))
-                    worker_B_exist = eval(" or ".join([f"'worker_B{k}' in cellInfo" for k in range(self.WORKER_MAX)]))
-                    
+                    worker_A_exist = eval(
+                        " or ".join(
+                            [
+                                f"'worker_A{k}' in cellInfo"
+                                for k in range(self.WORKER_MAX)
+                            ]
+                        )
+                    )
+                    worker_B_exist = eval(
+                        " or ".join(
+                            [
+                                f"'worker_B{k}' in cellInfo"
+                                for k in range(self.WORKER_MAX)
+                            ]
+                        )
+                    )
+
                     # 色付き四角を何色にすべきか判定
                     if "castle" in cellInfo:
                         color = YELLOW
@@ -505,14 +519,19 @@ class Game(gym.Env):
                         color = SKY
                     else:
                         color = WHITE
-                    
+
                     # 色付き四角の描画
                     pygame.draw.rect(window_surface, color, cellPlacement)
-                    
+
                     # 職人番号の描画
                     font = pygame.font.SysFont(None, 37)
                     text = font.render(currentWorker, False, (255, 255, 255))
-                    text_rect = text.get_rect(center=(j * self.CELL_SIZE + self.CELL_SIZE / 2, i * self.CELL_SIZE + self.CELL_SIZE / 2))
+                    text_rect = text.get_rect(
+                        center=(
+                            j * self.CELL_SIZE + self.CELL_SIZE / 2,
+                            i * self.CELL_SIZE + self.CELL_SIZE / 2,
+                        )
+                    )
                     window_surface.blit(text, text_rect)
 
             # 縦線描画
@@ -547,6 +566,7 @@ done = False
 while not done:
     env.render()
 
+    print(" , ".join(f"{i}:{action}" for i, action in enumerate(env.ACTIONS)))
     print(f"input team A actions (need {env.worker_count} input) : ")
     actions = [int(input()) for _ in range(env.worker_count)]
     observation, reward, done, _ = env.step(actions)
