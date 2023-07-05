@@ -8,6 +8,8 @@ RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 BLUE = (0, 0, 255)
 YELLOW = (255, 255, 0)
+SKY = (127, 176, 255)
+PINK = (255, 127, 127)
 
 
 class Worker:
@@ -474,26 +476,26 @@ class Game(gym.Env):
                         self.CELL_SIZE,
                     )
                     cellInfo = view[i][j]
-                    
-                    # このforループで見ている職人が何番か
                     currentWorker = ""
-                    if eval(" or ".join([f"('worker_A{i}' in cellInfo) or ('worker_B{i}' in cellInfo)" for i in range(6)])):
-                        for item in cellInfo:
-                            currentWorker = item[-1]
+                    worker_A_exist = eval(" or ".join([f"'worker_A{k}' in cellInfo" for k in range(self.WORKER_MAX)]))
+                    worker_B_exist = eval(" or ".join([f"'worker_B{k}' in cellInfo" for k in range(self.WORKER_MAX)]))
                     
                     # 色付き四角を何色にすべきか判定
                     if "castle" in cellInfo:
                         color = YELLOW
-                    elif eval(
-                        " or ".join([f"'worker_A{i}' in cellInfo" for i in range(6)])
-                    ):
+                    elif worker_A_exist:
                         color = RED
-                    elif eval(
-                        " or ".join([f"'worker_B{i}' in cellInfo" for i in range(6)])
-                    ):
+                        currentWorker = cellInfo[0][-1]
+                    elif worker_B_exist:
                         color = BLUE
+                        currentWorker = cellInfo[0][-1]
                     elif "pond" in cellInfo:
                         color = GREEN
+                    elif "rampart_A" in cellInfo:
+                        print(cellInfo)
+                        color = PINK
+                    elif "rampart_B" in cellInfo:
+                        color = SKY
                     else:
                         color = WHITE
                     
