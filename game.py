@@ -226,7 +226,10 @@ class Game(gym.Env):
             and 0 <= y < self.height
             and 0 <= x < self.width
             and not self.compile_layers(
-                "rampart_A", "rampart_B", "pond", f"worker_{worker.another_team}"
+                "rampart_A",
+                "rampart_B",
+                "pond",
+                *[f"worker_{worker.another_team}{i}" for i in range(6)],
             )[y, x]
             and (y, x) not in self.get_team_worker_coordinate(worker.team)
         ):
@@ -240,7 +243,10 @@ class Game(gym.Env):
             and 0 <= y < self.height
             and 0 <= x < self.width
             and not self.compile_layers(
-                "rampart_A", "rampart_B", "castle", f"worker_{worker.another_team}"
+                "rampart_A",
+                "rampart_B",
+                "castle",
+                *[f"worker_{worker.another_team}{i}" for i in range(6)],
             )[y, x]
             and (y, x) not in self.get_team_worker_coordinate(worker.team)
         ):
