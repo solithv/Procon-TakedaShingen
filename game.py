@@ -538,11 +538,13 @@ done = False
 while not done:
     env.render()
 
+    print(f"input team A actions (need {env.worker_count} input) : ")
     actions = [int(input()) for _ in range(env.worker_count)]
     observation, reward, done, _ = env.step(actions)
 
     env.render()
 
+    print(f"input team B actions (need {env.worker_count} input) : ")
     actions = [int(input()) for _ in range(env.worker_count)]
     observation, reward, done, _ = env.step(actions)
 
