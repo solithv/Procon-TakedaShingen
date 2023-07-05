@@ -13,13 +13,13 @@ YELLOW = (255, 255, 0)
 class Worker:
     TEAMS = ("A", "B")
 
-    def __init__(self, name, y, x, num):
+    def __init__(self, name, y, x):
         self.name = name
-        self.team = name[-1]
+        self.team = name[-2]
+        self.num = name[-1]
         self.another_team = self.TEAMS[1 - self.TEAMS.index(self.team)]
         self.y = y
         self.x = x
-        self.num = num
         self.is_action = False
         self.action_log = []
 
@@ -60,8 +60,18 @@ class Game(gym.Env):
         "rampart_B",
         "castle",
         "pond",
-        "worker_A",
-        "worker_B",
+        "worker_A0",
+        "worker_A1",
+        "worker_A2",
+        "worker_A3",
+        "worker_A4",
+        "worker_A5",
+        "worker_B0",
+        "worker_B1",
+        "worker_B2",
+        "worker_B3",
+        "worker_B4",
+        "worker_B5",
     )
     ACTIONS = (
         "move_N",
@@ -121,7 +131,7 @@ class Game(gym.Env):
         self.window_size_x = self.width * self.CELL_SIZE
         self.window_size_y = self.height * self.CELL_SIZE
 
-    def set_cell_property(self, target, count=1, coordinates=None):
+    def set_cell_property(self, target, coordinates=None):
         if not coordinates:
             while True:
                 y = np.random.randint(0, self.height - 1)
@@ -130,13 +140,13 @@ class Game(gym.Env):
                     break
         else:
             y, x = coordinates
-        self.board[self.CELL.index(target), y, x] = count
+        self.board[self.CELL.index(target), y, x] = 1
         self.used.append((y, x))
         return y, x
 
-    def set_worker_position(self, target, count, coordinates=None):
-        y, x = self.set_cell_property(target, count, coordinates)
-        return Worker(target, y, x, count)
+    def set_worker_position(self, target, coordinates=None):
+        y, x = self.set_cell_property(target, coordinates)
+        return Worker(target, y, x)
 
     def update_blank(self):
         self.board[0] = 1 - self.board[1:].any(axis=0)
@@ -168,24 +178,24 @@ class Game(gym.Env):
         if worker_A:
             assert self.worker_count == len(worker_A), "worker_A input error"
             self.workers_A = [
-                self.set_worker_position("worker_A", i + 1, coordinate)
+                self.set_worker_position(f"worker_A{i}", coordinate)
                 for i, coordinate in enumerate(worker_A)
             ]
         else:
             self.workers_A = [
-                self.set_worker_position("worker_A", i + 1)
+                self.set_worker_position(f"worker_A{i}")
                 for i in range(self.worker_count)
             ]
 
         if worker_B:
             assert self.worker_count == len(worker_B), "worker_B input error"
             self.workers_B = [
-                self.set_worker_position("worker_B", i + 1, coordinate)
+                self.set_worker_position(f"worker_B{i}", coordinate)
                 for i, coordinate in enumerate(worker_B)
             ]
         else:
             self.workers_B = [
-                self.set_worker_position("worker_B", i + 1)
+                self.set_worker_position(f"worker_B{i}")
                 for i in range(self.worker_count)
             ]
 
