@@ -464,71 +464,71 @@ class Game(gym.Env):
 
             pygame.display.update()
 
-    def direction(self,pos,act):
-        direct = np.array(0,0)
-        compass = {"N": np.array((0,-1)),
-                  "W": np.array((-1,0)),
-                  "S": np.array((0,1)),
-                  "E": np.array((1,0))}
-        if "N" in self.ACTIONS[act]:
-            direct += compass["N"]
-        if "W" in self.ACTIONS[act]:
-            direct += compass["W"]
-        if "S" in self.ACTIONS[act]:
-            direct += compass["S"]
-        if "E" in self.ACTIONS[act]:
-            direct += compass["E"]
-        direct += np.array(pos)
+    # def direction(self,pos,act):
+    #     direct = np.array(0,0)
+    #     compass = {"N": np.array((0,-1)),
+    #               "W": np.array((-1,0)),
+    #               "S": np.array((0,1)),
+    #               "E": np.array((1,0))}
+    #     if "N" in self.ACTIONS[act]:
+    #         direct += compass["N"]
+    #     if "W" in self.ACTIONS[act]:
+    #         direct += compass["W"]
+    #     if "S" in self.ACTIONS[act]:
+    #         direct += compass["S"]
+    #     if "E" in self.ACTIONS[act]:
+    #         direct += compass["E"]
+    #     direct += np.array(pos)
 
-        return direct
+    #     return direct
     
-    def judge_move(self,worker_pos,move):
-        moved_pos = self.direction(worker_pos,move)
+    # def judge_move(self,worker_pos,move):
+    #     moved_pos = self.direction(worker_pos,move)
     
-        if (moved_pos[0] >= 0) and (moved_pos[1] >= 0):
-            if not "rampart" in self.board[moved_pos[0]][moved_pos[1]]:
-                if not "worker" in self.board[moved_pos[0]][moved_pos[1]]:    
-                    if not "pond" in self.board[moved_pos[0]][moved_pos[1]]:
-                        return True
-        return False
+    #     if (moved_pos[0] >= 0) and (moved_pos[1] >= 0):
+    #         if not "rampart" in self.board[moved_pos[0]][moved_pos[1]]:
+    #             if not "worker" in self.board[moved_pos[0]][moved_pos[1]]:    
+    #                 if not "pond" in self.board[moved_pos[0]][moved_pos[1]]:
+    #                     return True
+    #     return False
     
-    def judge_build(self,worker_pos,build):
-        build_pos = self.direction(worker_pos,build)
+    # def judge_build(self,worker_pos,build):
+    #     build_pos = self.direction(worker_pos,build)
 
-        if (build_pos[0] >= 0) and (build_pos[1] >= 0):
-            if not "rampart" in self.board[build_pos[0]][build_pos[1]]:
-                if not "worker" in self.board[build_pos[0]][build_pos[1]]:
-                    return True
-        return False
+    #     if (build_pos[0] >= 0) and (build_pos[1] >= 0):
+    #         if not "rampart" in self.board[build_pos[0]][build_pos[1]]:
+    #             if not "worker" in self.board[build_pos[0]][build_pos[1]]:
+    #                 return True
+    #     return False
     
-    def judge_destroy(self,worker_pos,destroy):
-        destroy_pos = self.direction(worker_pos,destroy)
+    # def judge_destroy(self,worker_pos,destroy):
+    #     destroy_pos = self.direction(worker_pos,destroy)
 
-        if not "rampart" in self.board[destroy_pos[0]][destroy_pos[1]]:
-            return True
-        return False 
+    #     if not "rampart" in self.board[destroy_pos[0]][destroy_pos[1]]:
+    #         return True
+    #     return False 
     
-    def move(self,worker_pos,move):
-        self.board[worker_pos[0]][worker_pos[1]] = self.CELL[0]
-        worker_pos = np.array(worker_pos)
-        worker_pos += self.direction(worker_pos,move)
-        return worker_pos
+    # def move(self,worker_pos,move):
+    #     self.board[worker_pos[0]][worker_pos[1]] = self.CELL[0]
+    #     worker_pos = np.array(worker_pos)
+    #     worker_pos += self.direction(worker_pos,move)
+    #     return worker_pos
     
-    def build(self,worker_pos,build):
-        if "N" in self.ACTIONS[build]:
-            self.board[worker_pos[0]-1][worker_pos[1]] = self.CELL[5]
-        elif "W" in self.ACTIONS[build]:
-            self.board[worker_pos[0]][worker_pos[1]-1] = self.CELL[5]
-        elif "S" in self.ACTIONS[build]:
-            self.board[worker_pos[0]+1][worker_pos[1]] = self.CELL[5]
-        elif "E" in self.ACTIONS[build]:
-            self.board[worker_pos[0]][worker_pos[1]+1] = self.CELL[5]
+    # def build(self,worker_pos,build):
+    #     if "N" in self.ACTIONS[build]:
+    #         self.board[worker_pos[0]-1][worker_pos[1]] = self.CELL[5]
+    #     elif "W" in self.ACTIONS[build]:
+    #         self.board[worker_pos[0]][worker_pos[1]-1] = self.CELL[5]
+    #     elif "S" in self.ACTIONS[build]:
+    #         self.board[worker_pos[0]+1][worker_pos[1]] = self.CELL[5]
+    #     elif "E" in self.ACTIONS[build]:
+    #         self.board[worker_pos[0]][worker_pos[1]+1] = self.CELL[5]
     
-    def worker_action(self,worker_pos,act):
-        if self.judge_move(worker_pos,act):
-            self.move(worker_pos)
-        if self.judge_build(worker_pos,act):
-            self.build(worker_pos,act)
+    # def worker_action(self,worker_pos,act):
+    #     if self.judge_move(worker_pos,act):
+    #         self.move(worker_pos)
+    #     if self.judge_build(worker_pos,act):
+    #         self.build(worker_pos,act)
 
 
 env = Game()
@@ -539,6 +539,7 @@ observation = env.reset()
 done = False
 
 while not done:
+    
     env.render()
 
     print(f"input team A actions (need {env.worker_count} input) : ")
