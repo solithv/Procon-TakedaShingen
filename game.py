@@ -526,7 +526,7 @@ class Game(gym.Env):
         描画を行う
         mode: str("human" or "console") pygameかcliどちらで描画するか選択
         """
-        IMG_SCALER = (self.cell_size, self.cell_size)
+        IMG_SCALER = np.array((self.cell_size, self.cell_size))
         BLANK_IMG = pygame.transform.scale(pygame.image.load(CWD + "/assets/blank.png"), IMG_SCALER)
         POND_IMG = pygame.transform.scale(pygame.image.load(CWD + "/assets/pond.png"), IMG_SCALER)
         CASTLE_IMG = pygame.transform.scale(pygame.image.load(CWD + "/assets/castle.png"), IMG_SCALER)
