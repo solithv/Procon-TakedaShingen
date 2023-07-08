@@ -1,5 +1,5 @@
 import copy
-
+import pyautogui
 import gymnasium as gym
 import numpy as np
 import pygame
@@ -56,7 +56,6 @@ class Worker:
 
 class Game(gym.Env):
     metadata = {"render.modes": ["human", "console"]}
-    CELL_SIZE = 32
     CELL = (
         "blank",  # 論理反転
         "position_A",
@@ -110,8 +109,6 @@ class Game(gym.Env):
     POND_MIN, POND_MAX = 1, 5
     FIELD_MIN, FIELD_MAX = 11, 25
     WORKER_MIN, WORKER_MAX = 2, 6
-    WORKER_A_IMG = pygame.transform.scale(pygame.image.load(CWD + "/assets/worker_A.png"), (CELL_SIZE, CELL_SIZE))
-    WORKER_B_IMG = pygame.transform.scale(pygame.image.load(CWD + "/assets/worker_B.png"), (CELL_SIZE, CELL_SIZE))
 
     def __init__(self, end_turn=10, width=None, height=None, pond=None, worker=None):
         super().__init__()
@@ -137,9 +134,12 @@ class Game(gym.Env):
             dtype=np.int8,
         )
         self.reward_range = [np.NINF, np.inf]
-        self.window_size = max(self.width, self.height) * self.CELL_SIZE
-        self.window_size_x = self.width * self.CELL_SIZE
-        self.window_size_y = self.height * self.CELL_SIZE
+        self.display_size_x, self.display_size_y = pyautogui.size()
+        self.cell_size = min(self.display_size_x * 0.9 // self.width, self.display_size_y * 0.9 // self.height)
+        print(self.cell_size)
+        self.window_size = max(self.width, self.height) * self.cell_size
+        self.window_size_x = self.width * self.cell_size
+        self.window_size_y = self.height * self.cell_size
 
     def set_cell_property(self, target, coordinates=None):
         """
@@ -526,6 +526,31 @@ class Game(gym.Env):
         描画を行う
         mode: str("human" or "console") pygameかcliどちらで描画するか選択
         """
+        IMG_SCALER = np.array((self.cell_size, self.cell_size))
+        BLANK_IMG = pygame.transform.scale(pygame.image.load(CWD + "/assets/blank.png"), IMG_SCALER)
+        POND_IMG = pygame.transform.scale(pygame.image.load(CWD + "/assets/pond.png"), IMG_SCALER)
+        CASTLE_IMG = pygame.transform.scale(pygame.image.load(CWD + "/assets/castle.png"), IMG_SCALER)
+        RAMPART_A_IMG = pygame.transform.scale(pygame.image.load(CWD + "/assets/rampart_A.png"), IMG_SCALER)
+        RAMPART_B_IMG = pygame.transform.scale(pygame.image.load(CWD + "/assets/rampart_B.png"), IMG_SCALER)
+        WORKER_A_IMG = pygame.transform.scale(pygame.image.load(CWD + "/assets/worker_A.png"), IMG_SCALER)
+        WORKER_B_IMG = pygame.transform.scale(pygame.image.load(CWD + "/assets/worker_B.png"), IMG_SCALER)
+        
+        def placeImage(img, i, j, workerNumber=None, scale=1.0):
+            """
+            i, j番目に画像描画する関数
+            workerNumber: str 職人番号
+            scale: float 画像の倍率
+            """
+            placement = (self.cell_size * (j + (1 - scale) / 2), self.cell_size * (i + (1 - scale) / 2)) if scale != 1.0 else (j * self.cell_size, i * self.cell_size)
+            img = pygame.transform.scale(img, IMG_SCALER * scale)
+            window_surface.blit(img, placement)
+                
+            if workerNumber:
+                font = pygame.font.SysFont(None, 30)
+                text = font.render(workerNumber, False, BLACK)
+                text_rect = text.get_rect(center=(j * self.cell_size + 7, i * self.cell_size + 7))
+                window_surface.blit(text, text_rect)
+                
         view = [
             [
                 [
@@ -537,72 +562,56 @@ class Game(gym.Env):
             ]
             for y in range(self.height)
         ]
+        
         pygame.init()
         if mode == "console":
             [print(row) for row in view]
         elif mode == "human":
-            window_surface = pygame.display.set_mode(
-                (self.window_size_x, self.window_size_y)
-            )
+            window_surface = pygame.display.set_mode((self.window_size_x, self.window_size_y))
             pygame.display.set_caption("game")
 
-            window_surface.fill(WHITE)
+            window_surface.fill(GREEN)
 
             for i in range(self.height):
-                for j in range(self.width):
-                    cellPlacement = (
-                        j * self.CELL_SIZE,
-                        i * self.CELL_SIZE,
-                        self.CELL_SIZE,
-                        self.CELL_SIZE,
-                    )
+                for j in range(self.width):                    
                     cellInfo = view[i][j]
-                    currentWorker = ""
-                    worker_A_exist = eval(" or ".join([f"'worker_A{k}' in cellInfo" for k in range(self.WORKER_MAX)]))
-                    worker_B_exist = eval(" or ".join([f"'worker_B{k}' in cellInfo" for k in range(self.WORKER_MAX)]))
-                    castle_and_worker_A = False
-                    # 色付き四角を何色にすべきか判定
+                    worker_A_exist = any(f"worker_A{k}" in cellInfo for k in range(self.WORKER_MAX))
+                    worker_B_exist = any(f"worker_B{k}" in cellInfo for k in range(self.WORKER_MAX))
+
                     if "castle" in cellInfo and worker_A_exist:
-                        color = YELLOW
-                        castle_and_worker_A = True 
-                        currentWorker = cellInfo[0][-1] 
+                        placeImage(CASTLE_IMG, i, j) 
+                        placeImage(WORKER_A_IMG, i, j, workerNumber=cellInfo[-1][-1], scale=0.7) 
+                    elif "castle" in cellInfo and worker_B_exist:
+                        placeImage(CASTLE_IMG, i, j) 
+                        placeImage(WORKER_B_IMG, i, j, workerNumber=cellInfo[-1][-1], scale=0.7) 
+                    elif "pond" in cellInfo and "rampart_A" in cellInfo:
+                        placeImage(POND_IMG, i, j) 
+                        placeImage(RAMPART_A_IMG, i, j, scale=0.8) 
+                    elif "pond" in cellInfo and "rampart_B" in cellInfo:
+                        placeImage(POND_IMG, i, j) 
+                        placeImage(RAMPART_B_IMG, i, j, scale=0.8) 
                     elif "castle" in cellInfo:
-                        color = YELLOW
+                        placeImage(CASTLE_IMG, i, j)
                     elif worker_A_exist:
-                        window_surface.blit(self.WORKER_A_IMG, (j * self.CELL_SIZE, i * self.CELL_SIZE))
-                        currentWorker = cellInfo[0][-1]
+                        placeImage(WORKER_A_IMG, i, j, workerNumber=cellInfo[-1][-1]) 
                     elif worker_B_exist:
-                        window_surface.blit(self.WORKER_B_IMG, (j * self.CELL_SIZE, i * self.CELL_SIZE))
-                        currentWorker = cellInfo[0][-1]
+                        placeImage(WORKER_B_IMG, i, j, workerNumber=cellInfo[-1][-1]) 
                     elif "pond" in cellInfo:
-                        color = GREEN
+                        placeImage(POND_IMG, i, j)
                     elif "rampart_A" in cellInfo:
-                        color = PINK
+                        placeImage(RAMPART_A_IMG, i, j)
                     elif "rampart_B" in cellInfo:
-                        color = SKY
-                    else:
-                        color = WHITE
-                    
-                    # マスの描画
-                    if castle_and_worker_A:
-                        pygame.draw.rect(window_surface, color, cellPlacement)
-                        window_surface.blit(self.WORKER_A_IMG, (j * self.CELL_SIZE, i * self.CELL_SIZE))
-                    elif not any([worker_A_exist, worker_B_exist]):
-                        pygame.draw.rect(window_surface, color, cellPlacement)
-                    
-                    # 職人番号の描画
-                    font = pygame.font.SysFont(None, 25)
-                    text = font.render(currentWorker, False, BLACK)
-                    text_rect = text.get_rect(center=(j * self.CELL_SIZE + 5, i * self.CELL_SIZE + 5))
-                    window_surface.blit(text, text_rect)
+                        placeImage(RAMPART_B_IMG, i, j)
+                    elif "blank" in cellInfo:
+                        placeImage(BLANK_IMG, i, j)
 
             # 縦線描画
             for i in range(1, self.width):
                 pygame.draw.line(
                     window_surface,
                     BLACK,
-                    (i * self.CELL_SIZE, 0),
-                    (i * self.CELL_SIZE, self.window_size_y),
+                    (i * self.cell_size, 0),
+                    (i * self.cell_size, self.window_size_y),
                     1,
                 )
             # 横線描画
@@ -610,13 +619,12 @@ class Game(gym.Env):
                 pygame.draw.line(
                     window_surface,
                     BLACK,
-                    (0, i * self.CELL_SIZE),
-                    (self.window_size_x, i * self.CELL_SIZE),
+                    (0, i * self.cell_size),
+                    (self.window_size_x, i * self.cell_size),
                     1,
                 )
 
             pygame.display.update()
-
 
 env = Game()
 
@@ -628,7 +636,7 @@ done = False
 while not done:
     env.render()
 
-    print(" , ".join(f"{i}:{action}" for i, action in enumerate(env.ACTIONS)))
+    [print(f"{i:2}: {action}") for i, action in enumerate(env.ACTIONS)]
     print(f"input team A actions (need {env.worker_count} input) : ")
     actions = [int(input()) for _ in range(env.worker_count)]
     observation, reward, done, _ = env.step(actions)
