@@ -526,7 +526,7 @@ class Game(gym.Env):
         描画を行う
         mode: str("human" or "console") pygameかcliどちらで描画するか選択
         """
-        IMG_SCALER = np.array((self.cell_size, self.cell_size))
+        IMG_SCALER = (self.cell_size, self.cell_size)
         BLANK_IMG = pygame.transform.scale(pygame.image.load(CWD + "/assets/blank.png"), IMG_SCALER)
         POND_IMG = pygame.transform.scale(pygame.image.load(CWD + "/assets/pond.png"), IMG_SCALER)
         CASTLE_IMG = pygame.transform.scale(pygame.image.load(CWD + "/assets/castle.png"), IMG_SCALER)
@@ -535,13 +535,22 @@ class Game(gym.Env):
         WORKER_A_IMG = pygame.transform.scale(pygame.image.load(CWD + "/assets/worker_A.png"), IMG_SCALER)
         WORKER_B_IMG = pygame.transform.scale(pygame.image.load(CWD + "/assets/worker_B.png"), IMG_SCALER)
         
-        def placeImage(img, i, j):
+        def placeImage(img, i, j, workerNumber=None, scale=1.0):
             """
-            i, j番目に画像描画するためだけの関数
-            ごちゃごちゃ軽減
+            i, j番目に画像描画する関数
+            workerNumber: str 職人番号
+            scale: float 画像の倍率
             """
-            window_surface.blit(img, (j * self.cell_size, i * self.cell_size))
-            
+            placement = (self.cell_size * (j + (1 - scale) / 2), self.cell_size * (i + (1 - scale) / 2)) if scale != 1.0 else (j * self.cell_size, i * self.cell_size)
+            img = pygame.transform.scale(img, IMG_SCALER * scale)
+            window_surface.blit(img, placement)
+                
+            if workerNumber:
+                font = pygame.font.SysFont(None, 30)
+                text = font.render(workerNumber, False, BLACK)
+                text_rect = text.get_rect(center=(j * self.cell_size + 7, i * self.cell_size + 7))
+                window_surface.blit(text, text_rect)
+                
         view = [
             [
                 [
@@ -553,61 +562,40 @@ class Game(gym.Env):
             ]
             for y in range(self.height)
         ]
+        
         pygame.init()
         if mode == "console":
             [print(row) for row in view]
         elif mode == "human":
-            window_surface = pygame.display.set_mode(
-                (self.window_size_x, self.window_size_y)
-            )
+            window_surface = pygame.display.set_mode((self.window_size_x, self.window_size_y))
             pygame.display.set_caption("game")
 
             window_surface.fill(GREEN)
 
             for i in range(self.height):
-                for j in range(self.width):
-                    cellPlacement = (
-                        j * self.cell_size,
-                        i * self.cell_size,
-                        self.cell_size,
-                        self.cell_size,
-                    )
+                for j in range(self.width):                    
                     cellInfo = view[i][j]
-                    currentWorker = ""
                     worker_A_exist = any(f"worker_A{k}" in cellInfo for k in range(self.WORKER_MAX))
                     worker_B_exist = any(f"worker_B{k}" in cellInfo for k in range(self.WORKER_MAX))
-                    castle_and_worker_A = False
-                    castle_and_worker_B = False
-                    
-                    """
-                    メモ: 考えられる重なりパターン
-                    
-                    ・城壁の上に職人
-                    ・池の上に城壁
-                    ・
-                    
-                    """
-                    
-                    
-                    
-                    
-                    
+
                     if "castle" in cellInfo and worker_A_exist:
-                        castle_and_worker_A = True 
-                        # currentWorker = cellInfo[0][-1]
-                        currentWorker = "1"
-                        print(cellInfo[0][-1])
-                    if "castle" in cellInfo and worker_B_exist:
-                        castle_and_worker_B = True 
-                        currentWorker = cellInfo[0][-1] 
+                        placeImage(CASTLE_IMG, i, j) 
+                        placeImage(WORKER_A_IMG, i, j, workerNumber=cellInfo[-1][-1], scale=0.7) 
+                    elif "castle" in cellInfo and worker_B_exist:
+                        placeImage(CASTLE_IMG, i, j) 
+                        placeImage(WORKER_B_IMG, i, j, workerNumber=cellInfo[-1][-1], scale=0.7) 
+                    elif "pond" in cellInfo and "rampart_A" in cellInfo:
+                        placeImage(POND_IMG, i, j) 
+                        placeImage(RAMPART_A_IMG, i, j, scale=0.8) 
+                    elif "pond" in cellInfo and "rampart_B" in cellInfo:
+                        placeImage(POND_IMG, i, j) 
+                        placeImage(RAMPART_B_IMG, i, j, scale=0.8) 
                     elif "castle" in cellInfo:
                         placeImage(CASTLE_IMG, i, j)
                     elif worker_A_exist:
-                        placeImage(WORKER_A_IMG, i, j)
-                        currentWorker = cellInfo[0][-1]
+                        placeImage(WORKER_A_IMG, i, j, workerNumber=cellInfo[-1][-1]) 
                     elif worker_B_exist:
-                        placeImage(WORKER_B_IMG, i, j)
-                        currentWorker = cellInfo[0][-1]
+                        placeImage(WORKER_B_IMG, i, j, workerNumber=cellInfo[-1][-1]) 
                     elif "pond" in cellInfo:
                         placeImage(POND_IMG, i, j)
                     elif "rampart_A" in cellInfo:
@@ -616,26 +604,6 @@ class Game(gym.Env):
                         placeImage(RAMPART_B_IMG, i, j)
                     elif "blank" in cellInfo:
                         placeImage(BLANK_IMG, i, j)
-                    else:
-                        color = WHITE
-                    
-                    color = WHITE
-                    
-                    # マスの描画
-                    if castle_and_worker_A:
-                        pygame.draw.rect(window_surface, color, cellPlacement)
-                        placeImage(WORKER_A_IMG, i, j)
-                    elif castle_and_worker_B:
-                        pygame.draw.rect(window_surface, color, cellPlacement)
-                        placeImage(WORKER_B_IMG, i, j)
-                    # elif not any([worker_A_exist, worker_B_exist]):
-                    #     pygame.draw.rect(window_surface, color, cellPlacement)
-                    
-                    # 職人番号の描画
-                    font = pygame.font.SysFont(None, 30)
-                    text = font.render(currentWorker, False, BLACK)
-                    text_rect = text.get_rect(center=(j * self.cell_size + 7, i * self.cell_size + 7))
-                    window_surface.blit(text, text_rect)
 
             # 縦線描画
             for i in range(1, self.width):
@@ -658,7 +626,6 @@ class Game(gym.Env):
 
             pygame.display.update()
 
-
 env = Game()
 
 print(f"width:{env.width}, height:{env.height}, workers:{env.worker_count}")
@@ -669,7 +636,7 @@ done = False
 while not done:
     env.render()
 
-    print(" , ".join(f"{i}:{action}" for i, action in enumerate(env.ACTIONS)))
+    [print(f"{i:2}: {action}") for i, action in enumerate(env.ACTIONS)]
     print(f"input team A actions (need {env.worker_count} input) : ")
     actions = [int(input()) for _ in range(env.worker_count)]
     observation, reward, done, _ = env.step(actions)
