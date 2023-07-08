@@ -16,6 +16,7 @@ PINK = (255, 127, 127)
 
 CWD = os.getcwd()
 
+
 class Worker:
     TEAMS = ("A", "B")
 
@@ -99,7 +100,7 @@ class Game(gym.Env):
         "break_W",
     )
     DIRECTIONS = {
-        # y, x
+        # [y, x]
         "N": np.array([-1, 0]),
         "E": np.array([0, 1]),
         "S": np.array([1, 0]),
@@ -112,7 +113,7 @@ class Game(gym.Env):
 
     def __init__(self, end_turn=10, width=None, height=None, pond=None, worker=None):
         super().__init__()
-        self.end_turn = end_turn
+        self.end_turn = end_turn * 2
         self.width = width or np.random.randint(self.FIELD_MIN, self.FIELD_MAX)
         self.height = height or np.random.randint(self.FIELD_MIN, self.FIELD_MAX)
         self.pond_count = pond or np.random.randint(self.POND_MIN, self.POND_MAX)
@@ -135,8 +136,10 @@ class Game(gym.Env):
         )
         self.reward_range = [np.NINF, np.inf]
         self.display_size_x, self.display_size_y = pyautogui.size()
-        self.cell_size = min(self.display_size_x * 0.9 // self.width, self.display_size_y * 0.9 // self.height)
-        print(self.cell_size)
+        self.cell_size = min(
+            self.display_size_x * 0.9 // self.width,
+            self.display_size_y * 0.9 // self.height,
+        )
         self.window_size = max(self.width, self.height) * self.cell_size
         self.window_size_x = self.width * self.cell_size
         self.window_size_y = self.height * self.cell_size
@@ -492,8 +495,6 @@ class Game(gym.Env):
         gymの必須関数
         1ターン進める処理を実行
         """
-        print(actions[0])
-        print(type(actions))
         assert self.worker_count == len(actions), "input length error"
         current_workers = self.workers_A if self.current_player > 0 else self.workers_B
         [worker.turn_init() for worker in current_workers]
@@ -527,30 +528,53 @@ class Game(gym.Env):
         mode: str("human" or "console") pygameかcliどちらで描画するか選択
         """
         IMG_SCALER = np.array((self.cell_size, self.cell_size))
-        BLANK_IMG = pygame.transform.scale(pygame.image.load(CWD + "/assets/blank.png"), IMG_SCALER)
-        POND_IMG = pygame.transform.scale(pygame.image.load(CWD + "/assets/pond.png"), IMG_SCALER)
-        CASTLE_IMG = pygame.transform.scale(pygame.image.load(CWD + "/assets/castle.png"), IMG_SCALER)
-        RAMPART_A_IMG = pygame.transform.scale(pygame.image.load(CWD + "/assets/rampart_A.png"), IMG_SCALER)
-        RAMPART_B_IMG = pygame.transform.scale(pygame.image.load(CWD + "/assets/rampart_B.png"), IMG_SCALER)
-        WORKER_A_IMG = pygame.transform.scale(pygame.image.load(CWD + "/assets/worker_A.png"), IMG_SCALER)
-        WORKER_B_IMG = pygame.transform.scale(pygame.image.load(CWD + "/assets/worker_B.png"), IMG_SCALER)
-        
+        BLANK_IMG = pygame.transform.scale(
+            pygame.image.load(CWD + "/assets/blank.png"), IMG_SCALER
+        )
+        POND_IMG = pygame.transform.scale(
+            pygame.image.load(CWD + "/assets/pond.png"), IMG_SCALER
+        )
+        CASTLE_IMG = pygame.transform.scale(
+            pygame.image.load(CWD + "/assets/castle.png"), IMG_SCALER
+        )
+        RAMPART_A_IMG = pygame.transform.scale(
+            pygame.image.load(CWD + "/assets/rampart_A.png"), IMG_SCALER
+        )
+        RAMPART_B_IMG = pygame.transform.scale(
+            pygame.image.load(CWD + "/assets/rampart_B.png"), IMG_SCALER
+        )
+        WORKER_A_IMG = pygame.transform.scale(
+            pygame.image.load(CWD + "/assets/worker_A.png"), IMG_SCALER
+        )
+        WORKER_B_IMG = pygame.transform.scale(
+            pygame.image.load(CWD + "/assets/worker_B.png"), IMG_SCALER
+        )
+
         def placeImage(img, i, j, workerNumber=None, scale=1.0):
             """
             i, j番目に画像描画する関数
             workerNumber: str 職人番号
             scale: float 画像の倍率
             """
-            placement = (self.cell_size * (j + (1 - scale) / 2), self.cell_size * (i + (1 - scale) / 2)) if scale != 1.0 else (j * self.cell_size, i * self.cell_size)
+            placement = (
+                (
+                    self.cell_size * (j + (1 - scale) / 2),
+                    self.cell_size * (i + (1 - scale) / 2),
+                )
+                if scale != 1.0
+                else (j * self.cell_size, i * self.cell_size)
+            )
             img = pygame.transform.scale(img, IMG_SCALER * scale)
             window_surface.blit(img, placement)
-                
+
             if workerNumber:
                 font = pygame.font.SysFont(None, 30)
                 text = font.render(workerNumber, False, BLACK)
-                text_rect = text.get_rect(center=(j * self.cell_size + 7, i * self.cell_size + 7))
+                text_rect = text.get_rect(
+                    center=(j * self.cell_size + 7, i * self.cell_size + 7)
+                )
                 window_surface.blit(text, text_rect)
-                
+
         view = [
             [
                 [
@@ -562,40 +586,50 @@ class Game(gym.Env):
             ]
             for y in range(self.height)
         ]
-        
+
         pygame.init()
         if mode == "console":
             [print(row) for row in view]
         elif mode == "human":
-            window_surface = pygame.display.set_mode((self.window_size_x, self.window_size_y))
+            window_surface = pygame.display.set_mode(
+                (self.window_size_x, self.window_size_y)
+            )
             pygame.display.set_caption("game")
 
             window_surface.fill(GREEN)
 
             for i in range(self.height):
-                for j in range(self.width):                    
+                for j in range(self.width):
                     cellInfo = view[i][j]
-                    worker_A_exist = any(f"worker_A{k}" in cellInfo for k in range(self.WORKER_MAX))
-                    worker_B_exist = any(f"worker_B{k}" in cellInfo for k in range(self.WORKER_MAX))
+                    worker_A_exist = any(
+                        f"worker_A{k}" in cellInfo for k in range(self.WORKER_MAX)
+                    )
+                    worker_B_exist = any(
+                        f"worker_B{k}" in cellInfo for k in range(self.WORKER_MAX)
+                    )
 
                     if "castle" in cellInfo and worker_A_exist:
-                        placeImage(CASTLE_IMG, i, j) 
-                        placeImage(WORKER_A_IMG, i, j, workerNumber=cellInfo[-1][-1], scale=0.7) 
+                        placeImage(CASTLE_IMG, i, j)
+                        placeImage(
+                            WORKER_A_IMG, i, j, workerNumber=cellInfo[-1][-1], scale=0.7
+                        )
                     elif "castle" in cellInfo and worker_B_exist:
-                        placeImage(CASTLE_IMG, i, j) 
-                        placeImage(WORKER_B_IMG, i, j, workerNumber=cellInfo[-1][-1], scale=0.7) 
+                        placeImage(CASTLE_IMG, i, j)
+                        placeImage(
+                            WORKER_B_IMG, i, j, workerNumber=cellInfo[-1][-1], scale=0.7
+                        )
                     elif "pond" in cellInfo and "rampart_A" in cellInfo:
-                        placeImage(POND_IMG, i, j) 
-                        placeImage(RAMPART_A_IMG, i, j, scale=0.8) 
+                        placeImage(POND_IMG, i, j)
+                        placeImage(RAMPART_A_IMG, i, j, scale=0.8)
                     elif "pond" in cellInfo and "rampart_B" in cellInfo:
-                        placeImage(POND_IMG, i, j) 
-                        placeImage(RAMPART_B_IMG, i, j, scale=0.8) 
+                        placeImage(POND_IMG, i, j)
+                        placeImage(RAMPART_B_IMG, i, j, scale=0.8)
                     elif "castle" in cellInfo:
                         placeImage(CASTLE_IMG, i, j)
                     elif worker_A_exist:
-                        placeImage(WORKER_A_IMG, i, j, workerNumber=cellInfo[-1][-1]) 
+                        placeImage(WORKER_A_IMG, i, j, workerNumber=cellInfo[-1][-1])
                     elif worker_B_exist:
-                        placeImage(WORKER_B_IMG, i, j, workerNumber=cellInfo[-1][-1]) 
+                        placeImage(WORKER_B_IMG, i, j, workerNumber=cellInfo[-1][-1])
                     elif "pond" in cellInfo:
                         placeImage(POND_IMG, i, j)
                     elif "rampart_A" in cellInfo:
@@ -626,29 +660,31 @@ class Game(gym.Env):
 
             pygame.display.update()
 
-env = Game()
 
-print(f"width:{env.width}, height:{env.height}, workers:{env.worker_count}")
+if __name__ == "__main__":
+    env = Game()
 
-observation = env.reset()
-done = False
+    print(f"width:{env.width}, height:{env.height}, workers:{env.worker_count}")
 
-while not done:
+    observation = env.reset()
+    done = False
+
+    while not done:
+        env.render()
+
+        [print(f"{i:2}: {action}") for i, action in enumerate(env.ACTIONS)]
+        print(f"input team A actions (need {env.worker_count} input) : ")
+        actions = [int(input()) for _ in range(env.worker_count)]
+        observation, reward, done, _ = env.step(actions)
+
+        env.render()
+
+        print(f"input team B actions (need {env.worker_count} input) : ")
+        actions = [int(input()) for _ in range(env.worker_count)]
+        observation, reward, done, _ = env.step(actions)
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+
     env.render()
-
-    [print(f"{i:2}: {action}") for i, action in enumerate(env.ACTIONS)]
-    print(f"input team A actions (need {env.worker_count} input) : ")
-    actions = [int(input()) for _ in range(env.worker_count)]
-    observation, reward, done, _ = env.step(actions)
-
-    env.render()
-
-    print(f"input team B actions (need {env.worker_count} input) : ")
-    actions = [int(input()) for _ in range(env.worker_count)]
-    observation, reward, done, _ = env.step(actions)
-
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            pygame.quit()
-
-env.render()
