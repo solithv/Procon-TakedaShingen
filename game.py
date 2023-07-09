@@ -2,8 +2,11 @@ import copy
 import pyautogui
 import gymnasium as gym
 import numpy as np
+import tkinter as tk
 import pygame
 import os
+import sys
+from PyQt5.QtWidgets import QApplication, QWidget, QPushButton
 
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
@@ -660,6 +663,49 @@ class Game(gym.Env):
 
             pygame.display.update()
 
+class ControllerWindow(QWidget):
+    def __init__(self, workerCount):
+        super().__init__()
+        self.workerCount = workerCount
+        self.actions = []
+        self.setWindowTitle("controller")
+        
+        self.movePattern = [8, 1, 2, 7, 0, 3, 6, 5, 4]
+        movePatternIter = iter(self.movePattern)
+        for i in range(3):
+            for j in range(3):
+                button = QPushButton(str(next(movePatternIter)), self)
+                button.move(j * 60, i * 60)
+                button.resize(60, 60)
+                button.clicked.connect(self.buttonAction)
+                
+        self.buildPattern = [9, 12, 10, 11]
+        buildPatternIter = iter(self.buildPattern)     
+        for i in range(3):
+            for j in range(3):
+                if (i + j) % 2 != 0:
+                    button = QPushButton(str(next(buildPatternIter)), self)
+                    button.move(j * 60, i * 60 + 200)
+                    button.resize(60, 60)
+                    button.clicked.connect(self.buttonAction)
+
+        self.breakPattern = [13, 16, 14, 15]
+        breakPatternIter = iter(self.breakPattern)
+        for i in range(3):
+            for j in range(3):
+                if (i + j) % 2 != 0:
+                    button = QPushButton(str(next(breakPatternIter)), self)
+                    button.move(j * 60, i * 60 + 400)
+                    button.resize(60, 60)
+                    button.clicked.connect(self.buttonAction)
+
+    def buttonAction(self):
+        pattern = int(self.sender().text())
+        self.actions.append(pattern)
+        print(self.actions)
+        if len(self.actions) == self.workerCount:
+            self.close()
+            return self.actions
 
 if __name__ == "__main__":
     env = Game()
@@ -674,7 +720,14 @@ if __name__ == "__main__":
 
         [print(f"{i:2}: {action}") for i, action in enumerate(env.ACTIONS)]
         print(f"input team A actions (need {env.worker_count} input) : ")
-        actions = [int(input()) for _ in range(env.worker_count)]
+        
+        # actions = [int(input()) for _ in range(env.worker_count)]
+        app = QApplication(sys.argv)
+        # app.setQuitOnLastWindowClosed(False)
+        controller = ControllerWindow(env.worker_count)
+        controller.show()
+        sys.exit(app.exec_())
+        actions = controller.buttonAction()
         observation, reward, done, _ = env.step(actions)
 
         env.render()
