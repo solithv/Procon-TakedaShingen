@@ -1,9 +1,9 @@
 import copy
 import os
 
-import pyautogui
 import gymnasium as gym
 import numpy as np
+import pyautogui
 import pygame
 
 BLACK = (0, 0, 0)
@@ -58,6 +58,10 @@ class Worker:
 
 class Game(gym.Env):
     metadata = {"render.modes": ["human", "console"]}
+    SCORE_MULTIPLIER = {"castle": 100, "position": 50, "rampart": 10}
+    POND_MIN, POND_MAX = 1, 5
+    FIELD_MIN, FIELD_MAX = 11, 25
+    WORKER_MIN, WORKER_MAX = 2, 6
     CELL = (
         "blank",  # 論理反転
         "position_A",
@@ -97,16 +101,6 @@ class Game(gym.Env):
         "S": np.array([1, 0]),
         "W": np.array([0, -1]),
     }
-    SCORE_MULTIPLIER = {"castle": 100, "position": 50, "rampart": 10}
-    WORKER_A_IMG = pygame.transform.scale(
-        pygame.image.load(CWD + "/assets/worker_A.png"), (CELL_SIZE, CELL_SIZE)
-    )
-    WORKER_B_IMG = pygame.transform.scale(
-        pygame.image.load(CWD + "/assets/worker_B.png"), (CELL_SIZE, CELL_SIZE)
-    )
-    POND_MIN, POND_MAX = 1, 5
-    FIELD_MIN, FIELD_MAX = 11, 25
-    WORKER_MIN, WORKER_MAX = 2, 6
 
     def __init__(self, end_turn=10, width=None, height=None, pond=None, worker=None):
         super().__init__()
