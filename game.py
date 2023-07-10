@@ -8,16 +8,6 @@ import os
 import sys
 from PyQt5.QtWidgets import QApplication, QWidget, QPushButton
 
-BLACK = (0, 0, 0)
-WHITE = (255, 255, 255)
-RED = (255, 0, 0)
-GREEN = (0, 255, 0)
-BLUE = (0, 0, 255)
-YELLOW = (255, 255, 0)
-SKY = (127, 176, 255)
-PINK = (255, 127, 127)
-
-CWD = os.getcwd()
 
 
 class Worker:
@@ -114,6 +104,15 @@ class Game(gym.Env):
     FIELD_MIN, FIELD_MAX = 11, 25
     WORKER_MIN, WORKER_MAX = 2, 6
 
+    BLACK = (0, 0, 0)
+    WHITE = (255, 255, 255)
+    RED = (255, 0, 0)
+    GREEN = (0, 255, 0)
+    BLUE = (0, 0, 255)
+    YELLOW = (255, 255, 0)
+    SKY = (127, 176, 255)
+    PINK = (255, 127, 127)
+
     def __init__(self, end_turn=10, width=None, height=None, pond=None, worker=None):
         super().__init__()
         self.end_turn = end_turn * 2
@@ -138,6 +137,7 @@ class Game(gym.Env):
             dtype=np.int8,
         )
         self.reward_range = [np.NINF, np.inf]
+        self.cwd = os.getcwd()
         self.display_size_x, self.display_size_y = pyautogui.size()
         self.cell_size = min(
             self.display_size_x * 0.9 // self.width,
@@ -532,25 +532,25 @@ class Game(gym.Env):
         """
         IMG_SCALER = np.array((self.cell_size, self.cell_size))
         BLANK_IMG = pygame.transform.scale(
-            pygame.image.load(CWD + "/assets/blank.png"), IMG_SCALER
+            pygame.image.load(self.cwd + "/assets/blank.png"), IMG_SCALER
         )
         POND_IMG = pygame.transform.scale(
-            pygame.image.load(CWD + "/assets/pond.png"), IMG_SCALER
+            pygame.image.load(self.cwd + "/assets/pond.png"), IMG_SCALER
         )
         CASTLE_IMG = pygame.transform.scale(
-            pygame.image.load(CWD + "/assets/castle.png"), IMG_SCALER
+            pygame.image.load(self.cwd + "/assets/castle.png"), IMG_SCALER
         )
         RAMPART_A_IMG = pygame.transform.scale(
-            pygame.image.load(CWD + "/assets/rampart_A.png"), IMG_SCALER
+            pygame.image.load(self.cwd + "/assets/rampart_A.png"), IMG_SCALER
         )
         RAMPART_B_IMG = pygame.transform.scale(
-            pygame.image.load(CWD + "/assets/rampart_B.png"), IMG_SCALER
+            pygame.image.load(self.cwd + "/assets/rampart_B.png"), IMG_SCALER
         )
         WORKER_A_IMG = pygame.transform.scale(
-            pygame.image.load(CWD + "/assets/worker_A.png"), IMG_SCALER
+            pygame.image.load(self.cwd + "/assets/worker_A.png"), IMG_SCALER
         )
         WORKER_B_IMG = pygame.transform.scale(
-            pygame.image.load(CWD + "/assets/worker_B.png"), IMG_SCALER
+            pygame.image.load(self.cwd + "/assets/worker_B.png"), IMG_SCALER
         )
 
         def placeImage(img, i, j, workerNumber=None, scale=1.0):
@@ -572,7 +572,7 @@ class Game(gym.Env):
 
             if workerNumber:
                 font = pygame.font.SysFont(None, 30)
-                text = font.render(workerNumber, False, BLACK)
+                text = font.render(workerNumber, False, self.BLACK)
                 text_rect = text.get_rect(
                     center=(j * self.cell_size + 7, i * self.cell_size + 7)
                 )
@@ -599,7 +599,7 @@ class Game(gym.Env):
             )
             pygame.display.set_caption("game")
 
-            window_surface.fill(GREEN)
+            window_surface.fill(self.GREEN)
 
             for i in range(self.height):
                 for j in range(self.width):
@@ -646,7 +646,7 @@ class Game(gym.Env):
             for i in range(1, self.width):
                 pygame.draw.line(
                     window_surface,
-                    BLACK,
+                    self.BLACK,
                     (i * self.cell_size, 0),
                     (i * self.cell_size, self.window_size_y),
                     1,
@@ -655,7 +655,7 @@ class Game(gym.Env):
             for i in range(1, self.height):
                 pygame.draw.line(
                     window_surface,
-                    BLACK,
+                    self.BLACK,
                     (0, i * self.cell_size),
                     (self.window_size_x, i * self.cell_size),
                     1,
@@ -721,13 +721,13 @@ if __name__ == "__main__":
         [print(f"{i:2}: {action}") for i, action in enumerate(env.ACTIONS)]
         print(f"input team A actions (need {env.worker_count} input) : ")
         
-        # actions = [int(input()) for _ in range(env.worker_count)]
-        app = QApplication(sys.argv)
+        actions = [int(input()) for _ in range(env.worker_count)]
+        # app = QApplication(sys.argv)
         # app.setQuitOnLastWindowClosed(False)
-        controller = ControllerWindow(env.worker_count)
-        controller.show()
-        sys.exit(app.exec_())
-        actions = controller.buttonAction()
+        # controller = ControllerWindow(env.worker_count)
+        # controller.show()
+        # sys.exit(app.exec_())
+        # actions = controller.buttonAction()
         observation, reward, done, _ = env.step(actions)
 
         env.render()
