@@ -1,9 +1,9 @@
 import copy
+import os
 
 import gymnasium as gym
 import numpy as np
 import pygame
-import os
 
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
@@ -15,6 +15,7 @@ SKY = (127, 176, 255)
 PINK = (255, 127, 127)
 
 CWD = os.getcwd()
+
 
 class Worker:
     TEAMS = ("A", "B")
@@ -57,6 +58,9 @@ class Worker:
 class Game(gym.Env):
     metadata = {"render.modes": ["human", "console"]}
     CELL_SIZE = 32
+    POND_MIN, POND_MAX = 1, 5
+    FIELD_MIN, FIELD_MAX = 11, 25
+    WORKER_MIN, WORKER_MAX = 2, 6
     CELL = (
         "blank",  # 論理反転
         "position_A",
@@ -67,18 +71,8 @@ class Game(gym.Env):
         "rampart_B",
         "castle",
         "pond",
-        "worker_A0",
-        "worker_A1",
-        "worker_A2",
-        "worker_A3",
-        "worker_A4",
-        "worker_A5",
-        "worker_B0",
-        "worker_B1",
-        "worker_B2",
-        "worker_B3",
-        "worker_B4",
-        "worker_B5",
+        *[f"worker_A{i}" for i in range(WORKER_MAX)],
+        *[f"worker_B{i}" for i in range(WORKER_MAX)],
     )
     ACTIONS = (
         "stay",
@@ -107,11 +101,12 @@ class Game(gym.Env):
         "W": np.array([0, -1]),
     }
     SCORE_MULTIPLIER = {"castle": 100, "position": 50, "rampart": 10}
-    POND_MIN, POND_MAX = 1, 5
-    FIELD_MIN, FIELD_MAX = 11, 25
-    WORKER_MIN, WORKER_MAX = 2, 6
-    WORKER_A_IMG = pygame.transform.scale(pygame.image.load(CWD + "/assets/worker_A.png"), (CELL_SIZE, CELL_SIZE))
-    WORKER_B_IMG = pygame.transform.scale(pygame.image.load(CWD + "/assets/worker_B.png"), (CELL_SIZE, CELL_SIZE))
+    WORKER_A_IMG = pygame.transform.scale(
+        pygame.image.load(CWD + "/assets/worker_A.png"), (CELL_SIZE, CELL_SIZE)
+    )
+    WORKER_B_IMG = pygame.transform.scale(
+        pygame.image.load(CWD + "/assets/worker_B.png"), (CELL_SIZE, CELL_SIZE)
+    )
 
     def __init__(self, end_turn=10, width=None, height=None, pond=None, worker=None):
         super().__init__()
@@ -558,21 +553,39 @@ class Game(gym.Env):
                     )
                     cellInfo = view[i][j]
                     currentWorker = ""
-                    worker_A_exist = eval(" or ".join([f"'worker_A{k}' in cellInfo" for k in range(self.WORKER_MAX)]))
-                    worker_B_exist = eval(" or ".join([f"'worker_B{k}' in cellInfo" for k in range(self.WORKER_MAX)]))
+                    worker_A_exist = eval(
+                        " or ".join(
+                            [
+                                f"'worker_A{k}' in cellInfo"
+                                for k in range(self.WORKER_MAX)
+                            ]
+                        )
+                    )
+                    worker_B_exist = eval(
+                        " or ".join(
+                            [
+                                f"'worker_B{k}' in cellInfo"
+                                for k in range(self.WORKER_MAX)
+                            ]
+                        )
+                    )
                     castle_and_worker_A = False
                     # 色付き四角を何色にすべきか判定
                     if "castle" in cellInfo and worker_A_exist:
                         color = YELLOW
-                        castle_and_worker_A = True 
-                        currentWorker = cellInfo[0][-1] 
+                        castle_and_worker_A = True
+                        currentWorker = cellInfo[0][-1]
                     elif "castle" in cellInfo:
                         color = YELLOW
                     elif worker_A_exist:
-                        window_surface.blit(self.WORKER_A_IMG, (j * self.CELL_SIZE, i * self.CELL_SIZE))
+                        window_surface.blit(
+                            self.WORKER_A_IMG, (j * self.CELL_SIZE, i * self.CELL_SIZE)
+                        )
                         currentWorker = cellInfo[0][-1]
                     elif worker_B_exist:
-                        window_surface.blit(self.WORKER_B_IMG, (j * self.CELL_SIZE, i * self.CELL_SIZE))
+                        window_surface.blit(
+                            self.WORKER_B_IMG, (j * self.CELL_SIZE, i * self.CELL_SIZE)
+                        )
                         currentWorker = cellInfo[0][-1]
                     elif "pond" in cellInfo:
                         color = GREEN
@@ -582,18 +595,22 @@ class Game(gym.Env):
                         color = SKY
                     else:
                         color = WHITE
-                    
+
                     # マスの描画
                     if castle_and_worker_A:
                         pygame.draw.rect(window_surface, color, cellPlacement)
-                        window_surface.blit(self.WORKER_A_IMG, (j * self.CELL_SIZE, i * self.CELL_SIZE))
+                        window_surface.blit(
+                            self.WORKER_A_IMG, (j * self.CELL_SIZE, i * self.CELL_SIZE)
+                        )
                     elif not any([worker_A_exist, worker_B_exist]):
                         pygame.draw.rect(window_surface, color, cellPlacement)
-                    
+
                     # 職人番号の描画
                     font = pygame.font.SysFont(None, 25)
                     text = font.render(currentWorker, False, BLACK)
-                    text_rect = text.get_rect(center=(j * self.CELL_SIZE + 5, i * self.CELL_SIZE + 5))
+                    text_rect = text.get_rect(
+                        center=(j * self.CELL_SIZE + 5, i * self.CELL_SIZE + 5)
+                    )
                     window_surface.blit(text, text_rect)
 
             # 縦線描画
