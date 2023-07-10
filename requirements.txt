@@ -1,0 +1,11 @@
+gym
+gymnasium
+keras-rl2
+matplotlib
+numpy
+opencv-python
+Pillow
+PyAutoGUI
+pygame
+scipy
+tensorflow
