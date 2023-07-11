@@ -9,7 +9,6 @@ import pygame
 from pygame.locals import *
 
 
-
 class Worker:
     TEAMS = ("A", "B")
 
@@ -117,13 +116,6 @@ class Game(gym.Env):
         self.worker_count = worker or np.random.randint(
             self.WORKER_MIN, self.WORKER_MAX
         )
-        self.current_player = 0
-        self.change_player(no_change=True)
-        self.score_A, self.score_B = 0, 0
-        self.previous_score_A, self.previous_score_B = 0, 0
-        self.turn = 0
-        self.done = False
-        self.board = np.zeros((len(self.CELL), self.height, self.width))
 
         self.action_space = gym.spaces.Discrete(len(self.ACTIONS))
         self.observation_space = gym.spaces.Box(
@@ -142,6 +134,8 @@ class Game(gym.Env):
         self.window_size = max(self.width, self.height) * self.cell_size
         self.window_size_x = self.width * self.cell_size
         self.window_size_y = self.height * self.cell_size
+
+        self.reset()
 
     def change_player(self, no_change=False):
         if not no_change:
@@ -181,22 +175,28 @@ class Game(gym.Env):
         """
         self.board[0] = 1 - self.board[1:].any(axis=0)
 
-    def reset(self, castle=None, pond=None, worker_A=None, worker_B=None):
+    def reset(
+        self, first_player=None, castle=None, pond=None, worker_A=None, worker_B=None
+    ):
         """
         gymの必須関数
         環境の初期化
+        first_player: str("A" or "B") 先攻のチーム名を指定
         castle: list[y,x] 城の座標を指定
         pond: list[list[y,x]] 池の座標を指定
         worker_A: list[list[y,x]] Aチームの職人の座標を指定
         worker_B: list[list[y,x]] Aチームの職人の座標を指定
         """
-        self.current_player = np.random.randint(0, 2)
+        self.current_player = (
+            self.TEAM.index(first_player) if first_player else np.random.randint(0, 2)
+        )
         self.change_player(no_change=True)
         self.score_A, self.score_B = 0, 0
         self.previous_score_A, self.previous_score_B = 0, 0
-        self.turn = 0
+        self.turn = 1
         self.done = False
         self.board = np.zeros((len(self.CELL), self.height, self.width))
+        self.workers = {}
         self.used = []
 
         self.set_cell_property("castle", coordinates=castle)
@@ -212,24 +212,24 @@ class Game(gym.Env):
 
         if worker_A:
             assert self.worker_count == len(worker_A), "worker_A input error"
-            self.workers_A = [
+            self.workers["A"] = [
                 self.set_worker_position(f"worker_A{i}", coordinate)
                 for i, coordinate in enumerate(worker_A)
             ]
         else:
-            self.workers_A = [
+            self.workers["A"] = [
                 self.set_worker_position(f"worker_A{i}")
                 for i in range(self.worker_count)
             ]
 
         if worker_B:
             assert self.worker_count == len(worker_B), "worker_B input error"
-            self.workers_B = [
+            self.workers["B"] = [
                 self.set_worker_position(f"worker_B{i}", coordinate)
                 for i, coordinate in enumerate(worker_B)
             ]
         else:
-            self.workers_B = [
+            self.workers["B"] = [
                 self.set_worker_position(f"worker_B{i}")
                 for i in range(self.worker_count)
             ]
@@ -257,9 +257,7 @@ class Game(gym.Env):
         team: str("A" or "B") 取得するチームを指定
         """
         return [
-            worker.get_coordinate()
-            for worker in eval(f"self.workers_{team}")
-            if worker.is_action
+            worker.get_coordinate() for worker in self.workers[team] if worker.is_action
         ]
 
     def is_movable(self, worker: Worker, y, x):
@@ -502,7 +500,9 @@ class Game(gym.Env):
         1ターン進める処理を実行
         """
         assert self.worker_count == len(actions), "input length error"
-        current_workers = self.workers_A if self.current_player <= 0 else self.workers_B
+        current_workers = (
+            self.workers["A"] if not self.current_player else self.workers["B"]
+        )
         [worker.turn_init() for worker in current_workers]
         sorted_workers = [
             (worker, action)
@@ -665,20 +665,21 @@ class Game(gym.Env):
                 )
 
             pygame.display.update()
-            
+
             if input_with == "pygame":
                 actions = []
                 actingWorker = 0
                 print("ok")
                 # クリックによって行動を入力する
-                while len(actions) != self.worker_count:        
+                while len(actions) != self.worker_count:
                     for event in pygame.event.get():
                         mouseX, mouseY = pygame.mouse.get_pos()
                         cellX = int(mouseX // self.cell_size)
                         cellY = int(mouseY // self.cell_size)
-                        workerX = eval(f"self.workers_{self.current_team}")[actingWorker].x
-                        workerY = eval(f"self.workers_{self.current_team}")[actingWorker].y
-                        
+                        workerY,  workerX = self.workers[self.current_team][
+                            actingWorker
+                        ].get_coordinate()
+
                         # マウスクリック時の動作
                         if event.type == MOUSEBUTTONDOWN:
                             print(f"\n-------------\ncellX = {cellX}\ncellY = {cellY}\nworkerX = {workerX}\nworkerY = {workerY}\n-------------")
@@ -694,12 +695,22 @@ class Game(gym.Env):
                                 actions.append(7) 
                                 
                             actingWorker += 1
-                            
+
                 return actions
-                        
-            
+
 
 if __name__ == "__main__":
+
+    def turn():
+        env.render()
+
+        [print(f"{i:2}: {action}") for i, action in enumerate(env.ACTIONS)]
+        print(
+            f"input team {env.current_team} actions (need {env.worker_count} input) : "
+        )
+        actions = [int(input()) for _ in range(env.worker_count)]
+
+        return env.step(actions)
 
     env = Game()
 
@@ -709,15 +720,18 @@ if __name__ == "__main__":
     done = False
 
     while not done:
-        
-        print(f"input team {env.current_team} actions (need {env.worker_count} input) : ")
+        print(
+            f"input team {env.current_team} actions (need {env.worker_count} input) : "
+        )
         actions = env.render(input_with="pygame")
         observation, reward, done, _ = env.step(actions)
-        
-        print(f"input team {env.current_team} actions (need {env.worker_count} input) : ")
+
+        print(
+            f"input team {env.current_team} actions (need {env.worker_count} input) : "
+        )
         actions = env.render(input_with="pygame")
         observation, reward, done, _ = env.step(actions)
-        
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
@@ -749,4 +763,3 @@ if __name__ == "__main__":
     #             pygame.quit()
 
     # env.render()
-
