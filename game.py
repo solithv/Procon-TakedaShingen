@@ -212,27 +212,31 @@ class Game(gym.Env):
 
         if worker_A:
             assert self.worker_count == len(worker_A), "worker_A input error"
-            self.workers["A"] = [
+        self.workers["A"] = (
+            [
                 self.set_worker_position(f"worker_A{i}", coordinate)
                 for i, coordinate in enumerate(worker_A)
             ]
-        else:
-            self.workers["A"] = [
+            if worker_A
+            else [
                 self.set_worker_position(f"worker_A{i}")
                 for i in range(self.worker_count)
             ]
+        )
 
         if worker_B:
             assert self.worker_count == len(worker_B), "worker_B input error"
-            self.workers["B"] = [
+        self.workers["B"] = (
+            [
                 self.set_worker_position(f"worker_B{i}", coordinate)
                 for i, coordinate in enumerate(worker_B)
             ]
-        else:
-            self.workers["B"] = [
+            if worker_B
+            else [
                 self.set_worker_position(f"worker_B{i}")
                 for i in range(self.worker_count)
             ]
+        )
 
         self.update_blank()
         return self.board
@@ -676,7 +680,7 @@ class Game(gym.Env):
                         mouseX, mouseY = pygame.mouse.get_pos()
                         cellX = int(mouseX // self.cell_size)
                         cellY = int(mouseY // self.cell_size)
-                        workerY,  workerX = self.workers[self.current_team][
+                        workerY, workerX = self.workers[self.current_team][
                             actingWorker
                         ].get_coordinate()
 
