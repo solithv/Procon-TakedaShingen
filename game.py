@@ -502,7 +502,7 @@ class Game(gym.Env):
         1ターン進める処理を実行
         """
         assert self.worker_count == len(actions), "input length error"
-        current_workers = self.workers_A if self.current_player > 0 else self.workers_B
+        current_workers = self.workers_A if self.current_player <= 0 else self.workers_B
         [worker.turn_init() for worker in current_workers]
         sorted_workers = [
             (worker, action)
@@ -520,20 +520,19 @@ class Game(gym.Env):
         )
         self.update_position()
         self.update_open_position()
-        self.change_player(no_change=True)
+        self.change_player()
         self.turn += 1
         self.calculate_score()
         reward = self.get_reward(successful)
         self.is_done()
         return self.board, reward, self.done, {}
 
-    def render(self, mode="human", input_with="cli", turn=None):
+    def render(self, mode="human", input_with="cli"):
         """
         gymの必須関数
         描画を行う
         mode: str("human" or "console") pygameかcliどちらで描画するか選択
         input_with: str("pygame" or "cli") pygame上で職人を操作するか、cli上で行動番号を入力するか選択
-        turn: str("A" or "B")
         """
         IMG_SCALER = np.array((self.cell_size, self.cell_size))
         BLANK_IMG = pygame.transform.scale(
@@ -677,13 +676,16 @@ class Game(gym.Env):
                         mouseX, mouseY = pygame.mouse.get_pos()
                         cellX = int(mouseX // self.cell_size)
                         cellY = int(mouseY // self.cell_size)
-                        workerX = eval(f"self.workers_{turn}")[actingWorker].x
-                        workerY = eval(f"self.workers_{turn}")[actingWorker].y
+                        workerX = eval(f"self.workers_{self.current_team}")[actingWorker].x
+                        workerY = eval(f"self.workers_{self.current_team}")[actingWorker].y
                         
                         # マウスクリック時の動作
                         if event.type == MOUSEBUTTONDOWN:
                             print(f"\n-------------\ncellX = {cellX}\ncellY = {cellY}\nworkerX = {workerX}\nworkerY = {workerY}\n-------------")
-                            actions.append(1)
+                            if cellY > workerY:
+                                actions.append(5) 
+                            else:
+                                actions.append(1)
                                 
                             actingWorker += 1
                             
@@ -693,17 +695,6 @@ class Game(gym.Env):
 
 if __name__ == "__main__":
 
-    def turn():
-        env.render()
-
-        [print(f"{i:2}: {action}") for i, action in enumerate(env.ACTIONS)]
-        print(
-            f"input team {env.current_team} actions (need {env.worker_count} input) : "
-        )
-        actions = [int(input()) for _ in range(env.worker_count)]
-        observation, reward, done, _ = env.step(actions)
-        return observation, reward, done, _
-
     env = Game()
 
     print(f"width:{env.width}, height:{env.height}, workers:{env.worker_count}")
@@ -712,10 +703,44 @@ if __name__ == "__main__":
     done = False
 
     while not done:
-        observation, reward, done, _ = turn()
-
+        
+        print(f"input team {env.current_team} actions (need {env.worker_count} input) : ")
+        actions = env.render(input_with="pygame")
+        observation, reward, done, _ = env.step(actions)
+        
+        print(f"input team {env.current_team} actions (need {env.worker_count} input) : ")
+        actions = env.render(input_with="pygame")
+        observation, reward, done, _ = env.step(actions)
+        
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
 
     env.render()
+
+    # def turn():
+    #     env.render()
+
+    #     [print(f"{i:2}: {action}") for i, action in enumerate(env.ACTIONS)]
+    #     print(
+    #         f"input team {env.current_team} actions (need {env.worker_count} input) : "
+    #     )
+    #     actions = [int(input()) for _ in range(env.worker_count)]
+    #     return env.step(actions)
+
+    # env = Game()
+
+    # print(f"width:{env.width}, height:{env.height}, workers:{env.worker_count}")
+
+    # observation = env.reset()
+    # done = False
+
+    # while not done:
+    #     observation, reward, done, _ = turn()
+
+    #     for event in pygame.event.get():
+    #         if event.type == pygame.QUIT:
+    #             pygame.quit()
+
+    # env.render()
+
