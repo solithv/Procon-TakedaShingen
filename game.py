@@ -682,10 +682,16 @@ class Game(gym.Env):
                         # マウスクリック時の動作
                         if event.type == MOUSEBUTTONDOWN:
                             print(f"\n-------------\ncellX = {cellX}\ncellY = {cellY}\nworkerX = {workerX}\nworkerY = {workerY}\n-------------")
-                            if cellY > workerY:
-                                actions.append(5) 
-                            else:
+                            if cellY == workerY and cellX == workerX:
+                                actions.append(0)
+                            elif cellY < workerY:
                                 actions.append(1)
+                            elif cellY > workerY:
+                                actions.append(5) 
+                            elif cellX > workerX:
+                                actions.append(3) 
+                            elif cellX < workerX:
+                                actions.append(7) 
                                 
                             actingWorker += 1
                             
