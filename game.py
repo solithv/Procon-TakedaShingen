@@ -4,18 +4,9 @@ import os
 import gymnasium as gym
 import numpy as np
 import pyautogui
+import tkinter as tk
 import pygame
-
-BLACK = (0, 0, 0)
-WHITE = (255, 255, 255)
-RED = (255, 0, 0)
-GREEN = (0, 255, 0)
-BLUE = (0, 0, 255)
-YELLOW = (255, 255, 0)
-SKY = (127, 176, 255)
-PINK = (255, 127, 127)
-
-CWD = os.getcwd()
+from pygame.locals import *
 
 
 class Worker:
@@ -102,6 +93,19 @@ class Game(gym.Env):
         "S": np.array([1, 0]),
         "W": np.array([0, -1]),
     }
+    SCORE_MULTIPLIER = {"castle": 100, "position": 50, "rampart": 10}
+    POND_MIN, POND_MAX = 1, 5
+    FIELD_MIN, FIELD_MAX = 11, 25
+    WORKER_MIN, WORKER_MAX = 2, 6
+
+    BLACK = (0, 0, 0)
+    WHITE = (255, 255, 255)
+    RED = (255, 0, 0)
+    GREEN = (0, 255, 0)
+    BLUE = (0, 0, 255)
+    YELLOW = (255, 255, 0)
+    SKY = (127, 176, 255)
+    PINK = (255, 127, 127)
 
     def __init__(self, end_turn=10, width=None, height=None, pond=None, worker=None):
         super().__init__()
@@ -121,6 +125,7 @@ class Game(gym.Env):
             dtype=np.int8,
         )
         self.reward_range = [np.NINF, np.inf]
+        self.cwd = os.getcwd()
         self.display_size_x, self.display_size_y = pyautogui.size()
         self.cell_size = min(
             self.display_size_x * 0.9 // self.width,
@@ -129,7 +134,7 @@ class Game(gym.Env):
         self.window_size = max(self.width, self.height) * self.cell_size
         self.window_size_x = self.width * self.cell_size
         self.window_size_y = self.height * self.cell_size
-        
+
         self.reset()
 
     def change_player(self, no_change=False):
@@ -252,9 +257,7 @@ class Game(gym.Env):
         team: str("A" or "B") 取得するチームを指定
         """
         return [
-            worker.get_coordinate()
-            for worker in self.workers[team]
-            if worker.is_action
+            worker.get_coordinate() for worker in self.workers[team] if worker.is_action
         ]
 
     def is_movable(self, worker: Worker, y, x):
@@ -497,7 +500,9 @@ class Game(gym.Env):
         1ターン進める処理を実行
         """
         assert self.worker_count == len(actions), "input length error"
-        current_workers = self.workers["A"] if not self.current_player else self.workers["B"]
+        current_workers = (
+            self.workers["A"] if not self.current_player else self.workers["B"]
+        )
         [worker.turn_init() for worker in current_workers]
         sorted_workers = [
             (worker, action)
@@ -522,33 +527,34 @@ class Game(gym.Env):
         self.is_done()
         return self.board, reward, self.done, {}
 
-    def render(self, mode="human"):
+    def render(self, mode="human", input_with="cli"):
         """
         gymの必須関数
         描画を行う
         mode: str("human" or "console") pygameかcliどちらで描画するか選択
+        input_with: str("pygame" or "cli") pygame上で職人を操作するか、cli上で行動番号を入力するか選択
         """
         IMG_SCALER = np.array((self.cell_size, self.cell_size))
         BLANK_IMG = pygame.transform.scale(
-            pygame.image.load(CWD + "/assets/blank.png"), IMG_SCALER
+            pygame.image.load(self.cwd + "/assets/blank.png"), IMG_SCALER
         )
         POND_IMG = pygame.transform.scale(
-            pygame.image.load(CWD + "/assets/pond.png"), IMG_SCALER
+            pygame.image.load(self.cwd + "/assets/pond.png"), IMG_SCALER
         )
         CASTLE_IMG = pygame.transform.scale(
-            pygame.image.load(CWD + "/assets/castle.png"), IMG_SCALER
+            pygame.image.load(self.cwd + "/assets/castle.png"), IMG_SCALER
         )
         RAMPART_A_IMG = pygame.transform.scale(
-            pygame.image.load(CWD + "/assets/rampart_A.png"), IMG_SCALER
+            pygame.image.load(self.cwd + "/assets/rampart_A.png"), IMG_SCALER
         )
         RAMPART_B_IMG = pygame.transform.scale(
-            pygame.image.load(CWD + "/assets/rampart_B.png"), IMG_SCALER
+            pygame.image.load(self.cwd + "/assets/rampart_B.png"), IMG_SCALER
         )
         WORKER_A_IMG = pygame.transform.scale(
-            pygame.image.load(CWD + "/assets/worker_A.png"), IMG_SCALER
+            pygame.image.load(self.cwd + "/assets/worker_A.png"), IMG_SCALER
         )
         WORKER_B_IMG = pygame.transform.scale(
-            pygame.image.load(CWD + "/assets/worker_B.png"), IMG_SCALER
+            pygame.image.load(self.cwd + "/assets/worker_B.png"), IMG_SCALER
         )
 
         def placeImage(img, i, j, workerNumber=None, scale=1.0):
@@ -570,9 +576,9 @@ class Game(gym.Env):
 
             if workerNumber:
                 font = pygame.font.SysFont(None, 30)
-                text = font.render(workerNumber, False, BLACK)
+                text = font.render(workerNumber, False, self.BLACK)
                 text_rect = text.get_rect(
-                    center=(j * self.cell_size + 7, i * self.cell_size + 7)
+                    center=((j + 0.5) * self.cell_size, (i + 0.125) * self.cell_size)
                 )
                 window_surface.blit(text, text_rect)
 
@@ -597,10 +603,9 @@ class Game(gym.Env):
             )
             pygame.display.set_caption("game")
 
-            window_surface.fill(GREEN)
-
             for i in range(self.height):
                 for j in range(self.width):
+                    placeImage(BLANK_IMG, i, j)
                     cellInfo = view[i][j]
                     worker_A_exist = any(
                         f"worker_A{k}" in cellInfo for k in range(self.WORKER_MAX)
@@ -644,7 +649,7 @@ class Game(gym.Env):
             for i in range(1, self.width):
                 pygame.draw.line(
                     window_surface,
-                    BLACK,
+                    self.BLACK,
                     (i * self.cell_size, 0),
                     (i * self.cell_size, self.window_size_y),
                     1,
@@ -653,13 +658,44 @@ class Game(gym.Env):
             for i in range(1, self.height):
                 pygame.draw.line(
                     window_surface,
-                    BLACK,
+                    self.BLACK,
                     (0, i * self.cell_size),
                     (self.window_size_x, i * self.cell_size),
                     1,
                 )
 
             pygame.display.update()
+
+            if input_with == "pygame":
+                actions = []
+                actingWorker = 0
+                print("ok")
+                # クリックによって行動を入力する
+                while len(actions) != self.worker_count:
+                    for event in pygame.event.get():
+                        mouseX, mouseY = pygame.mouse.get_pos()
+                        cellX = int(mouseX // self.cell_size)
+                        cellY = int(mouseY // self.cell_size)
+                        workerX = eval(f"self.workers_{self.current_team}")[
+                            actingWorker
+                        ].x
+                        workerY = eval(f"self.workers_{self.current_team}")[
+                            actingWorker
+                        ].y
+
+                        # マウスクリック時の動作
+                        if event.type == MOUSEBUTTONDOWN:
+                            print(
+                                f"\n-------------\ncellX = {cellX}\ncellY = {cellY}\nworkerX = {workerX}\nworkerY = {workerY}\n-------------"
+                            )
+                            if cellY > workerY:
+                                actions.append(5)
+                            else:
+                                actions.append(1)
+
+                            actingWorker += 1
+
+                return actions
 
 
 if __name__ == "__main__":
@@ -683,10 +719,46 @@ if __name__ == "__main__":
     done = False
 
     while not done:
-        observation, reward, done, _ = turn()
+        print(
+            f"input team {env.current_team} actions (need {env.worker_count} input) : "
+        )
+        actions = env.render(input_with="pygame")
+        observation, reward, done, _ = env.step(actions)
+
+        print(
+            f"input team {env.current_team} actions (need {env.worker_count} input) : "
+        )
+        actions = env.render(input_with="pygame")
+        observation, reward, done, _ = env.step(actions)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
 
     env.render()
+
+    # def turn():
+    #     env.render()
+
+    #     [print(f"{i:2}: {action}") for i, action in enumerate(env.ACTIONS)]
+    #     print(
+    #         f"input team {env.current_team} actions (need {env.worker_count} input) : "
+    #     )
+    #     actions = [int(input()) for _ in range(env.worker_count)]
+    #     return env.step(actions)
+
+    # env = Game()
+
+    # print(f"width:{env.width}, height:{env.height}, workers:{env.worker_count}")
+
+    # observation = env.reset()
+    # done = False
+
+    # while not done:
+    #     observation, reward, done, _ = turn()
+
+    #     for event in pygame.event.get():
+    #         if event.type == pygame.QUIT:
+    #             pygame.quit()
+
+    # env.render()
