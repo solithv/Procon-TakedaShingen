@@ -4,6 +4,7 @@ import gymnasium as gym
 import numpy as np
 import tkinter as tk
 import pygame
+from pygame.locals import *
 import os
 import sys
 from PyQt5.QtWidgets import QApplication, QWidget, QPushButton
@@ -524,11 +525,13 @@ class Game(gym.Env):
         self.is_done()
         return self.board, reward, self.done, {}
 
-    def render(self, mode="human"):
+    def render(self, mode="human", input_with="cli", turn=None):
         """
         gymの必須関数
         描画を行う
         mode: str("human" or "console") pygameかcliどちらで描画するか選択
+        input_with: str("pygame" or "cli") pygame上で職人を操作するか、cli上で行動番号を入力するか選択
+        turn: str("A" or "B")
         """
         IMG_SCALER = np.array((self.cell_size, self.cell_size))
         BLANK_IMG = pygame.transform.scale(
@@ -574,7 +577,7 @@ class Game(gym.Env):
                 font = pygame.font.SysFont(None, 30)
                 text = font.render(workerNumber, False, self.BLACK)
                 text_rect = text.get_rect(
-                    center=(j * self.cell_size + 7, i * self.cell_size + 7)
+                    center=((j + 0.5) * self.cell_size, (i + 0.125) * self.cell_size)
                 )
                 window_surface.blit(text, text_rect)
 
@@ -599,10 +602,9 @@ class Game(gym.Env):
             )
             pygame.display.set_caption("game")
 
-            window_surface.fill(self.GREEN)
-
             for i in range(self.height):
                 for j in range(self.width):
+                    placeImage(BLANK_IMG, i, j)
                     cellInfo = view[i][j]
                     worker_A_exist = any(
                         f"worker_A{k}" in cellInfo for k in range(self.WORKER_MAX)
@@ -662,6 +664,30 @@ class Game(gym.Env):
                 )
 
             pygame.display.update()
+            
+            if input_with == "pygame":
+                actions = []
+                actingWorker = 0
+                print("ok")
+                # クリックによって行動を入力する
+                while len(actions) != self.worker_count:        
+                    for event in pygame.event.get():
+                        mouseX, mouseY = pygame.mouse.get_pos()
+                        cellX = int(mouseX // self.cell_size)
+                        cellY = int(mouseY // self.cell_size)
+                        workerX = eval(f"self.workers_{turn}")[actingWorker].x
+                        workerY = eval(f"self.workers_{turn}")[actingWorker].y
+                        
+                        # マウスクリック時の動作
+                        if event.type == MOUSEBUTTONDOWN:
+                            print(f"\n-------------\ncellX = {cellX}\ncellY = {cellY}\nworkerX = {workerX}\nworkerY = {workerY}\n-------------")
+                            actions.append(1)
+                                
+                            actingWorker += 1
+                            
+                return actions
+                        
+            
 
 class ControllerWindow(QWidget):
     def __init__(self, workerCount):
@@ -716,26 +742,15 @@ if __name__ == "__main__":
     done = False
 
     while not done:
-        env.render()
-
-        [print(f"{i:2}: {action}") for i, action in enumerate(env.ACTIONS)]
-        print(f"input team A actions (need {env.worker_count} input) : ")
         
-        actions = [int(input()) for _ in range(env.worker_count)]
-        # app = QApplication(sys.argv)
-        # app.setQuitOnLastWindowClosed(False)
-        # controller = ControllerWindow(env.worker_count)
-        # controller.show()
-        # sys.exit(app.exec_())
-        # actions = controller.buttonAction()
+        print(f"input team A actions (need {env.worker_count} input) : ")
+        actions = env.render(input_with="pygame", turn="A")
         observation, reward, done, _ = env.step(actions)
-
-        env.render()
-
+        
         print(f"input team B actions (need {env.worker_count} input) : ")
-        actions = [int(input()) for _ in range(env.worker_count)]
+        actions = env.render(input_with="pygame", turn="B")
         observation, reward, done, _ = env.step(actions)
-
+        
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
