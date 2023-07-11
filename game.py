@@ -111,8 +111,10 @@ class Game(gym.Env):
         super().__init__()
         self.end_turn = end_turn * 2
         self.width = width or np.random.randint(self.FIELD_MIN, self.FIELD_MAX)
-        self.height = height or np.random.randint(self.FIELD_MIN, self.FIELD_MAX)
-        self.pond_count = pond or np.random.randint(self.POND_MIN, self.POND_MAX)
+        self.height = height or np.random.randint(
+            self.FIELD_MIN, self.FIELD_MAX)
+        self.pond_count = pond or np.random.randint(
+            self.POND_MIN, self.POND_MAX)
         self.worker_count = worker or np.random.randint(
             self.WORKER_MIN, self.WORKER_MAX
         )
@@ -188,7 +190,8 @@ class Game(gym.Env):
         worker_B: list[list[y,x]] Aチームの職人の座標を指定
         """
         self.current_player = (
-            self.TEAM.index(first_player) if first_player else np.random.randint(0, 2)
+            self.TEAM.index(
+                first_player) if first_player else np.random.randint(0, 2)
         )
         self.change_player(no_change=True)
         self.score_A, self.score_B = 0, 0
@@ -423,8 +426,10 @@ class Game(gym.Env):
         内部関数
         開放陣地を更新
         """
-        self.previous_open_position_A = self.board[self.CELL.index("open_position_A")]
-        self.previous_open_position_B = self.board[self.CELL.index("open_position_B")]
+        self.previous_open_position_A = self.board[self.CELL.index(
+            "open_position_A")]
+        self.previous_open_position_B = self.board[self.CELL.index(
+            "open_position_B")]
         self.board[self.CELL.index("open_position_A")] = np.where(
             (
                 self.previous_position_A
@@ -465,7 +470,8 @@ class Game(gym.Env):
             * self.SCORE_MULTIPLIER["position"]
         )
         self.score_A += np.sum(
-            self.board[self.CELL.index("rampart_A")] * self.SCORE_MULTIPLIER["rampart"]
+            self.board[self.CELL.index("rampart_A")] *
+            self.SCORE_MULTIPLIER["rampart"]
         )
 
         self.score_B = np.sum(
@@ -479,7 +485,8 @@ class Game(gym.Env):
             * self.SCORE_MULTIPLIER["position"]
         )
         self.score_B += np.sum(
-            self.board[self.CELL.index("rampart_B")] * self.SCORE_MULTIPLIER["rampart"]
+            self.board[self.CELL.index("rampart_B")] *
+            self.SCORE_MULTIPLIER["rampart"]
         )
 
         print(f"score_A:{self.score_A}, score_B:{self.score_B}")
@@ -516,7 +523,8 @@ class Game(gym.Env):
         ]
 
         successful = all(
-            [self.worker_action(worker, action) for worker, action in sorted_workers]
+            [self.worker_action(worker, action)
+             for worker, action in sorted_workers]
         )
         self.update_position()
         self.update_open_position()
@@ -537,6 +545,9 @@ class Game(gym.Env):
         IMG_SCALER = np.array((self.cell_size, self.cell_size))
         BLANK_IMG = pygame.transform.scale(
             pygame.image.load(self.cwd + "/assets/blank.png"), IMG_SCALER
+        )
+        UNAVAILABLE_IMG = pygame.transform.scale(
+            pygame.image.load(self.cwd + "/assets/unavailable.png"), IMG_SCALER
         )
         POND_IMG = pygame.transform.scale(
             pygame.image.load(self.cwd + "/assets/pond.png"), IMG_SCALER
@@ -578,7 +589,8 @@ class Game(gym.Env):
                 font = pygame.font.SysFont(None, 30)
                 text = font.render(workerNumber, False, self.BLACK)
                 text_rect = text.get_rect(
-                    center=((j + 0.5) * self.cell_size, (i + 0.125) * self.cell_size)
+                    center=((j + 0.5) * self.cell_size,
+                            (i + 0.125) * self.cell_size)
                 )
                 window_surface.blit(text, text_rect)
 
@@ -633,9 +645,11 @@ class Game(gym.Env):
                     elif "castle" in cellInfo:
                         placeImage(CASTLE_IMG, i, j)
                     elif worker_A_exist:
-                        placeImage(WORKER_A_IMG, i, j, workerNumber=cellInfo[-1][-1])
+                        placeImage(WORKER_A_IMG, i, j,
+                                   workerNumber=cellInfo[-1][-1])
                     elif worker_B_exist:
-                        placeImage(WORKER_B_IMG, i, j, workerNumber=cellInfo[-1][-1])
+                        placeImage(WORKER_B_IMG, i, j,
+                                   workerNumber=cellInfo[-1][-1])
                     elif "pond" in cellInfo:
                         placeImage(POND_IMG, i, j)
                     elif "rampart_A" in cellInfo:
@@ -682,19 +696,22 @@ class Game(gym.Env):
 
                         # マウスクリック時の動作
                         if event.type == MOUSEBUTTONDOWN:
-                            print(f"\n-------------\ncellX = {cellX}\ncellY = {cellY}\nworkerX = {workerX}\nworkerY = {workerY}\n-------------")
+                            print(
+                                f"\n-------------\ncellX = {cellX}\ncellY = {cellY}\nworkerX = {workerX}\nworkerY = {workerY}\n-------------")
                             if cellY == workerY and cellX == workerX:
                                 actions.append(0)
                             elif cellY < workerY:
                                 actions.append(1)
                             elif cellY > workerY:
-                                actions.append(5) 
+                                actions.append(5)
                             elif cellX > workerX:
-                                actions.append(3) 
+                                actions.append(3)
                             elif cellX < workerX:
-                                actions.append(7) 
-                                
+                                actions.append(7)
+
                             actingWorker += 1
+                            placeImage(UNAVAILABLE_IMG, cellY, cellX)
+                            pygame.display.update()
 
                 return actions
 
