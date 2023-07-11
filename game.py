@@ -676,12 +676,9 @@ class Game(gym.Env):
                         mouseX, mouseY = pygame.mouse.get_pos()
                         cellX = int(mouseX // self.cell_size)
                         cellY = int(mouseY // self.cell_size)
-                        workerX = eval(f"self.workers_{self.current_team}")[
+                        workerY,  workerX = self.workers[self.current_team][
                             actingWorker
-                        ].x
-                        workerY = eval(f"self.workers_{self.current_team}")[
-                            actingWorker
-                        ].y
+                        ].get_coordinate()
 
                         # マウスクリック時の動作
                         if event.type == MOUSEBUTTONDOWN:
