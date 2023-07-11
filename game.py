@@ -1,13 +1,12 @@
 import copy
-import pyautogui
+import os
+
 import gymnasium as gym
 import numpy as np
+import pyautogui
 import tkinter as tk
 import pygame
 from pygame.locals import *
-import os
-import sys
-from PyQt5.QtWidgets import QApplication, QWidget, QPushButton
 
 
 
@@ -51,6 +50,11 @@ class Worker:
 
 class Game(gym.Env):
     metadata = {"render.modes": ["human", "console"]}
+    SCORE_MULTIPLIER = {"castle": 100, "position": 50, "rampart": 10}
+    TEAM = ("A", "B")
+    POND_MIN, POND_MAX = 1, 5
+    FIELD_MIN, FIELD_MAX = 11, 25
+    WORKER_MIN, WORKER_MAX = 2, 6
     CELL = (
         "blank",  # 論理反転
         "position_A",
@@ -61,18 +65,8 @@ class Game(gym.Env):
         "rampart_B",
         "castle",
         "pond",
-        "worker_A0",
-        "worker_A1",
-        "worker_A2",
-        "worker_A3",
-        "worker_A4",
-        "worker_A5",
-        "worker_B0",
-        "worker_B1",
-        "worker_B2",
-        "worker_B3",
-        "worker_B4",
-        "worker_B5",
+        *[f"worker_A{i}" for i in range(WORKER_MAX)],
+        *[f"worker_B{i}" for i in range(WORKER_MAX)],
     )
     ACTIONS = (
         "stay",
@@ -123,7 +117,8 @@ class Game(gym.Env):
         self.worker_count = worker or np.random.randint(
             self.WORKER_MIN, self.WORKER_MAX
         )
-        self.current_player = 1
+        self.current_player = 0
+        self.change_player(no_change=True)
         self.score_A, self.score_B = 0, 0
         self.previous_score_A, self.previous_score_B = 0, 0
         self.turn = 0
@@ -147,6 +142,12 @@ class Game(gym.Env):
         self.window_size = max(self.width, self.height) * self.cell_size
         self.window_size_x = self.width * self.cell_size
         self.window_size_y = self.height * self.cell_size
+
+    def change_player(self, no_change=False):
+        if not no_change:
+            self.current_player = 1 - self.current_player
+        self.current_team = self.TEAM[self.current_player]
+        self.opponent_team = self.TEAM[1 - self.current_player]
 
     def set_cell_property(self, target, coordinates=None):
         """
@@ -189,7 +190,8 @@ class Game(gym.Env):
         worker_A: list[list[y,x]] Aチームの職人の座標を指定
         worker_B: list[list[y,x]] Aチームの職人の座標を指定
         """
-        self.current_player = 1
+        self.current_player = np.random.randint(0, 2)
+        self.change_player(no_change=True)
         self.score_A, self.score_B = 0, 0
         self.previous_score_A, self.previous_score_B = 0, 0
         self.turn = 0
@@ -518,7 +520,7 @@ class Game(gym.Env):
         )
         self.update_position()
         self.update_open_position()
-        self.current_player = -self.current_player
+        self.change_player(no_change=True)
         self.turn += 1
         self.calculate_score()
         reward = self.get_reward(successful)
@@ -689,51 +691,19 @@ class Game(gym.Env):
                         
             
 
-class ControllerWindow(QWidget):
-    def __init__(self, workerCount):
-        super().__init__()
-        self.workerCount = workerCount
-        self.actions = []
-        self.setWindowTitle("controller")
-        
-        self.movePattern = [8, 1, 2, 7, 0, 3, 6, 5, 4]
-        movePatternIter = iter(self.movePattern)
-        for i in range(3):
-            for j in range(3):
-                button = QPushButton(str(next(movePatternIter)), self)
-                button.move(j * 60, i * 60)
-                button.resize(60, 60)
-                button.clicked.connect(self.buttonAction)
-                
-        self.buildPattern = [9, 12, 10, 11]
-        buildPatternIter = iter(self.buildPattern)     
-        for i in range(3):
-            for j in range(3):
-                if (i + j) % 2 != 0:
-                    button = QPushButton(str(next(buildPatternIter)), self)
-                    button.move(j * 60, i * 60 + 200)
-                    button.resize(60, 60)
-                    button.clicked.connect(self.buttonAction)
-
-        self.breakPattern = [13, 16, 14, 15]
-        breakPatternIter = iter(self.breakPattern)
-        for i in range(3):
-            for j in range(3):
-                if (i + j) % 2 != 0:
-                    button = QPushButton(str(next(breakPatternIter)), self)
-                    button.move(j * 60, i * 60 + 400)
-                    button.resize(60, 60)
-                    button.clicked.connect(self.buttonAction)
-
-    def buttonAction(self):
-        pattern = int(self.sender().text())
-        self.actions.append(pattern)
-        print(self.actions)
-        if len(self.actions) == self.workerCount:
-            self.close()
-            return self.actions
-
 if __name__ == "__main__":
+
+    def turn():
+        env.render()
+
+        [print(f"{i:2}: {action}") for i, action in enumerate(env.ACTIONS)]
+        print(
+            f"input team {env.current_team} actions (need {env.worker_count} input) : "
+        )
+        actions = [int(input()) for _ in range(env.worker_count)]
+        observation, reward, done, _ = env.step(actions)
+        return observation, reward, done, _
+
     env = Game()
 
     print(f"width:{env.width}, height:{env.height}, workers:{env.worker_count}")
@@ -742,15 +712,8 @@ if __name__ == "__main__":
     done = False
 
     while not done:
-        
-        print(f"input team A actions (need {env.worker_count} input) : ")
-        actions = env.render(input_with="pygame", turn="A")
-        observation, reward, done, _ = env.step(actions)
-        
-        print(f"input team B actions (need {env.worker_count} input) : ")
-        actions = env.render(input_with="pygame", turn="B")
-        observation, reward, done, _ = env.step(actions)
-        
+        observation, reward, done, _ = turn()
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
