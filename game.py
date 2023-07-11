@@ -22,15 +22,15 @@ class Worker:
         self.is_action = False
         self.action_log = []
 
+    def stay(self):
+        self.action_log.append(("stay", (self.y, self.x)))
+        self.is_action = True
+            
     def move(self, y, x):
-        if self.x - 1 <= x <= self.x + 1 and self.y - 1 <= y <= self.y + 1:
-            self.x = x
-            self.y = y
-            self.action_log.append(("move", (y, x)))
-            self.is_action = True
-            return True
-        else:
-            return False
+        self.x = x
+        self.y = y
+        self.action_log.append(("move", (y, x)))
+        self.is_action = True
 
     def build(self, y, x):
         self.action_log.append(("build", (y, x)))
@@ -199,7 +199,7 @@ class Game(gym.Env):
         self.turn = 1
         self.done = False
         self.board = np.zeros((len(self.CELL), self.height, self.width))
-        self.workers = {}
+        self.workers: dict[str, Worker] = {}
         self.used = []
 
         self.set_cell_property("castle", coordinates=castle)
@@ -215,27 +215,31 @@ class Game(gym.Env):
 
         if worker_A:
             assert self.worker_count == len(worker_A), "worker_A input error"
-            self.workers["A"] = [
+        self.workers["A"] = (
+            [
                 self.set_worker_position(f"worker_A{i}", coordinate)
                 for i, coordinate in enumerate(worker_A)
             ]
-        else:
-            self.workers["A"] = [
+            if worker_A
+            else [
                 self.set_worker_position(f"worker_A{i}")
                 for i in range(self.worker_count)
             ]
+        )
 
         if worker_B:
             assert self.worker_count == len(worker_B), "worker_B input error"
-            self.workers["B"] = [
+        self.workers["B"] = (
+            [
                 self.set_worker_position(f"worker_B{i}", coordinate)
                 for i, coordinate in enumerate(worker_B)
             ]
-        else:
-            self.workers["B"] = [
+            if worker_B
+            else [
                 self.set_worker_position(f"worker_B{i}")
                 for i in range(self.worker_count)
             ]
+        )
 
         self.update_blank()
         return self.board
@@ -259,9 +263,10 @@ class Game(gym.Env):
         行動済みの職人の座標を取得
         team: str("A" or "B") 取得するチームを指定
         """
-        return [
+        res=  [
             worker.get_coordinate() for worker in self.workers[team] if worker.is_action
         ]
+        return res
 
     def is_movable(self, worker: Worker, y, x):
         """
@@ -272,12 +277,17 @@ class Game(gym.Env):
             not worker.is_action
             and 0 <= y < self.height
             and 0 <= x < self.width
-            and not self.compile_layers(
-                f"rampart_{worker.another_team}",
-                "pond",
-                *[f"worker_{worker.another_team}{i}" for i in range(self.WORKER_MAX)],
-            )[y, x]
-            and (y, x) not in self.get_team_worker_coordinate(worker.team)
+            and (
+                not self.compile_layers(
+                    f"rampart_{worker.another_team}",
+                    "pond",
+                    *[
+                        f"worker_{worker.another_team}{i}"
+                        for i in range(self.WORKER_MAX)
+                    ],
+                )[y, x]
+            )
+            and ((y, x) not in self.get_team_worker_coordinate(worker.team))
         ):
             return True
         else:
@@ -340,7 +350,7 @@ class Game(gym.Env):
         職人を行動させる
         """
         if "stay" == self.ACTIONS[action]:
-            return True
+            worker.stay()
 
         direction = self.get_direction(action)
         y, x = map(int, np.array(worker.get_coordinate()) + direction)
@@ -506,7 +516,9 @@ class Game(gym.Env):
         gymの必須関数
         1ターン進める処理を実行
         """
-        assert self.worker_count == len(actions), "input length error"
+        assert self.worker_count == len(
+            actions
+        ), f"input length error {self.worker_count}, {len(actions)}"
         current_workers = (
             self.workers["A"] if not self.current_player else self.workers["B"]
         )
@@ -685,12 +697,14 @@ class Game(gym.Env):
                 actingWorker = 0
                 print("ok")
                 # クリックによって行動を入力する
-                while len(actions) != self.worker_count:
+                while actingWorker < self.worker_count:
                     for event in pygame.event.get():
+                        if actingWorker >= self.worker_count:
+                            break
                         mouseX, mouseY = pygame.mouse.get_pos()
                         cellX = int(mouseX // self.cell_size)
                         cellY = int(mouseY // self.cell_size)
-                        workerY,  workerX = self.workers[self.current_team][
+                        workerY, workerX = self.workers[self.current_team][
                             actingWorker
                         ].get_coordinate()
 
