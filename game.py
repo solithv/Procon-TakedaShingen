@@ -1,4 +1,5 @@
 import os
+import copy
 from typing import Iterable, Optional, Union
 
 import gymnasium as gym
@@ -433,8 +434,12 @@ class Game(gym.Env):
         内部関数
         陣地を更新
         """
-        self.previous_position_A = self.board[self.CELL.index("position_A")]
-        self.previous_position_B = self.board[self.CELL.index("position_B")]
+        self.previous_position_A = copy.deepcopy(
+            self.board[self.CELL.index("position_A")]
+        )
+        self.previous_position_B = copy.deepcopy(
+            self.board[self.CELL.index("position_B")]
+        )
         self.board[self.CELL.index("position_A")] = self.fill_area(
             self.board[self.CELL.index("rampart_A")]
         )
@@ -447,8 +452,12 @@ class Game(gym.Env):
         内部関数
         開放陣地を更新
         """
-        self.previous_open_position_A = self.board[self.CELL.index("open_position_A")]
-        self.previous_open_position_B = self.board[self.CELL.index("open_position_B")]
+        self.previous_open_position_A = copy.deepcopy(
+            self.board[self.CELL.index("open_position_A")]
+        )
+        self.previous_open_position_B = copy.deepcopy(
+            self.board[self.CELL.index("open_position_B")]
+        )
         self.board[self.CELL.index("open_position_A")] = np.where(
             np.where(
                 (
@@ -666,7 +675,8 @@ class Game(gym.Env):
                             np.sin(2 * n * np.pi / directions) + y,
                         ]
                         for n in range(directions)
-                    ] + [[x, y]]
+                    ]
+                    + [[x, y]]
                 )
             )
 
@@ -759,16 +769,12 @@ class Game(gym.Env):
 
             print(self.compile_layers("rampart_A", "pond", one_hot=True))
 
-
             if input_with != "pygame":
                 return
             showPosition = False
             actions = []
             actingWorker = 0
             while actingWorker < self.worker_count:
-                
-                
-                
                 for event in pygame.event.get():
                     if actingWorker >= self.worker_count:
                         break
@@ -814,13 +820,15 @@ class Game(gym.Env):
                             )
                         placeImage(BLANK_IMG, workerY, workerX)
                         placeImage(
-                            eval(f"WORKER_{self.current_team}_IMG"), cellY, cellX,
-                            workerNumber=str(actingWorker)
+                            eval(f"WORKER_{self.current_team}_IMG"),
+                            cellY,
+                            cellX,
+                            workerNumber=str(actingWorker),
                         )
                         drawGrids()
                         actingWorker += 1
                         pygame.display.update()
-                        
+
                     elif event.type == KEYDOWN:
                         # build
                         if event.key == pygame.K_SPACE:
@@ -857,7 +865,7 @@ class Game(gym.Env):
                             )
                             drawGrids()
                             pygame.display.update()
-                            
+
                         # break
                         elif event.key == pygame.K_BACKSPACE:
                             if not np.any(
@@ -891,7 +899,7 @@ class Game(gym.Env):
                             placeImage(BLANK_IMG, cellY, cellX)
                             drawGrids()
                             pygame.display.update()
-                            
+
                         elif event.key == pygame.K_RETURN:
                             showPosition = not showPosition
                             print(showPosition)
@@ -899,7 +907,6 @@ class Game(gym.Env):
                             # for i in range(self.height):
                             #     for j in range(self.width):
                             #         placeImage(BLANK_IMG, i, j)
-                            
 
             return actions
 
@@ -917,7 +924,7 @@ if __name__ == "__main__":
 
         return env.step(actions)
 
-    env = Game()
+    env = Game(100)
 
     print(f"width:{env.width}, height:{env.height}, workers:{env.worker_count}")
 
