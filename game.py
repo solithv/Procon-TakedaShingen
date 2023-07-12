@@ -4,8 +4,8 @@ import gymnasium as gym
 import numpy as np
 import pyautogui
 import pygame
-
 from pygame.locals import *
+
 from worker import Worker
 
 
@@ -78,8 +78,10 @@ class Game(gym.Env):
         self.width = width or np.random.randint(self.FIELD_MIN, self.FIELD_MAX)
         self.height = height or np.random.randint(self.FIELD_MIN, self.FIELD_MAX)
 
-        self.castle_count = castle or np.random.randint(
-            self.CASTLE_MIN, self.CASTLE_MAX
+        self.castle_count = (
+            castle or self.CASTLE_MIN
+            if self.CASTLE_MIN == self.CASTLE_MAX
+            else np.random.randint(self.CASTLE_MIN, self.CASTLE_MAX)
         )
         self.pond_count = pond or np.random.randint(self.POND_MIN, self.POND_MAX)
         self.worker_count = worker or np.random.randint(
@@ -323,7 +325,6 @@ class Game(gym.Env):
         内部関数
         職人を行動させる
         """
-        # while workers:
         for _ in range(self.worker_count):
             worker, action = workers.pop(0)
             y, x = map(
@@ -368,7 +369,7 @@ class Game(gym.Env):
                 break
 
         for worker, action in workers:
-            print("行動できませんでした。待機します。")
+            print(f"{worker.name}: 行動できませんでした。待機します。")
             worker.stay()
             self.successful.append(False)
 
@@ -458,32 +459,42 @@ class Game(gym.Env):
         """
         self.previous_score_A, self.previous_score_B = self.score_A, self.score_B
 
-        self.score_A = np.sum(
-            self.board[self.CELL.index("castle")]
-            * self.compile_layers("position_A", "open_position_A", one_hot=True)
+        self.score_A = (
+            np.sum(
+                self.board[self.CELL.index("castle")]
+                * self.compile_layers("position_A", "open_position_A", one_hot=True)
+            )
             * self.SCORE_MULTIPLIER["castle"]
         )
-        self.score_A += np.sum(
-            (1 - self.board[self.CELL.index("castle")])
-            * self.compile_layers("position_A", "open_position_A", one_hot=True)
+        self.score_A += (
+            np.sum(
+                (1 - self.board[self.CELL.index("castle")])
+                * self.compile_layers("position_A", "open_position_A", one_hot=True)
+            )
             * self.SCORE_MULTIPLIER["position"]
         )
-        self.score_A += np.sum(
-            self.board[self.CELL.index("rampart_A")] * self.SCORE_MULTIPLIER["rampart"]
+        self.score_A += (
+            np.sum(self.board[self.CELL.index("rampart_A")])
+            * self.SCORE_MULTIPLIER["rampart"]
         )
 
-        self.score_B = np.sum(
-            self.board[self.CELL.index("castle")]
-            * self.compile_layers("position_B", "open_position_B", one_hot=True)
+        self.score_B = (
+            np.sum(
+                self.board[self.CELL.index("castle")]
+                * self.compile_layers("position_B", "open_position_B", one_hot=True)
+            )
             * self.SCORE_MULTIPLIER["castle"]
         )
-        self.score_B += np.sum(
-            (1 - self.board[self.CELL.index("castle")])
-            * self.compile_layers("position_B", "open_position_B", one_hot=True)
+        self.score_B += (
+            np.sum(
+                (1 - self.board[self.CELL.index("castle")])
+                * self.compile_layers("position_B", "open_position_B", one_hot=True)
+            )
             * self.SCORE_MULTIPLIER["position"]
         )
-        self.score_B += np.sum(
-            self.board[self.CELL.index("rampart_B")] * self.SCORE_MULTIPLIER["rampart"]
+        self.score_B += (
+            np.sum(self.board[self.CELL.index("rampart_B")])
+            * self.SCORE_MULTIPLIER["rampart"]
         )
 
         print(f"score_A:{self.score_A}, score_B:{self.score_B}")
