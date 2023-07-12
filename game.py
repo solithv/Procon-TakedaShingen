@@ -151,19 +151,19 @@ class Game(gym.Env):
         self.current_team = self.TEAM[self.current_player]
         self.opponent_team = self.TEAM[1 - self.current_player]
 
-    def set_cell_property(self, target, coordinates=None):
+    def set_cell_property(self, target, coordinate=None):
         """
         内部関数
         セルに要素を配置
         """
-        if not coordinates:
+        if not coordinate:
             while True:
                 y = np.random.randint(0, self.height - 1)
                 x = np.random.randint(0, self.width - 1)
                 if (y, x) not in self.used:
                     break
         else:
-            y, x = coordinates
+            y, x = coordinate
         self.board[self.CELL.index(target), y, x] = 1
         self.used.append((y, x))
         return y, x
@@ -210,7 +210,7 @@ class Game(gym.Env):
         if castle:
             assert self.castle_count == len(castle), "castle input error"
             [
-                self.set_cell_property("castle", coordinates=coordinate)
+                self.set_cell_property("castle", coordinate=coordinate)
                 for coordinate in castle
             ]
         else:
@@ -219,7 +219,7 @@ class Game(gym.Env):
         if pond:
             assert self.pond_count == len(pond), "pond input error"
             [
-                self.set_cell_property("pond", coordinates=coordinate)
+                self.set_cell_property("pond", coordinate=coordinate)
                 for coordinate in pond
             ]
         else:
@@ -363,8 +363,7 @@ class Game(gym.Env):
         職人を行動させる
         """
         # while workers:
-        for _ in range(5):
-            print(workers)
+        for _ in range(self.worker_count):
             worker, action = workers.pop(0)
             y, x = map(
                 int, np.array(worker.get_coordinate()) + self.get_direction(action)
@@ -832,11 +831,11 @@ if __name__ == "__main__":
 
         return env.step(actions)
 
-    env = Game(100, 11, 11, 1, 1, 2)
+    env = Game()
 
     print(f"width:{env.width}, height:{env.height}, workers:{env.worker_count}")
 
-    observation = env.reset(worker_A=[[3, 4], [3, 3]], worker_B=[[4, 4], [4, 3]])
+    observation = env.reset()
     done = False
 
     while not done:
