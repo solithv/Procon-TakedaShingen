@@ -626,7 +626,7 @@ class Game(gym.Env):
                             np.sin(2 * n * np.pi / directions) + y,
                         ]
                         for n in range(directions)
-                    ]
+                    ] + [[x, y]]
                 )
             )
 
@@ -643,7 +643,7 @@ class Game(gym.Env):
             ]
             for y in range(self.height)
         ]
-
+        print(view)
         pygame.init()
         if mode == "console":
             [print(row) for row in view]
@@ -673,6 +673,16 @@ class Game(gym.Env):
                         placeImage(CASTLE_IMG, i, j)
                         placeImage(
                             WORKER_B_IMG, i, j, workerNumber=cellInfo[-1][-1], scale=0.7
+                        )
+                    elif "rampart_A" in cellInfo and worker_A_exist:
+                        placeImage(RAMPART_A_IMG, i, j)
+                        placeImage(
+                            WORKER_A_IMG, i, j, workerNumber=cellInfo[-1][-1], scale=0.8
+                        )
+                    elif "rampart_B" in cellInfo and worker_B_exist:
+                        placeImage(RAMPART_B_IMG, i, j)
+                        placeImage(
+                            WORKER_B_IMG, i, j, workerNumber=cellInfo[-1][-1], scale=0.8
                         )
                     elif "pond" in cellInfo and "rampart_A" in cellInfo:
                         placeImage(POND_IMG, i, j)
@@ -707,12 +717,18 @@ class Game(gym.Env):
             window_surface.blit(text, text_rect)
             pygame.display.update()
 
+            print(self.compile_layers("rampart_A", "pond", one_hot=True))
+
+
             if input_with != "pygame":
                 return
-
+            showPosition = False
             actions = []
             actingWorker = 0
             while actingWorker < self.worker_count:
+                
+                
+                
                 for event in pygame.event.get():
                     if actingWorker >= self.worker_count:
                         break
@@ -734,32 +750,37 @@ class Game(gym.Env):
                         ):
                             continue
                         directionVector = np.array([cellX - workerX, workerY - cellY])
-                        actions.append(
-                            int(
-                                (
+                        if directionVector[0] == directionVector[1] == 0:
+                            actions.append(0)
+                        else:
+                            actions.append(
+                                int(
                                     (
-                                        np.round(
-                                            np.degrees(
-                                                np.arctan2(
-                                                    directionVector[0],
-                                                    directionVector[1],
+                                        (
+                                            np.round(
+                                                np.degrees(
+                                                    np.arctan2(
+                                                        directionVector[0],
+                                                        directionVector[1],
+                                                    )
                                                 )
                                             )
+                                            / 45
                                         )
-                                        / 45
+                                        % 8
                                     )
-                                    % 8
+                                    + 1
                                 )
-                                + 1
                             )
-                        )
-                        actingWorker += 1
                         placeImage(BLANK_IMG, workerY, workerX)
                         placeImage(
-                            eval(f"WORKER_{self.current_team}_IMG"), cellY, cellX
+                            eval(f"WORKER_{self.current_team}_IMG"), cellY, cellX,
+                            workerNumber=str(actingWorker)
                         )
                         drawGrids()
+                        actingWorker += 1
                         pygame.display.update()
+                        
                     elif event.type == KEYDOWN:
                         # build
                         if event.key == pygame.K_SPACE:
@@ -796,6 +817,7 @@ class Game(gym.Env):
                             )
                             drawGrids()
                             pygame.display.update()
+                            
                         # break
                         elif event.key == pygame.K_BACKSPACE:
                             if not np.any(
@@ -829,6 +851,15 @@ class Game(gym.Env):
                             placeImage(BLANK_IMG, cellY, cellX)
                             drawGrids()
                             pygame.display.update()
+                            
+                        elif event.key == pygame.K_RETURN:
+                            showPosition = not showPosition
+                            print(showPosition)
+                            pygame.display.update()
+                            # for i in range(self.height):
+                            #     for j in range(self.width):
+                            #         placeImage(BLANK_IMG, i, j)
+                            
 
             return actions
 
