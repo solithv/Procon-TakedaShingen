@@ -160,10 +160,10 @@ class Game(gym.Env):
     def reset(
         self,
         first_player: Optional[int] = None,
-        castle: Optional[Iterable[Iterable[int, int]]] = None,
-        pond: Optional[Iterable[Iterable[int, int]]] = None,
-        worker_A: Optional[Iterable[Iterable[int, int]]] = None,
-        worker_B: Optional[Iterable[Iterable[int, int]]] = None,
+        castle: Optional[Iterable[Iterable[int]]] = None,
+        pond: Optional[Iterable[Iterable[int]]] = None,
+        worker_A: Optional[Iterable[Iterable[int]]] = None,
+        worker_B: Optional[Iterable[Iterable[int]]] = None,
     ):
         """
         gymの必須関数
@@ -436,10 +436,10 @@ class Game(gym.Env):
         self.previous_position_A = self.board[self.CELL.index("position_A")]
         self.previous_position_B = self.board[self.CELL.index("position_B")]
         self.board[self.CELL.index("position_A")] = self.fill_area(
-            self.board[self.CELL.index("position_A")]
+            self.board[self.CELL.index("rampart_A")]
         )
         self.board[self.CELL.index("position_B")] = self.fill_area(
-            self.board[self.CELL.index("position_B")]
+            self.board[self.CELL.index("rampart_B")]
         )
 
     def update_open_position(self):
@@ -450,25 +450,37 @@ class Game(gym.Env):
         self.previous_open_position_A = self.board[self.CELL.index("open_position_A")]
         self.previous_open_position_B = self.board[self.CELL.index("open_position_B")]
         self.board[self.CELL.index("open_position_A")] = np.where(
-            (
-                self.previous_position_A
-                - self.board[self.CELL.index("position_A")]
-                + self.previous_open_position_A
+            np.where(
+                (
+                    self.previous_position_A
+                    - self.board[self.CELL.index("position_A")]
+                    + self.previous_open_position_A
+                )
+                > 0,
+                1,
+                0,
             )
+            - self.compile_layers("rampart_B", "position_B")
             > 0,
             1,
             0,
-        ) - self.compile_layers("rampart_B", "position_B")
+        )
         self.board[self.CELL.index("open_position_B")] = np.where(
-            (
-                self.previous_position_B
-                - self.board[self.CELL.index("position_B")]
-                + self.previous_open_position_B
+            np.where(
+                (
+                    self.previous_position_B
+                    - self.board[self.CELL.index("position_B")]
+                    + self.previous_open_position_B
+                )
+                > 0,
+                1,
+                0,
             )
+            - self.compile_layers("rampart_A", "position_A")
             > 0,
             1,
             0,
-        ) - self.compile_layers("rampart_A", "position_A")
+        )
 
     def calculate_score(self):
         """
@@ -555,6 +567,11 @@ class Game(gym.Env):
         self.update_position()
         self.update_open_position()
         self.update_blank()
+        print(
+            self.compile_layers(
+                f"position_{self.current_team}", f"open_position_{self.current_team}"
+            )
+        )
         self.change_player()
         self.turn += 1
         self.calculate_score()
