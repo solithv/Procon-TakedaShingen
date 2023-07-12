@@ -1,9 +1,9 @@
-from game import Game
-import tensorflow as tf
-import rl
 import gymnasium as gym
 import pygame
+import rl
+import tensorflow as tf
 
+from game import Game
 
 env = Game()
 
