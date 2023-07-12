@@ -741,15 +741,20 @@ class Game(gym.Env):
                         directionVector = np.array([cellX - workerX, workerY - cellY])
                         actions.append(
                             int(
-                                np.round(
-                                    np.degrees(
-                                        np.arctan2(
-                                            directionVector[0], directionVector[1]
+                                (
+                                    (
+                                        np.round(
+                                            np.degrees(
+                                                np.arctan2(
+                                                    directionVector[0],
+                                                    directionVector[1],
+                                                )
+                                            )
                                         )
                                         / 45
                                     )
+                                    % 8
                                 )
-                                % 8
                                 + 1
                             )
                         )
@@ -776,16 +781,18 @@ class Game(gym.Env):
                             )
                             actions.append(
                                 int(
-                                    np.round(
-                                        np.degrees(
-                                            np.arctan2(
-                                                directionVector[0], directionVector[1]
+                                    (
+                                        np.round(
+                                            np.degrees(
+                                                np.arctan2(
+                                                    -directionVector[1],
+                                                    directionVector[0],
+                                                )
                                             )
-                                            / 45
                                         )
+                                        / 90
                                     )
-                                    % 8
-                                    + 1
+                                    + 10
                                 )
                             )
                             actingWorker += 1
@@ -809,16 +816,18 @@ class Game(gym.Env):
                             )
                             actions.append(
                                 int(
-                                    np.round(
-                                        np.degrees(
-                                            np.arctan2(
-                                                directionVector[0], directionVector[1]
+                                    (
+                                        np.round(
+                                            np.degrees(
+                                                np.arctan2(
+                                                    -directionVector[1],
+                                                    directionVector[0],
+                                                )
                                             )
-                                            / 45
                                         )
+                                        / 90
                                     )
-                                    % 8
-                                    + 1
+                                    + 14
                                 )
                             )
                             actingWorker += 1
