@@ -611,6 +611,21 @@ class Game(gym.Env):
                 )
                 window_surface.blit(text, text_rect)
 
+        def nonAllowedMovements(x, y, directions):
+            coordinates = np.round(
+                np.array(
+                    [
+                        [
+                            np.cos(2 * n * np.pi / directions) + x,
+                            np.sin(2 * n * np.pi / directions) + y,
+                        ]
+                        for n in range(directions)
+                    ]
+                )
+            )
+
+            return coordinates
+
         view = [
             [
                 [
@@ -704,6 +719,14 @@ class Game(gym.Env):
 
                     # move
                     if event.type == MOUSEBUTTONDOWN:
+                        if not np.any(
+                            np.all(
+                                nonAllowedMovements(workerX, workerY, 8)
+                                == np.array([cellX, cellY]),
+                                axis=1,
+                            )
+                        ):
+                            continue
                         directionVector = np.array([cellX - workerX, workerY - cellY])
                         actions.append(
                             int(
@@ -729,6 +752,14 @@ class Game(gym.Env):
                     elif event.type == KEYDOWN:
                         # build
                         if event.key == pygame.K_SPACE:
+                            if not np.any(
+                                np.all(
+                                    nonAllowedMovements(workerX, workerY, 4)
+                                    == np.array([cellX, cellY]),
+                                    axis=1,
+                                )
+                            ):
+                                continue
                             directionVector = np.array(
                                 [cellX - workerX, workerY - cellY]
                             )
@@ -754,6 +785,14 @@ class Game(gym.Env):
                             pygame.display.update()
                         # break
                         elif event.key == pygame.K_BACKSPACE:
+                            if not np.any(
+                                np.all(
+                                    nonAllowedMovements(workerX, workerY, 4)
+                                    == np.array([cellX, cellY]),
+                                    axis=1,
+                                )
+                            ):
+                                continue
                             directionVector = np.array(
                                 [cellX - workerX, workerY - cellY]
                             )
