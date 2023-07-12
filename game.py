@@ -1,51 +1,12 @@
-import copy
 import os
 
 import gymnasium as gym
 import numpy as np
 import pyautogui
-import tkinter as tk
 import pygame
+
 from pygame.locals import *
-from collections import deque
-
-
-class Worker:
-    TEAMS = ("A", "B")
-
-    def __init__(self, name, y, x):
-        self.name = name
-        self.team = name[-2]
-        self.num = name[-1]
-        self.opponent_team = self.TEAMS[1 - self.TEAMS.index(self.team)]
-        self.y = y
-        self.x = x
-        self.is_action = False
-        self.action_log = []
-
-    def stay(self):
-        self.action_log.append(("stay", (self.y, self.x)))
-        self.is_action = True
-
-    def move(self, y, x):
-        self.x = x
-        self.y = y
-        self.action_log.append(("move", (y, x)))
-        self.is_action = True
-
-    def build(self, y, x):
-        self.action_log.append(("build", (y, x)))
-        self.is_action = True
-
-    def break_(self, y, x):
-        self.action_log.append(("break", (y, x)))
-        self.is_action = True
-
-    def get_coordinate(self):
-        return self.y, self.x
-
-    def turn_init(self):
-        self.is_action = False
+from worker import Worker
 
 
 class Game(gym.Env):
