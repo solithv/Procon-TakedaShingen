@@ -769,7 +769,32 @@ class Game(gym.Env):
                         actingWorker
                     ].get_coordinate()
 
-                    placeImage(
+                    if event.type == KEYDOWN:
+                        if event.key == pygame.K_RETURN:
+                            if showPosition:
+                                drawAll()
+                                
+                                
+                            showPosition = not showPosition
+                            print(showPosition)
+                    
+                    if showPosition:
+                        positionLayer = self.compile_layers(f"pond", one_hot=True)
+                        for i in range(self.height):
+                            for j in range(self.width):
+                                if positionLayer[i][j] == 1:
+                                    placeImage(POND_IMG, i, j)
+                                else:
+                                    placeImage(BLANK_IMG, i, j)
+                        drawGrids()
+                        continue
+
+                    placeImage(  
+                               
+                               
+                               
+                               
+                               
                         eval(f"WORKER_{self.current_team}_HOVER_IMG"),
                         workerY,
                         workerX,
@@ -777,8 +802,8 @@ class Game(gym.Env):
                         scale=1.0,
                     )
                     pygame.display.update()
+
                     if event.type == KEYDOWN:
-                        # move
                         if event.key == pygame.K_1:
                             if not np.any(
                                 np.all(
@@ -911,10 +936,6 @@ class Game(gym.Env):
                             placeImage(BLANK_IMG, cellY, cellX)
                             drawGrids()
                             pygame.display.update()
-
-                        elif event.key == pygame.K_RETURN:
-                            showPosition = not showPosition
-                            print(showPosition)
                 drawTurnInfo(actingWorker=actingWorker + 1)
             return actions
 
