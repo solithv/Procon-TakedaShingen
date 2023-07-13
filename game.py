@@ -1,6 +1,5 @@
 import copy
 import os
-
 import gymnasium as gym
 import numpy as np
 import pyautogui
@@ -698,8 +697,37 @@ class Game(gym.Env):
                         placeImage(RAMPART_B_IMG, i, j)
                     elif "blank" in cellInfo:
                         placeImage(BLANK_IMG, i, j)
-
             drawGrids()
+
+        def drawTurnInfo(actingWorker=None):
+            pygame.draw.rect(
+                window_surface,
+                self.BLACK,
+                (
+                    0,
+                    self.cell_size * self.height,
+                    self.cell_size * self.width,
+                    self.cell_size * 2
+                ),
+            )
+            font = pygame.font.SysFont(None, 60)
+            if actingWorker:
+                text = font.render(
+                    f"{self.current_team}'s turn {actingWorker}/{self.worker_count}",
+                    False,
+                    self.WHITE,
+                )
+            else:
+                text = font.render(f"{self.current_team}'s turn", False, self.WHITE)
+
+            text_rect = text.get_rect(
+                center=(
+                    self.cell_size * self.width / 2,
+                    self.cell_size * (self.height + 1),
+                )
+            )
+            window_surface.blit(text, text_rect)
+            pygame.display.update()
 
         view = [
             [
@@ -712,7 +740,6 @@ class Game(gym.Env):
             ]
             for y in range(self.height)
         ]
-        print(view)
         pygame.init()
         if mode == "console":
             [print(row) for row in view]
@@ -723,22 +750,10 @@ class Game(gym.Env):
             pygame.display.set_caption("game")
 
             drawAll()
-
-            # ターンの表示
-            font = pygame.font.SysFont(None, 60)
-            text = font.render(f"{self.current_team}'s turn", False, self.WHITE)
-            text_rect = text.get_rect(
-                center=(
-                    self.cell_size * self.width / 2,
-                    self.cell_size * (self.height + 1),
-                )
-            )
-            window_surface.blit(text, text_rect)
-            pygame.display.update()
-
             print(self.compile_layers("rampart_A", "pond", one_hot=True))
 
             if input_with != "pygame":
+                drawTurnInfo()
                 return
             showPosition = False
             actions = []
@@ -762,57 +777,58 @@ class Game(gym.Env):
                         scale=1.0,
                     )
                     pygame.display.update()
-                    # move
-                    if event.type == MOUSEBUTTONDOWN:
-                        if not np.any(
-                            np.all(
-                                np.append(
-                                    nonAllowedMovements(workerX, workerY, 8),
-                                    [[workerX, workerY]],
-                                    axis=0,
+                    if event.type == KEYDOWN:
+                        # move
+                        if event.key == pygame.K_1:
+                            if not np.any(
+                                np.all(
+                                    np.append(
+                                        nonAllowedMovements(workerX, workerY, 8),
+                                        [[workerX, workerY]],
+                                        axis=0,
+                                    )
+                                    == np.array([cellX, cellY]),
+                                    axis=1,
                                 )
-                                == np.array([cellX, cellY]),
-                                axis=1,
+                            ):
+                                continue
+                            directionVector = np.array(
+                                [cellX - workerX, workerY - cellY]
                             )
-                        ):
-                            continue
-                        directionVector = np.array([cellX - workerX, workerY - cellY])
-                        if directionVector[0] == directionVector[1] == 0:
-                            actions.append(0)
-                        else:
-                            actions.append(
-                                int(
-                                    (
+                            if directionVector[0] == directionVector[1] == 0:
+                                actions.append(0)
+                            else:
+                                actions.append(
+                                    int(
                                         (
-                                            np.round(
-                                                np.degrees(
-                                                    np.arctan2(
-                                                        directionVector[0],
-                                                        directionVector[1],
+                                            (
+                                                np.round(
+                                                    np.degrees(
+                                                        np.arctan2(
+                                                            directionVector[0],
+                                                            directionVector[1],
+                                                        )
                                                     )
                                                 )
+                                                / 45
                                             )
-                                            / 45
+                                            % 8
                                         )
-                                        % 8
+                                        + 1
                                     )
-                                    + 1
                                 )
+                            placeImage(BLANK_IMG, workerY, workerX)
+                            placeImage(
+                                eval(f"WORKER_{self.current_team}_IMG"),
+                                cellY,
+                                cellX,
+                                workerNumber=str(actingWorker),
                             )
-                        placeImage(BLANK_IMG, workerY, workerX)
-                        placeImage(
-                            eval(f"WORKER_{self.current_team}_IMG"),
-                            cellY,
-                            cellX,
-                            workerNumber=str(actingWorker),
-                        )
-                        drawGrids()
-                        actingWorker += 1
-                        pygame.display.update()
-
-                    elif event.type == KEYDOWN:
+                            drawGrids()
+                            actingWorker += 1
+                            pygame.display.update()
                         # build
-                        if event.key == pygame.K_SPACE:
+                        elif event.key == pygame.K_2:
                             if not np.any(
                                 np.all(
                                     nonAllowedMovements(workerX, workerY, 4)
@@ -855,7 +871,7 @@ class Game(gym.Env):
                             pygame.display.update()
 
                         # break
-                        elif event.key == pygame.K_BACKSPACE:
+                        elif event.key == pygame.K_3:
                             if not np.any(
                                 np.all(
                                     nonAllowedMovements(workerX, workerY, 4)
@@ -899,11 +915,7 @@ class Game(gym.Env):
                         elif event.key == pygame.K_RETURN:
                             showPosition = not showPosition
                             print(showPosition)
-                            pygame.display.update()
-                            for i in range(self.height):
-                                for j in range(self.width):
-                                    placeImage(BLANK_IMG, i, j)
-
+                drawTurnInfo(actingWorker=actingWorker + 1)
             return actions
 
 
