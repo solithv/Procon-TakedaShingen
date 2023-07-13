@@ -707,7 +707,7 @@ class Game(gym.Env):
                     0,
                     self.cell_size * self.height,
                     self.cell_size * self.width,
-                    self.cell_size * 2
+                    self.cell_size * 2,
                 ),
             )
             font = pygame.font.SysFont(None, 60)
@@ -750,7 +750,7 @@ class Game(gym.Env):
             pygame.display.set_caption("game")
 
             drawAll()
-            print(self.compile_layers("rampart_A", "pond", one_hot=True))
+            print(self.compile_layers("position_A", one_hot=True))
 
             if input_with != "pygame":
                 drawTurnInfo()
@@ -773,28 +773,41 @@ class Game(gym.Env):
                         if event.key == pygame.K_RETURN:
                             if showPosition:
                                 drawAll()
-                                
-                                
                             showPosition = not showPosition
-                            print(showPosition)
-                    
+
                     if showPosition:
-                        positionLayer = self.compile_layers(f"pond", one_hot=True)
+                        positionALayer = self.compile_layers("position_A", one_hot=True)
+                        positionBLayer = self.compile_layers("position_B", one_hot=True)
                         for i in range(self.height):
                             for j in range(self.width):
-                                if positionLayer[i][j] == 1:
-                                    placeImage(POND_IMG, i, j)
+                                if positionALayer[i][j] == 1:
+                                    pygame.draw.rect(
+                                        window_surface,
+                                        self.RED,
+                                        (
+                                            j * self.cell_size,
+                                            i * self.cell_size,
+                                            self.cell_size,
+                                            self.cell_size,
+                                        ),
+                                    )
+                                elif positionBLayer[i][j] == 1:
+                                    pygame.draw.rect(
+                                        window_surface,
+                                        self.BLUE,
+                                        (
+                                            j * self.cell_size,
+                                            i * self.cell_size,
+                                            self.cell_size,
+                                            self.cell_size,
+                                        ),
+                                    )
                                 else:
                                     placeImage(BLANK_IMG, i, j)
                         drawGrids()
                         continue
 
-                    placeImage(  
-                               
-                               
-                               
-                               
-                               
+                    placeImage(
                         eval(f"WORKER_{self.current_team}_HOVER_IMG"),
                         workerY,
                         workerX,
