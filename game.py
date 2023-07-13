@@ -107,7 +107,15 @@ class Game(gym.Env):
     SKY = (127, 176, 255)
     PINK = (255, 127, 127)
 
-    def __init__(self, end_turn=10, width=None, height=None, pond=None, worker=None):
+    def __init__(
+        self,
+        end_turn=10,
+        width=None,
+        height=None,
+        pond=None,
+        worker=None,
+        controller="cli",
+    ):
         super().__init__()
         self.end_turn = end_turn * 2
         self.width = width or np.random.randint(self.FIELD_MIN, self.FIELD_MAX)
@@ -116,7 +124,7 @@ class Game(gym.Env):
         self.worker_count = worker or np.random.randint(
             self.WORKER_MIN, self.WORKER_MAX
         )
-
+        self.controller = controller
         self.action_space = gym.spaces.Discrete(len(self.ACTIONS))
         self.observation_space = gym.spaces.Box(
             low=0,
@@ -571,6 +579,12 @@ class Game(gym.Env):
         WORKER_B_IMG = pygame.transform.scale(
             pygame.image.load(self.cwd + "/assets/worker_B.png"), IMG_SCALER
         )
+        WORKER_A_HOVER_IMG = pygame.transform.scale(
+            pygame.image.load(self.cwd + "/assets/worker_A_hover.png"), IMG_SCALER
+        )
+        WORKER_B_HOVER_IMG = pygame.transform.scale(
+            pygame.image.load(self.cwd + "/assets/worker_B_hover.png"), IMG_SCALER
+        )
 
         def drawGrids():
             # 縦線描画
@@ -626,33 +640,13 @@ class Game(gym.Env):
                             np.sin(2 * n * np.pi / directions) + y,
                         ]
                         for n in range(directions)
-                    ] + [[x, y]]
+                    ]
                 )
             )
 
             return coordinates
 
-        view = [
-            [
-                [
-                    self.CELL[i]
-                    for i, item in enumerate(self.board[:, y, x].astype(bool))
-                    if item
-                ]
-                for x in range(self.width)
-            ]
-            for y in range(self.height)
-        ]
-        print(view)
-        pygame.init()
-        if mode == "console":
-            [print(row) for row in view]
-        elif mode == "human":
-            window_surface = pygame.display.set_mode(
-                (self.window_size_x, self.window_size_y + self.cell_size * 2)
-            )
-            pygame.display.set_caption("game")
-
+        def drawAll():
             for i in range(self.height):
                 for j in range(self.width):
                     placeImage(BLANK_IMG, i, j)
@@ -706,6 +700,31 @@ class Game(gym.Env):
                         placeImage(BLANK_IMG, i, j)
 
             drawGrids()
+
+        view = [
+            [
+                [
+                    self.CELL[i]
+                    for i, item in enumerate(self.board[:, y, x].astype(bool))
+                    if item
+                ]
+                for x in range(self.width)
+            ]
+            for y in range(self.height)
+        ]
+        print(view)
+        pygame.init()
+        if mode == "console":
+            [print(row) for row in view]
+        elif mode == "human":
+            window_surface = pygame.display.set_mode(
+                (self.window_size_x, self.window_size_y + self.cell_size * 2)
+            )
+            pygame.display.set_caption("game")
+
+            drawAll()
+
+            # ターンの表示
             font = pygame.font.SysFont(None, 60)
             text = font.render(f"{self.current_team}'s turn", False, self.WHITE)
             text_rect = text.get_rect(
@@ -719,16 +738,12 @@ class Game(gym.Env):
 
             print(self.compile_layers("rampart_A", "pond", one_hot=True))
 
-
             if input_with != "pygame":
                 return
             showPosition = False
             actions = []
             actingWorker = 0
             while actingWorker < self.worker_count:
-                
-                
-                
                 for event in pygame.event.get():
                     if actingWorker >= self.worker_count:
                         break
@@ -739,11 +754,23 @@ class Game(gym.Env):
                         actingWorker
                     ].get_coordinate()
 
+                    placeImage(
+                        eval(f"WORKER_{self.current_team}_HOVER_IMG"),
+                        workerY,
+                        workerX,
+                        workerNumber=str(actingWorker),
+                        scale=1.0,
+                    )
+                    pygame.display.update()
                     # move
                     if event.type == MOUSEBUTTONDOWN:
                         if not np.any(
                             np.all(
-                                nonAllowedMovements(workerX, workerY, 8)
+                                np.append(
+                                    nonAllowedMovements(workerX, workerY, 8),
+                                    [[workerX, workerY]],
+                                    axis=0,
+                                )
                                 == np.array([cellX, cellY]),
                                 axis=1,
                             )
@@ -774,13 +801,15 @@ class Game(gym.Env):
                             )
                         placeImage(BLANK_IMG, workerY, workerX)
                         placeImage(
-                            eval(f"WORKER_{self.current_team}_IMG"), cellY, cellX,
-                            workerNumber=str(actingWorker)
+                            eval(f"WORKER_{self.current_team}_IMG"),
+                            cellY,
+                            cellX,
+                            workerNumber=str(actingWorker),
                         )
                         drawGrids()
                         actingWorker += 1
                         pygame.display.update()
-                        
+
                     elif event.type == KEYDOWN:
                         # build
                         if event.key == pygame.K_SPACE:
@@ -812,12 +841,19 @@ class Game(gym.Env):
                                 )
                             )
                             actingWorker += 1
+                            placeImage(BLANK_IMG, workerY, workerX)
+                            placeImage(
+                                eval(f"WORKER_{self.current_team}_IMG"),
+                                workerY,
+                                workerX,
+                                workerNumber=str(actingWorker - 1),
+                            )
                             placeImage(
                                 eval(f"RAMPART_{self.current_team}_IMG"), cellY, cellX
                             )
                             drawGrids()
                             pygame.display.update()
-                            
+
                         # break
                         elif event.key == pygame.K_BACKSPACE:
                             if not np.any(
@@ -848,18 +884,25 @@ class Game(gym.Env):
                                 )
                             )
                             actingWorker += 1
+
+                            placeImage(BLANK_IMG, workerY, workerX)
+                            placeImage(
+                                eval(f"WORKER_{self.current_team}_IMG"),
+                                workerY,
+                                workerX,
+                                workerNumber=str(actingWorker - 1),
+                            )
                             placeImage(BLANK_IMG, cellY, cellX)
                             drawGrids()
                             pygame.display.update()
-                            
+
                         elif event.key == pygame.K_RETURN:
                             showPosition = not showPosition
                             print(showPosition)
                             pygame.display.update()
-                            # for i in range(self.height):
-                            #     for j in range(self.width):
-                            #         placeImage(BLANK_IMG, i, j)
-                            
+                            for i in range(self.height):
+                                for j in range(self.width):
+                                    placeImage(BLANK_IMG, i, j)
 
             return actions
 
@@ -867,7 +910,7 @@ class Game(gym.Env):
 if __name__ == "__main__":
 
     def turn():
-        env.render()
+        env.render(input_with="cli")
 
         [print(f"{i:2}: {action}") for i, action in enumerate(env.ACTIONS)]
         print(
@@ -877,54 +920,32 @@ if __name__ == "__main__":
 
         return env.step(actions)
 
-    env = Game()
-
+    env = Game(controller="pygame")
     print(f"width:{env.width}, height:{env.height}, workers:{env.worker_count}")
-
     observation = env.reset()
     done = False
 
-    while not done:
-        print(
-            f"input team {env.current_team} actions (need {env.worker_count} input) : "
-        )
-        actions = env.render(input_with="pygame")
-        observation, reward, done, _ = env.step(actions)
+    if env.controller == "pygame":
+        while not done:
+            print(
+                f"input team {env.current_team} actions (need {env.worker_count} input) : "
+            )
+            actions = env.render(input_with="pygame")
+            observation, reward, done, _ = env.step(actions)
 
-        print(
-            f"input team {env.current_team} actions (need {env.worker_count} input) : "
-        )
-        actions = env.render(input_with="pygame")
-        observation, reward, done, _ = env.step(actions)
+            print(
+                f"input team {env.current_team} actions (need {env.worker_count} input) : "
+            )
+            actions = env.render(input_with="pygame")
+            observation, reward, done, _ = env.step(actions)
 
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+    elif env.controller == "cli":
+        while not done:
+            observation, reward, done, _ = turn()
 
-    env.render()
-
-    # def turn():
-    #     env.render()
-
-    #     [print(f"{i:2}: {action}") for i, action in enumerate(env.ACTIONS)]
-    #     print(
-    #         f"input team {env.current_team} actions (need {env.worker_count} input) : "
-    #     )
-    #     actions = [int(input()) for _ in range(env.worker_count)]
-    #     return env.step(actions)
-
-    # env = Game()
-
-    # print(f"width:{env.width}, height:{env.height}, workers:{env.worker_count}")
-
-    # observation = env.reset()
-    # done = False
-
-    # while not done:
-    #     observation, reward, done, _ = turn()
-
-    #     for event in pygame.event.get():
-    #         if event.type == pygame.QUIT:
-    #             pygame.quit()
-
-    # env.render()
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
