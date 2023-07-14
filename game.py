@@ -1,6 +1,8 @@
-import os
 import copy
+import csv
+import os
 from typing import Iterable, Optional, Union
+
 import gymnasium as gym
 import numpy as np
 import pyautogui
@@ -157,6 +159,28 @@ class Game(gym.Env):
         blank層を更新
         """
         self.board[0] = 1 - self.board[1:].any(axis=0)
+
+    def read_from_scv(self, path):
+        self.board = np.ndarray(0, dtype=np.uint8)
+        with open(path, "r") as f:
+            reader = csv.reader(f)
+            for row in reader:
+                line = np.ndarray(0, dtype=np.uint8)
+                for item in row:
+                    cell = np.zeros(len(self.CELL))
+                    if item == "0":
+                        cell[self.CELL.index("blank")] = 1
+                    elif item == "1":
+                        cell[self.CELL.index("pond")] = 1
+                    elif item == "2":
+                        cell[self.CELL.index("castle")] = 1
+                    elif item == "a":
+                        cell[self.CELL.index("worker_A")] = 1
+                    elif item == "b":
+                        cell[self.CELL.index("worker_B")] = 1
+                    np.stack([line, cell], axis=0)
+                np.stack([self.board, line], axis=0)
+        self.board.reshape()
 
     def reset(
         self,
