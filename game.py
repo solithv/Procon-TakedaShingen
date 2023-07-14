@@ -820,32 +820,32 @@ class Game(gym.Env):
                     if showPosition:
                         positionALayer = self.compile_layers("position_A", one_hot=True)
                         positionBLayer = self.compile_layers("position_B", one_hot=True)
+                        openPositionALayer = self.compile_layers("open_position_A", one_hot=True)
+                        openPositionBLayer = self.compile_layers("open_position_B", one_hot=True)
                         for i in range(self.height):
                             for j in range(self.width):
                                 if positionALayer[i][j] == 1:
-                                    pygame.draw.rect(
-                                        window_surface,
-                                        self.RED,
-                                        (
-                                            j * self.cell_size,
-                                            i * self.cell_size,
-                                            self.cell_size,
-                                            self.cell_size,
-                                        ),
-                                    )
+                                    color = self.RED
                                 elif positionBLayer[i][j] == 1:
-                                    pygame.draw.rect(
-                                        window_surface,
-                                        self.BLUE,
-                                        (
-                                            j * self.cell_size,
-                                            i * self.cell_size,
-                                            self.cell_size,
-                                            self.cell_size,
-                                        ),
-                                    )
+                                    color = self.BLUE
+                                elif openPositionALayer[i][j] == 1:
+                                    color = self.PINK
+                                elif openPositionBLayer[i][j] == 1:
+                                    color = self.SKY
                                 else:
                                     placeImage(BLANK_IMG, i, j)
+                                    continue
+                                    
+                                pygame.draw.rect(
+                                        window_surface,
+                                        color,
+                                        (
+                                            j * self.cell_size,
+                                            i * self.cell_size,
+                                            self.cell_size,
+                                            self.cell_size,
+                                        ),
+                                    )
                         drawGrids()
                         continue
 
