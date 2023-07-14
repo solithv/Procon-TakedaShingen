@@ -1,7 +1,6 @@
 import os
 import copy
 from typing import Iterable, Optional, Union
-
 import gymnasium as gym
 import numpy as np
 import pyautogui
@@ -80,7 +79,7 @@ class Game(gym.Env):
         castle: Optional[int] = None,
         pond: Optional[int] = None,
         worker: Optional[int] = None,
-        controller: str = "cli"
+        controller: str = "cli",
     ):
         super().__init__()
         self.end_turn = end_turn * 2
