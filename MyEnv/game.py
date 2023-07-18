@@ -13,14 +13,16 @@ import pyautogui
 import pygame
 from pygame.locals import *
 
-from worker import Worker
+try:
+    from .worker import Worker
+except:
+    from worker import Worker
 
 
 class Game(gym.Env):
-    metadata = {"render.modes": ["human", "console"]}
+    metadata = {"render_modes": ["human", "ansi"], "render_fps": 5}
     SCORE_MULTIPLIER = {"castle": 100, "position": 50, "rampart": 10}
     TEAM = ("A", "B")
-    POND_MIN, POND_MAX = 1, 5
     FIELD_MIN, FIELD_MAX = 11, 25
     WORKER_MIN, WORKER_MAX = 2, 6
     CELL = (
@@ -62,8 +64,6 @@ class Game(gym.Env):
         "S": np.array([1, 0]),
         "W": np.array([0, -1]),
     }
-    SCORE_MULTIPLIER = {"castle": 100, "position": 50, "rampart": 10}
-    FIELD_MIN, FIELD_MAX = 11, 25
 
     BLACK = (0, 0, 0)
     WHITE = (255, 255, 255)
@@ -74,17 +74,28 @@ class Game(gym.Env):
     SKY = (127, 176, 255)
     PINK = (255, 127, 127)
 
-    def __init__(self, controller: str = "cli"):
+    def __init__(
+        self,
+        csv_path: str,
+        render_mode="ansi",
+        max_episode_steps=100,
+        first_player: Optional[int] = None,
+        controller: str = "cli",
+    ):
         super().__init__()
+        self.csv_path = csv_path
+        self.render_mode = render_mode
+        self.max_episode_steps = max_episode_steps
         self.action_space = gym.spaces.Discrete(len(self.ACTIONS))
         self.observation_space = gym.spaces.Box(
             low=0,
             high=1,
             shape=(len(self.CELL), self.FIELD_MAX, self.FIELD_MAX),
-            dtype=np.int8,
+            dtype=np.uint8,
         )
         self.reward_range = [np.NINF, np.inf]
 
+        self.first_player = first_player
         self.controller = controller
         self.cwd = os.getcwd()
         self.display_size_x, self.display_size_y = pyautogui.size()
@@ -151,27 +162,27 @@ class Game(gym.Env):
         self.worker_count = a_count
         self.update_blank()
 
-    def reset(
-        self, field_data: str, end_turn: int = 500, first_player: Optional[int] = None
-    ):
+    def reset(self, seed=None, options=None):
         """
         gymの必須関数
         環境の初期化
         Args:
-            field_data (str): 使用するフィールドのcsvデータのパスを入力
+            csv_path (str): 使用するフィールドのcsvデータのパスを入力
             end_turn (int, optional): 終了ターン数を指定. Defaults to 500.
             first_player (Optional[int], optional): 先攻のチーム名を指定. Defaults to None.
         """
-        self.end_turn = end_turn * 2
+        super().reset(seed=seed, options=options)
         self.current_player = (
-            self.TEAM.index(first_player) if first_player else np.random.randint(0, 2)
+            self.TEAM.index(self.first_player)
+            if self.first_player
+            else np.random.randint(0, 2)
         )
         self.change_player(no_change=True)
         self.score_A, self.score_B = 0, 0
         self.previous_score_A, self.previous_score_B = 0, 0
         self.turn = 1
         self.done = False
-        self.load_from_csv(field_data)
+        self.load_from_csv(self.csv_path)
 
         self.cell_size = min(
             self.display_size_x * 0.9 // self.width,
@@ -512,10 +523,12 @@ class Game(gym.Env):
         """報酬更新処理実装予定"""
         if not all(self.successful):
             return np.NINF
+        else:
+            return 0
 
     def is_done(self):
         """ゲーム終了判定実装予定"""
-        if self.turn >= self.end_turn:
+        if self.turn >= self.max_episode_steps:
             self.done = True
 
     def step(self, actions: Iterable[int]):
@@ -551,13 +564,13 @@ class Game(gym.Env):
         self.calculate_score()
         reward = self.get_reward()
         self.is_done()
-        return self.board, reward, self.done, {}
+        return self.board, reward, self.done, {}, {}
 
-    def render(self, mode: str = "human", input_with: str = "cli"):
+    def render(self):
         """
         gymの必須関数
         描画を行う
-        mode: str("human" or "console") pygameかcliどちらで描画するか選択
+        mode: str("human" or "ansi") pygameかcliどちらで描画するか選択
         input_with: str("pygame" or "cli") pygame上で職人を操作するか、cli上で行動番号を入力するか選択
         """
         IMG_SCALER = np.array((self.cell_size, self.cell_size))
@@ -748,9 +761,11 @@ class Game(gym.Env):
             for y in range(self.height)
         ]
         pygame.init()
-        if mode == "console":
-            [print(row) for row in view]
-        elif mode == "human":
+        if self.render_mode == "ansi":
+            rendering = str([row for row in view])
+            print(rendering)
+            return rendering
+        elif self.render_mode == "human":
             window_surface = pygame.display.set_mode(
                 (self.window_size_x, self.window_size_y + self.cell_size * 2)
             )
@@ -758,7 +773,7 @@ class Game(gym.Env):
 
             drawAll()
 
-            if input_with != "pygame":
+            if self.controller != "pygame":
                 drawTurnInfo()
                 return
             showPosition = False
@@ -960,13 +975,16 @@ class Game(gym.Env):
                             drawGrids()
                             pygame.display.update()
                 drawTurnInfo(actingWorker=actingWorker + 1)
-            return actions
+            self.actions = actions
+
+    def get_actions_from_render(self):
+        return self.actions
 
 
 if __name__ == "__main__":
 
     def turn():
-        env.render(input_with="cli")
+        env.render()
 
         [print(f"{i:2}: {action}") for i, action in enumerate(env.ACTIONS)]
         print(
@@ -978,9 +996,9 @@ if __name__ == "__main__":
 
     fields = glob.glob("./field_data/*.csv")
 
-    env = Game(controller="pygame")
+    env = Game(csv_path=random.choice(fields), render_mode="human", controller="pygame")
 
-    observation = env.reset(random.choice(fields))
+    observation = env.reset()
     done = False
     print(f"width:{env.width}, height:{env.height}, workers:{env.worker_count}")
 
@@ -989,14 +1007,8 @@ if __name__ == "__main__":
             print(
                 f"input team {env.current_team} actions (need {env.worker_count} input) : "
             )
-            actions = env.render(input_with="pygame")
-            observation, reward, done, _ = env.step(actions)
-
-            print(
-                f"input team {env.current_team} actions (need {env.worker_count} input) : "
-            )
-            actions = env.render(input_with="pygame")
-            observation, reward, done, _ = env.step(actions)
+            env.render()
+            observation, reward, done, _ = env.step(env.get_actions_from_render())
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
