@@ -1056,7 +1056,7 @@ if __name__ == "__main__":
 
         return env.step(actions)
 
-    fields = glob.glob("./フィールドデータ/*.csv")
+    fields = glob.glob("./field_data/*.csv")
 
     env = Game(controller="pygame")
 
