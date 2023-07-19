@@ -5,7 +5,7 @@ import os
 import random
 from collections import defaultdict
 from typing import Iterable, Optional
-
+import re
 import gymnasium as gym
 import numpy as np
 import pyautogui
@@ -127,7 +127,7 @@ class Game(gym.Env):
         Args:
             path (str): csvデータのパス
         """
-        size = int(path[:-len(".csv")][-2::])
+        size = int(re.sub(r"[\D]", "", os.path.normpath(path).split(os.path.sep)[-1]))
         self.board = np.zeros((len(self.CELL), size, size), dtype=np.uint8)
         self.workers: defaultdict[str, list[Worker]] = defaultdict(list)
         self.width, self.height = [size] * 2
