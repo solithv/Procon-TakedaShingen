@@ -20,7 +20,7 @@ except:
 
 class Game(gym.Env):
     metadata = {"render_modes": ["human", "ansi"], "render_fps": 5}
-    SCORE_MULTIPLIER = {"castle": 100, "position": 50, "rampart": 10}
+    SCORE_MULTIPLIER = {"castle": 100, "position": 30, "rampart": 10}
     TEAM = ("A", "B")
     FIELD_MIN, FIELD_MAX = 11, 25
     WORKER_MIN, WORKER_MAX = 2, 6
