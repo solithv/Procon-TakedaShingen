@@ -3,7 +3,6 @@ import csv
 import glob
 import os
 import random
-import re
 from collections import defaultdict
 from typing import Iterable, Optional
 
@@ -128,7 +127,7 @@ class Game(gym.Env):
         Args:
             path (str): csvデータのパス
         """
-        size = int(re.sub(r"[\D]", "", os.path.normpath(path).split(os.path.sep)[-1]))
+        size = int(path[:-len(".csv")][-2::])
         self.board = np.zeros((len(self.CELL), size, size), dtype=np.uint8)
         self.workers: defaultdict[str, list[Worker]] = defaultdict(list)
         self.width, self.height = [size] * 2
@@ -576,9 +575,6 @@ class Game(gym.Env):
         IMG_SCALER = np.array((self.cell_size, self.cell_size))
         BLANK_IMG = pygame.transform.scale(
             pygame.image.load(self.cwd + "/assets/blank.png"), IMG_SCALER
-        )
-        UNAVAILABLE_IMG = pygame.transform.scale(
-            pygame.image.load(self.cwd + "/assets/unavailable.png"), IMG_SCALER
         )
         POND_IMG = pygame.transform.scale(
             pygame.image.load(self.cwd + "/assets/pond.png"), IMG_SCALER
