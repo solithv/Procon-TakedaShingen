@@ -303,11 +303,43 @@ class Game(gym.Env):
                 direction += value
         return direction
 
+    def check_stack_workers(self, workers: list[tuple[Worker, int]]):
+        destinations = defaultdict(int)
+        for worker, action in workers:
+            if "move" in self.ACTIONS[action]:
+                destinations[
+                    tuple(
+                        (
+                            np.array(worker.get_coordinate())
+                            + self.get_direction(action)
+                        ).tolist(),
+                    )
+                ] += 1
+        if any(value > 1 for value in destinations.values()):
+            stack_destinations = [
+                key for key, value in destinations.items() if value > 1
+            ]
+            for worker, action in workers.copy():
+                if "move" in self.ACTIONS[action] and (
+                    tuple(
+                        (
+                            np.array(worker.get_coordinate())
+                            + self.get_direction(action)
+                        ).tolist(),
+                    )
+                    in stack_destinations
+                ):
+                    worker.stay()
+                    self.successful.append(False)
+                    workers.remove((worker, action))
+        return workers
+
     def action_workers(self, workers: list[tuple[Worker, int]]):
         """
         内部関数
         職人を行動させる
         """
+        workers = self.check_stack_workers(workers)
         for _ in range(self.worker_count):
             worker, action = workers.pop(0)
             y, x = map(
