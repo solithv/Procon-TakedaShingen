@@ -422,39 +422,29 @@ class Game(gym.Env):
         self.previous_open_position_B = copy.deepcopy(
             self.board[self.CELL.index("open_position_B")]
         )
+
         self.board[self.CELL.index("open_position_A")] = np.where(
-            np.where(
-                (
-                    self.previous_position_A
-                    - self.board[self.CELL.index("position_A")]
-                    + self.previous_open_position_A
-                )
-                > 0,
-                1,
-                0,
-            )
-            - self.compile_layers("rampart_A", "rampart_B", "position_B")
-            > 0,
+            (self.previous_position_A + self.previous_open_position_A) > 0,
             1,
             0,
+        ) - self.compile_layers("rampart_A", "rampart_B", "position_A", "position_B")
+        self.board[self.CELL.index("open_position_A")] = np.where(
+            self.board[self.CELL.index("open_position_A")] == np.uint8(-1),
+            0,
+            self.board[self.CELL.index("open_position_A")],
         )
         self.board[self.CELL.index("open_position_A"), :, self.width :] = -1
         self.board[self.CELL.index("open_position_A"), self.height :, :] = -1
+
         self.board[self.CELL.index("open_position_B")] = np.where(
-            np.where(
-                (
-                    self.previous_position_B
-                    - self.board[self.CELL.index("position_B")]
-                    + self.previous_open_position_B
-                )
-                > 0,
-                1,
-                0,
-            )
-            - self.compile_layers("rampart_B", "rampart_A", "position_A")
-            > 0,
+            (self.previous_position_B + self.previous_open_position_B) > 0,
             1,
             0,
+        ) - self.compile_layers("rampart_A", "rampart_B", "position_A", "position_B")
+        self.board[self.CELL.index("open_position_B")] = np.where(
+            self.board[self.CELL.index("open_position_B")] == np.uint8(-1),
+            0,
+            self.board[self.CELL.index("open_position_B")],
         )
         self.board[self.CELL.index("open_position_B"), :, self.width :] = -1
         self.board[self.CELL.index("open_position_B"), self.height :, :] = -1
