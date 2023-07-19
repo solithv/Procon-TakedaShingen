@@ -1,20 +1,28 @@
-import os
 import copy
-from typing import Iterable, Optional, Union
+import csv
+import glob
+import os
+import random
+import re
+from collections import defaultdict
+from typing import Iterable, Optional
+
 import gymnasium as gym
 import numpy as np
 import pyautogui
 import pygame
 from pygame.locals import *
 
-from worker import Worker
+try:
+    from .worker import Worker
+except:
+    from worker import Worker
 
 
 class Game(gym.Env):
-    metadata = {"render.modes": ["human", "console"]}
+    metadata = {"render_modes": ["human", "ansi"], "render_fps": 5}
     SCORE_MULTIPLIER = {"castle": 100, "position": 50, "rampart": 10}
     TEAM = ("A", "B")
-    POND_MIN, POND_MAX = 1, 5
     FIELD_MIN, FIELD_MAX = 11, 25
     WORKER_MIN, WORKER_MAX = 2, 6
     CELL = (
@@ -56,11 +64,6 @@ class Game(gym.Env):
         "S": np.array([1, 0]),
         "W": np.array([0, -1]),
     }
-    SCORE_MULTIPLIER = {"castle": 100, "position": 50, "rampart": 10}
-    CASTLE_MIN, CASTLE_MAX = 1, 1
-    POND_MIN, POND_MAX = 1, 5
-    FIELD_MIN, FIELD_MAX = 11, 25
-    WORKER_MIN, WORKER_MAX = 2, 6
 
     BLACK = (0, 0, 0)
     WHITE = (255, 255, 255)
@@ -73,39 +76,114 @@ class Game(gym.Env):
 
     def __init__(
         self,
-        end_turn: int = 10,
-        width: Optional[int] = None,
-        height: Optional[int] = None,
-        castle: Optional[int] = None,
-        pond: Optional[int] = None,
-        worker: Optional[int] = None,
+        csv_path: str,
+        render_mode="ansi",
+        max_episode_steps=100,
+        first_player: Optional[int] = None,
         controller: str = "cli",
     ):
         super().__init__()
-        self.end_turn = end_turn * 2
-        self.width = width or np.random.randint(self.FIELD_MIN, self.FIELD_MAX)
-        self.height = height or np.random.randint(self.FIELD_MIN, self.FIELD_MAX)
-
-        self.castle_count = (
-            castle or self.CASTLE_MIN
-            if self.CASTLE_MIN == self.CASTLE_MAX
-            else np.random.randint(self.CASTLE_MIN, self.CASTLE_MAX)
-        )
-        self.pond_count = pond or np.random.randint(self.POND_MIN, self.POND_MAX)
-        self.worker_count = worker or np.random.randint(
-            self.WORKER_MIN, self.WORKER_MAX
-        )
-        self.controller = controller
+        self.csv_path = csv_path
+        self.render_mode = render_mode
+        self.max_episode_steps = max_episode_steps
         self.action_space = gym.spaces.Discrete(len(self.ACTIONS))
         self.observation_space = gym.spaces.Box(
             low=0,
             high=1,
-            shape=(len(self.CELL), self.height, self.width),
-            dtype=np.int8,
+            shape=(len(self.CELL), self.FIELD_MAX, self.FIELD_MAX),
+            dtype=np.uint8,
         )
         self.reward_range = [np.NINF, np.inf]
+
+        self.first_player = first_player
+        self.controller = controller
         self.cwd = os.getcwd()
         self.display_size_x, self.display_size_y = pyautogui.size()
+
+    def change_player(self, no_change: bool = False):
+        """
+        内部関数
+        操作対象のチームを更新する
+        Args:
+            no_change (bool, optional): チームの変更は行わずに変数の更新のみを行う (default=False)
+        """
+        if not no_change:
+            self.current_player = 1 - self.current_player
+        self.current_team = self.TEAM[self.current_player]
+        self.opponent_team = self.TEAM[1 - self.current_player]
+
+    def update_blank(self):
+        """
+        内部関数
+        blank層を更新
+        """
+        self.board[0] = np.where(self.board[1:].any(axis=0), 0, 1)
+        self.board[0, self.height :, :] = -1
+        self.board[0, :, self.width :] = -1
+
+    def load_from_csv(self, path: str):
+        """
+        内部関数
+        csvデータからフィールドを作成する
+        Args:
+            path (str): csvデータのパス
+        """
+        size = int(re.sub(r"[\D]", "", os.path.normpath(path).split(os.path.sep)[-1]))
+        self.board = np.zeros((len(self.CELL), size, size), dtype=np.uint8)
+        self.workers: defaultdict[str, list[Worker]] = defaultdict(list)
+        self.width, self.height = [size] * 2
+
+        a_count, b_count = 0, 0
+        with open(path, "r") as f:
+            reader = csv.reader(f)
+            for y, row in enumerate(reader):
+                for x, item in enumerate(row):
+                    if item == "0":
+                        self.board[self.CELL.index("blank"), y, x] = 1
+                    elif item == "1":
+                        self.board[self.CELL.index("pond"), y, x] = 1
+                    elif item == "2":
+                        self.board[self.CELL.index("castle"), y, x] = 1
+                    elif item == "a":
+                        self.board[self.CELL.index(f"worker_A{a_count}"), y, x] = 1
+                        self.workers["A"].append(Worker(f"worker_A{a_count}", y, x))
+                        a_count += 1
+                    elif item == "b":
+                        self.board[self.CELL.index(f"worker_B{b_count}"), y, x] = 1
+                        self.workers["B"].append(Worker(f"worker_B{b_count}", y, x))
+                        b_count += 1
+        self.board = np.pad(
+            self.board,
+            [(0, 0), (0, self.FIELD_MAX - size), (0, self.FIELD_MAX - size)],
+            "constant",
+            constant_values=-1,
+        )
+        assert a_count == b_count, "チーム間の職人数が不一致"
+        self.worker_count = a_count
+        self.update_blank()
+
+    def reset(self, seed=None, options=None):
+        """
+        gymの必須関数
+        環境の初期化
+        Args:
+            csv_path (str): 使用するフィールドのcsvデータのパスを入力
+            end_turn (int, optional): 終了ターン数を指定. Defaults to 500.
+            first_player (Optional[int], optional): 先攻のチーム名を指定. Defaults to None.
+        """
+        super().reset(seed=seed, options=options)
+        self.current_player = (
+            self.TEAM.index(self.first_player)
+            if self.first_player
+            else np.random.randint(0, 2)
+        )
+        self.change_player(no_change=True)
+        self.score_A, self.score_B = 0, 0
+        self.previous_score_A, self.previous_score_B = 0, 0
+        self.turn = 1
+        self.done = False
+        self.load_from_csv(self.csv_path)
+
         self.cell_size = min(
             self.display_size_x * 0.9 // self.width,
             self.display_size_y * 0.8 // self.height,
@@ -114,140 +192,24 @@ class Game(gym.Env):
         self.window_size_x = self.width * self.cell_size
         self.window_size_y = self.height * self.cell_size
 
-        self.reset()
-
-    def change_player(self, no_change: bool = False):
-        if not no_change:
-            self.current_player = 1 - self.current_player
-        self.current_team = self.TEAM[self.current_player]
-        self.opponent_team = self.TEAM[1 - self.current_player]
-
-    def set_cell_property(
-        self, target: str, coordinate: Optional[Iterable[int]] = None
-    ):
-        """
-        内部関数
-        セルに要素を配置
-        """
-        if not coordinate:
-            while True:
-                y = np.random.randint(0, self.height - 1)
-                x = np.random.randint(0, self.width - 1)
-                if (y, x) not in self.used:
-                    break
-        else:
-            y, x = coordinate
-        self.board[self.CELL.index(target), y, x] = 1
-        self.used.append((y, x))
-        return y, x
-
-    def set_worker_position(
-        self, target: str, coordinates: Optional[Iterable[int]] = None
-    ):
-        """
-        内部関数
-        セルに職人を配置
-        """
-        y, x = self.set_cell_property(target, coordinates)
-        return Worker(target, y, x)
-
-    def update_blank(self):
-        """
-        内部関数
-        blank層を更新
-        """
-        self.board[0] = 1 - self.board[1:].any(axis=0)
-
-    def reset(
-        self,
-        first_player: Optional[int] = None,
-        castle: Optional[Iterable[Iterable[int]]] = None,
-        pond: Optional[Iterable[Iterable[int]]] = None,
-        worker_A: Optional[Iterable[Iterable[int]]] = None,
-        worker_B: Optional[Iterable[Iterable[int]]] = None,
-    ):
-        """
-        gymの必須関数
-        環境の初期化
-        first_player: str("A" or "B") 先攻のチーム名を指定
-        castle: list[y,x] 城の座標を指定
-        pond: list[list[y,x]] 池の座標を指定
-        worker_A: list[list[y,x]] Aチームの職人の座標を指定
-        worker_B: list[list[y,x]] Aチームの職人の座標を指定
-        """
-        self.current_player = (
-            self.TEAM.index(first_player) if first_player else np.random.randint(0, 2)
-        )
-        self.change_player(no_change=True)
-        self.score_A, self.score_B = 0, 0
-        self.previous_score_A, self.previous_score_B = 0, 0
-        self.turn = 1
-        self.done = False
-        self.board = np.zeros((len(self.CELL), self.height, self.width))
-        self.workers: dict[str, Worker] = {}
-        self.used = []
-
-        if castle:
-            assert self.castle_count == len(castle), "castle input error"
-            [
-                self.set_cell_property("castle", coordinate=coordinate)
-                for coordinate in castle
-            ]
-        else:
-            [self.set_cell_property("castle") for _ in range(self.castle_count)]
-
-        if pond:
-            assert self.pond_count == len(pond), "pond input error"
-            [
-                self.set_cell_property("pond", coordinate=coordinate)
-                for coordinate in pond
-            ]
-        else:
-            [self.set_cell_property("pond") for _ in range(self.pond_count)]
-
-        if worker_A:
-            assert self.worker_count == len(worker_A), "worker_A input error"
-        self.workers["A"] = (
-            [
-                self.set_worker_position(f"worker_A{i}", coordinate)
-                for i, coordinate in enumerate(worker_A)
-            ]
-            if worker_A
-            else [
-                self.set_worker_position(f"worker_A{i}")
-                for i in range(self.worker_count)
-            ]
-        )
-
-        if worker_B:
-            assert self.worker_count == len(worker_B), "worker_B input error"
-        self.workers["B"] = (
-            [
-                self.set_worker_position(f"worker_B{i}", coordinate)
-                for i, coordinate in enumerate(worker_B)
-            ]
-            if worker_B
-            else [
-                self.set_worker_position(f"worker_B{i}")
-                for i in range(self.worker_count)
-            ]
-        )
-
         self.update_blank()
         return self.board
 
     def compile_layers(self, *layers: tuple[str], one_hot: bool = True):
         """
         入力された層を合成した2次元配列を返す
-        one_hot: bool 返り値の各要素を1,0のみにする (default=False)
+        one_hot: bool 返り値の各要素を1,0のみにする (default=True)
         """
         compiled = np.sum(
-            [self.board[self.CELL.index(layer)] for layer in layers], axis=0
+            [self.board[self.CELL.index(layer)] for layer in layers],
+            axis=0,
+            dtype=np.uint8,
         )
         if one_hot:
-            return np.where(compiled, 1, 0)
-        else:
-            return compiled
+            compiled = np.where(compiled, 1, 0)
+        compiled[self.height :, :] = -1
+        compiled[:, self.width :] = -1
+        return compiled
 
     def get_team_worker_coordinate(
         self, team: str, actioned: bool = True, worker: Worker = None
@@ -339,7 +301,7 @@ class Game(gym.Env):
                 direction += value
         return direction
 
-    def action_workers(self, workers: Iterable[tuple[Worker, int]]):
+    def action_workers(self, workers: list[tuple[Worker, int]]):
         """
         内部関数
         職人を行動させる
@@ -427,7 +389,10 @@ class Game(gym.Env):
             dfs(i, 0)  # 左辺
             dfs(i, cols - 1)  # 右辺
 
-        return np.where(array == 1, 1, 0)
+        array = np.where(array == 1, 1, 0)
+        array[:, self.width :] = -1
+        array[self.height :, :] = -1
+        return array
 
     def update_position(self):
         """
@@ -474,6 +439,8 @@ class Game(gym.Env):
             1,
             0,
         )
+        self.board[self.CELL.index("open_position_A"), :, self.width :] = -1
+        self.board[self.CELL.index("open_position_A"), self.height :, :] = -1
         self.board[self.CELL.index("open_position_B")] = np.where(
             np.where(
                 (
@@ -490,6 +457,8 @@ class Game(gym.Env):
             1,
             0,
         )
+        self.board[self.CELL.index("open_position_B"), :, self.width :] = -1
+        self.board[self.CELL.index("open_position_B"), self.height :, :] = -1
 
     def calculate_score(self):
         """
@@ -500,39 +469,51 @@ class Game(gym.Env):
 
         self.score_A = (
             np.sum(
-                self.board[self.CELL.index("castle")]
-                * self.compile_layers("position_A", "open_position_A")
+                self.board[self.CELL.index("castle"), : self.height, : self.width]
+                * self.compile_layers("position_A", "open_position_A")[
+                    : self.height, : self.width
+                ]
             )
             * self.SCORE_MULTIPLIER["castle"]
         )
         self.score_A += (
             np.sum(
-                (1 - self.board[self.CELL.index("castle")])
-                * self.compile_layers("position_A", "open_position_A")
+                (1 - self.board[self.CELL.index("castle"), : self.height, : self.width])
+                * self.compile_layers("position_A", "open_position_A")[
+                    : self.height, : self.width
+                ]
             )
             * self.SCORE_MULTIPLIER["position"]
         )
         self.score_A += (
-            np.sum(self.board[self.CELL.index("rampart_A")])
+            np.sum(
+                self.board[self.CELL.index("rampart_A"), : self.height, : self.width]
+            )
             * self.SCORE_MULTIPLIER["rampart"]
         )
 
         self.score_B = (
             np.sum(
-                self.board[self.CELL.index("castle")]
-                * self.compile_layers("position_B", "open_position_B")
+                self.board[self.CELL.index("castle"), : self.height, : self.width]
+                * self.compile_layers("position_B", "open_position_B")[
+                    : self.height, : self.width
+                ]
             )
             * self.SCORE_MULTIPLIER["castle"]
         )
         self.score_B += (
             np.sum(
-                (1 - self.board[self.CELL.index("castle")])
-                * self.compile_layers("position_B", "open_position_B")
+                (1 - self.board[self.CELL.index("castle"), : self.height, : self.width])
+                * self.compile_layers("position_B", "open_position_B")[
+                    : self.height, : self.width
+                ]
             )
             * self.SCORE_MULTIPLIER["position"]
         )
         self.score_B += (
-            np.sum(self.board[self.CELL.index("rampart_B")])
+            np.sum(
+                self.board[self.CELL.index("rampart_B"), : self.height, : self.width]
+            )
             * self.SCORE_MULTIPLIER["rampart"]
         )
 
@@ -542,10 +523,12 @@ class Game(gym.Env):
         """報酬更新処理実装予定"""
         if not all(self.successful):
             return np.NINF
+        else:
+            return 0
 
     def is_done(self):
         """ゲーム終了判定実装予定"""
-        if self.turn >= self.end_turn:
+        if self.turn >= self.max_episode_steps:
             self.done = True
 
     def step(self, actions: Iterable[int]):
@@ -576,23 +559,18 @@ class Game(gym.Env):
         self.update_position()
         self.update_open_position()
         self.update_blank()
-        print(
-            self.compile_layers(
-                f"position_{self.current_team}", f"open_position_{self.current_team}"
-            )
-        )
         self.change_player()
         self.turn += 1
         self.calculate_score()
         reward = self.get_reward()
         self.is_done()
-        return self.board, reward, self.done, {}
+        return self.board, reward, self.done, {}, {}
 
-    def render(self, mode: str = "human", input_with: str = "cli"):
+    def render(self):
         """
         gymの必須関数
         描画を行う
-        mode: str("human" or "console") pygameかcliどちらで描画するか選択
+        mode: str("human" or "ansi") pygameかcliどちらで描画するか選択
         input_with: str("pygame" or "cli") pygame上で職人を操作するか、cli上で行動番号を入力するか選択
         """
         IMG_SCALER = np.array((self.cell_size, self.cell_size))
@@ -783,18 +761,19 @@ class Game(gym.Env):
             for y in range(self.height)
         ]
         pygame.init()
-        if mode == "console":
-            [print(row) for row in view]
-        elif mode == "human":
+        if self.render_mode == "ansi":
+            rendering = str([row for row in view])
+            print(rendering)
+            return rendering
+        elif self.render_mode == "human":
             window_surface = pygame.display.set_mode(
                 (self.window_size_x, self.window_size_y + self.cell_size * 2)
             )
             pygame.display.set_caption("game")
 
             drawAll()
-            print(self.compile_layers("position_A", one_hot=True))
 
-            if input_with != "pygame":
+            if self.controller != "pygame":
                 drawTurnInfo()
                 return
             showPosition = False
@@ -820,8 +799,12 @@ class Game(gym.Env):
                     if showPosition:
                         positionALayer = self.compile_layers("position_A", one_hot=True)
                         positionBLayer = self.compile_layers("position_B", one_hot=True)
-                        openPositionALayer = self.compile_layers("open_position_A", one_hot=True)
-                        openPositionBLayer = self.compile_layers("open_position_B", one_hot=True)
+                        openPositionALayer = self.compile_layers(
+                            "open_position_A", one_hot=True
+                        )
+                        openPositionBLayer = self.compile_layers(
+                            "open_position_B", one_hot=True
+                        )
                         for i in range(self.height):
                             for j in range(self.width):
                                 if positionALayer[i][j] == 1:
@@ -835,17 +818,17 @@ class Game(gym.Env):
                                 else:
                                     placeImage(BLANK_IMG, i, j)
                                     continue
-                                    
+
                                 pygame.draw.rect(
-                                        window_surface,
-                                        color,
-                                        (
-                                            j * self.cell_size,
-                                            i * self.cell_size,
-                                            self.cell_size,
-                                            self.cell_size,
-                                        ),
-                                    )
+                                    window_surface,
+                                    color,
+                                    (
+                                        j * self.cell_size,
+                                        i * self.cell_size,
+                                        self.cell_size,
+                                        self.cell_size,
+                                    ),
+                                )
                         drawGrids()
                         continue
 
@@ -992,13 +975,16 @@ class Game(gym.Env):
                             drawGrids()
                             pygame.display.update()
                 drawTurnInfo(actingWorker=actingWorker + 1)
-            return actions
+            self.actions = actions
+
+    def get_actions_from_render(self):
+        return self.actions
 
 
 if __name__ == "__main__":
 
     def turn():
-        env.render(input_with="cli")
+        env.render()
 
         [print(f"{i:2}: {action}") for i, action in enumerate(env.ACTIONS)]
         print(
@@ -1008,25 +994,21 @@ if __name__ == "__main__":
 
         return env.step(actions)
 
-    env = Game(controller="pygame")
+    fields = glob.glob("./field_data/*.csv")
 
-    print(f"width:{env.width}, height:{env.height}, workers:{env.worker_count}")
+    env = Game(csv_path=random.choice(fields), render_mode="human", controller="pygame")
+
     observation = env.reset()
     done = False
+    print(f"width:{env.width}, height:{env.height}, workers:{env.worker_count}")
 
     if env.controller == "pygame":
         while not done:
             print(
                 f"input team {env.current_team} actions (need {env.worker_count} input) : "
             )
-            actions = env.render(input_with="pygame")
-            observation, reward, done, _ = env.step(actions)
-
-            print(
-                f"input team {env.current_team} actions (need {env.worker_count} input) : "
-            )
-            actions = env.render(input_with="pygame")
-            observation, reward, done, _ = env.step(actions)
+            env.render()
+            observation, reward, done, _ = env.step(env.get_actions_from_render())
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
