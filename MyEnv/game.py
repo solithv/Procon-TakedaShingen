@@ -329,6 +329,7 @@ class Game(gym.Env):
                     )
                     in stack_destinations
                 ):
+                    print(f"{worker.name}: 行動できませんでした。待機します。")
                     worker.stay()
                     self.successful.append(False)
                     workers.remove((worker, action))
@@ -340,6 +341,8 @@ class Game(gym.Env):
         職人を行動させる
         """
         workers = self.check_stack_workers(workers)
+        if not workers:
+            return
         for _ in range(self.worker_count):
             worker, action = workers.pop(0)
             y, x = map(
@@ -376,7 +379,7 @@ class Game(gym.Env):
                 self.successful.append(True)
 
             else:
-                print("行動できない入力です")
+                print(f"{worker.name}: 行動できませんでした。待機します。")
                 worker.stay()
                 self.successful.append(False)
 
