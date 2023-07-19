@@ -1,51 +1,13 @@
-import copy
 import os
-
+import copy
+from typing import Iterable, Optional, Union
 import gymnasium as gym
 import numpy as np
 import pyautogui
-import tkinter as tk
 import pygame
 from pygame.locals import *
-from collections import deque
 
-
-class Worker:
-    TEAMS = ("A", "B")
-
-    def __init__(self, name, y, x):
-        self.name = name
-        self.team = name[-2]
-        self.num = name[-1]
-        self.opponent_team = self.TEAMS[1 - self.TEAMS.index(self.team)]
-        self.y = y
-        self.x = x
-        self.is_action = False
-        self.action_log = []
-
-    def stay(self):
-        self.action_log.append(("stay", (self.y, self.x)))
-        self.is_action = True
-
-    def move(self, y, x):
-        self.x = x
-        self.y = y
-        self.action_log.append(("move", (y, x)))
-        self.is_action = True
-
-    def build(self, y, x):
-        self.action_log.append(("build", (y, x)))
-        self.is_action = True
-
-    def break_(self, y, x):
-        self.action_log.append(("break", (y, x)))
-        self.is_action = True
-
-    def get_coordinate(self):
-        return self.y, self.x
-
-    def turn_init(self):
-        self.is_action = False
+from worker import Worker
 
 
 class Game(gym.Env):
@@ -95,6 +57,7 @@ class Game(gym.Env):
         "W": np.array([0, -1]),
     }
     SCORE_MULTIPLIER = {"castle": 100, "position": 50, "rampart": 10}
+    CASTLE_MIN, CASTLE_MAX = 1, 1
     POND_MIN, POND_MAX = 1, 5
     FIELD_MIN, FIELD_MAX = 11, 25
     WORKER_MIN, WORKER_MAX = 2, 6
@@ -108,18 +71,31 @@ class Game(gym.Env):
     SKY = (127, 176, 255)
     PINK = (255, 127, 127)
 
-    def __init__(self, end_turn=10, width=None, height=None, pond=None, worker=None):
+    def __init__(
+        self,
+        end_turn: int = 10,
+        width: Optional[int] = None,
+        height: Optional[int] = None,
+        castle: Optional[int] = None,
+        pond: Optional[int] = None,
+        worker: Optional[int] = None,
+        controller: str = "cli",
+    ):
         super().__init__()
         self.end_turn = end_turn * 2
         self.width = width or np.random.randint(self.FIELD_MIN, self.FIELD_MAX)
-        self.height = height or np.random.randint(
-            self.FIELD_MIN, self.FIELD_MAX)
-        self.pond_count = pond or np.random.randint(
-            self.POND_MIN, self.POND_MAX)
+        self.height = height or np.random.randint(self.FIELD_MIN, self.FIELD_MAX)
+
+        self.castle_count = (
+            castle or self.CASTLE_MIN
+            if self.CASTLE_MIN == self.CASTLE_MAX
+            else np.random.randint(self.CASTLE_MIN, self.CASTLE_MAX)
+        )
+        self.pond_count = pond or np.random.randint(self.POND_MIN, self.POND_MAX)
         self.worker_count = worker or np.random.randint(
             self.WORKER_MIN, self.WORKER_MAX
         )
-
+        self.controller = controller
         self.action_space = gym.spaces.Discrete(len(self.ACTIONS))
         self.observation_space = gym.spaces.Box(
             low=0,
@@ -140,30 +116,34 @@ class Game(gym.Env):
 
         self.reset()
 
-    def change_player(self, no_change=False):
+    def change_player(self, no_change: bool = False):
         if not no_change:
             self.current_player = 1 - self.current_player
         self.current_team = self.TEAM[self.current_player]
         self.opponent_team = self.TEAM[1 - self.current_player]
 
-    def set_cell_property(self, target, coordinates=None):
+    def set_cell_property(
+        self, target: str, coordinate: Optional[Iterable[int]] = None
+    ):
         """
         内部関数
         セルに要素を配置
         """
-        if not coordinates:
+        if not coordinate:
             while True:
                 y = np.random.randint(0, self.height - 1)
                 x = np.random.randint(0, self.width - 1)
                 if (y, x) not in self.used:
                     break
         else:
-            y, x = coordinates
+            y, x = coordinate
         self.board[self.CELL.index(target), y, x] = 1
         self.used.append((y, x))
         return y, x
 
-    def set_worker_position(self, target, coordinates=None):
+    def set_worker_position(
+        self, target: str, coordinates: Optional[Iterable[int]] = None
+    ):
         """
         内部関数
         セルに職人を配置
@@ -179,7 +159,12 @@ class Game(gym.Env):
         self.board[0] = 1 - self.board[1:].any(axis=0)
 
     def reset(
-        self, first_player=None, castle=None, pond=None, worker_A=None, worker_B=None
+        self,
+        first_player: Optional[int] = None,
+        castle: Optional[Iterable[Iterable[int]]] = None,
+        pond: Optional[Iterable[Iterable[int]]] = None,
+        worker_A: Optional[Iterable[Iterable[int]]] = None,
+        worker_B: Optional[Iterable[Iterable[int]]] = None,
     ):
         """
         gymの必須関数
@@ -191,8 +176,7 @@ class Game(gym.Env):
         worker_B: list[list[y,x]] Aチームの職人の座標を指定
         """
         self.current_player = (
-            self.TEAM.index(
-                first_player) if first_player else np.random.randint(0, 2)
+            self.TEAM.index(first_player) if first_player else np.random.randint(0, 2)
         )
         self.change_player(no_change=True)
         self.score_A, self.score_B = 0, 0
@@ -203,12 +187,19 @@ class Game(gym.Env):
         self.workers: dict[str, Worker] = {}
         self.used = []
 
-        self.set_cell_property("castle", coordinates=castle)
+        if castle:
+            assert self.castle_count == len(castle), "castle input error"
+            [
+                self.set_cell_property("castle", coordinate=coordinate)
+                for coordinate in castle
+            ]
+        else:
+            [self.set_cell_property("castle") for _ in range(self.castle_count)]
 
         if pond:
             assert self.pond_count == len(pond), "pond input error"
             [
-                self.set_cell_property("pond", coordinates=coordinate)
+                self.set_cell_property("pond", coordinate=coordinate)
                 for coordinate in pond
             ]
         else:
@@ -245,7 +236,7 @@ class Game(gym.Env):
         self.update_blank()
         return self.board
 
-    def compile_layers(self, *layers, one_hot=False):
+    def compile_layers(self, *layers: tuple[str], one_hot: bool = True):
         """
         入力された層を合成した2次元配列を返す
         one_hot: bool 返り値の各要素を1,0のみにする (default=False)
@@ -258,26 +249,31 @@ class Game(gym.Env):
         else:
             return compiled
 
-    def get_team_worker_coordinate(self, team, actioned=True):
+    def get_team_worker_coordinate(
+        self, team: str, actioned: bool = True, worker: Worker = None
+    ):
         """
         内部関数
         行動済みの職人の座標を取得
         team: str("A" or "B") 取得するチームを指定
         """
         if actioned:
-            return [
+            result = [
                 worker.get_coordinate()
                 for worker in self.workers[team]
                 if worker.is_action
             ]
         else:
-            return [
+            result = [
                 worker.get_coordinate()
                 for worker in self.workers[team]
                 if not worker.is_action
             ]
+        if worker:
+            result.remove(worker.get_coordinate())
+        return result
 
-    def is_movable(self, worker: Worker, y, x):
+    def is_movable(self, worker: Worker, y: int, x: int):
         """
         内部関数
         行動可能判定
@@ -297,7 +293,7 @@ class Game(gym.Env):
         else:
             return False
 
-    def is_buildable(self, worker: Worker, y, x):
+    def is_buildable(self, worker: Worker, y: int, x: int):
         """
         内部関数
         建築可能判定
@@ -317,7 +313,7 @@ class Game(gym.Env):
         else:
             return False
 
-    def is_breakable(self, worker: Worker, y, x):
+    def is_breakable(self, worker: Worker, y: int, x: int):
         """
         内部関数
         破壊可能判定
@@ -332,7 +328,7 @@ class Game(gym.Env):
         else:
             return False
 
-    def get_direction(self, action):
+    def get_direction(self, action: int):
         """
         内部関数
         入力行動に対する方向を取得
@@ -343,12 +339,12 @@ class Game(gym.Env):
                 direction += value
         return direction
 
-    def action_workers(self, workers: list[tuple[Worker, int]]):
+    def action_workers(self, workers: Iterable[tuple[Worker, int]]):
         """
         内部関数
         職人を行動させる
         """
-        while workers:
+        for _ in range(self.worker_count):
             worker, action = workers.pop(0)
             y, x = map(
                 int, np.array(worker.get_coordinate()) + self.get_direction(action)
@@ -361,7 +357,7 @@ class Game(gym.Env):
 
             elif "move" in self.ACTIONS[action] and self.is_movable(worker, y, x):
                 if (y, x) in self.get_team_worker_coordinate(
-                    worker.team, actioned=False
+                    worker.team, actioned=False, worker=worker
                 ):
                     workers.append((worker, action))
                     continue
@@ -388,7 +384,15 @@ class Game(gym.Env):
                 worker.stay()
                 self.successful.append(False)
 
-    def fill_area(self, array):
+            if not workers:
+                break
+
+        for worker, action in workers:
+            print(f"{worker.name}: 行動できませんでした。待機します。")
+            worker.stay()
+            self.successful.append(False)
+
+    def fill_area(self, array: np.ndarray):
         """
         内部関数
         囲まれている領域を取得
@@ -430,13 +434,17 @@ class Game(gym.Env):
         内部関数
         陣地を更新
         """
-        self.previous_position_A = self.board[self.CELL.index("position_A")]
-        self.previous_position_B = self.board[self.CELL.index("position_B")]
-        self.board[self.CELL.index("position_A")] = self.fill_area(
+        self.previous_position_A = copy.deepcopy(
             self.board[self.CELL.index("position_A")]
         )
-        self.board[self.CELL.index("position_B")] = self.fill_area(
+        self.previous_position_B = copy.deepcopy(
             self.board[self.CELL.index("position_B")]
+        )
+        self.board[self.CELL.index("position_A")] = self.fill_area(
+            self.board[self.CELL.index("rampart_A")]
+        )
+        self.board[self.CELL.index("position_B")] = self.fill_area(
+            self.board[self.CELL.index("rampart_B")]
         )
 
     def update_open_position(self):
@@ -444,30 +452,44 @@ class Game(gym.Env):
         内部関数
         開放陣地を更新
         """
-        self.previous_open_position_A = self.board[self.CELL.index(
-            "open_position_A")]
-        self.previous_open_position_B = self.board[self.CELL.index(
-            "open_position_B")]
+        self.previous_open_position_A = copy.deepcopy(
+            self.board[self.CELL.index("open_position_A")]
+        )
+        self.previous_open_position_B = copy.deepcopy(
+            self.board[self.CELL.index("open_position_B")]
+        )
         self.board[self.CELL.index("open_position_A")] = np.where(
-            (
-                self.previous_position_A
-                - self.board[self.CELL.index("position_A")]
-                + self.previous_open_position_A
+            np.where(
+                (
+                    self.previous_position_A
+                    - self.board[self.CELL.index("position_A")]
+                    + self.previous_open_position_A
+                )
+                > 0,
+                1,
+                0,
             )
+            - self.compile_layers("rampart_B", "position_B")
             > 0,
             1,
             0,
-        ) - self.compile_layers("rampart_B", "position_B", one_hot=True)
+        )
         self.board[self.CELL.index("open_position_B")] = np.where(
-            (
-                self.previous_position_B
-                - self.board[self.CELL.index("position_B")]
-                + self.previous_open_position_B
+            np.where(
+                (
+                    self.previous_position_B
+                    - self.board[self.CELL.index("position_B")]
+                    + self.previous_open_position_B
+                )
+                > 0,
+                1,
+                0,
             )
+            - self.compile_layers("rampart_A", "position_A")
             > 0,
             1,
             0,
-        ) - self.compile_layers("rampart_A", "position_A", one_hot=True)
+        )
 
     def calculate_score(self):
         """
@@ -476,34 +498,42 @@ class Game(gym.Env):
         """
         self.previous_score_A, self.previous_score_B = self.score_A, self.score_B
 
-        self.score_A = np.sum(
-            self.board[self.CELL.index("castle")]
-            * self.compile_layers("position_A", "open_position_A", one_hot=True)
+        self.score_A = (
+            np.sum(
+                self.board[self.CELL.index("castle")]
+                * self.compile_layers("position_A", "open_position_A")
+            )
             * self.SCORE_MULTIPLIER["castle"]
         )
-        self.score_A += np.sum(
-            (1 - self.board[self.CELL.index("castle")])
-            * self.compile_layers("position_A", "open_position_A", one_hot=True)
+        self.score_A += (
+            np.sum(
+                (1 - self.board[self.CELL.index("castle")])
+                * self.compile_layers("position_A", "open_position_A")
+            )
             * self.SCORE_MULTIPLIER["position"]
         )
-        self.score_A += np.sum(
-            self.board[self.CELL.index("rampart_A")] *
-            self.SCORE_MULTIPLIER["rampart"]
+        self.score_A += (
+            np.sum(self.board[self.CELL.index("rampart_A")])
+            * self.SCORE_MULTIPLIER["rampart"]
         )
 
-        self.score_B = np.sum(
-            self.board[self.CELL.index("castle")]
-            * self.compile_layers("position_B", "open_position_B", one_hot=True)
+        self.score_B = (
+            np.sum(
+                self.board[self.CELL.index("castle")]
+                * self.compile_layers("position_B", "open_position_B")
+            )
             * self.SCORE_MULTIPLIER["castle"]
         )
-        self.score_B += np.sum(
-            (1 - self.board[self.CELL.index("castle")])
-            * self.compile_layers("position_B", "open_position_B", one_hot=True)
+        self.score_B += (
+            np.sum(
+                (1 - self.board[self.CELL.index("castle")])
+                * self.compile_layers("position_B", "open_position_B")
+            )
             * self.SCORE_MULTIPLIER["position"]
         )
-        self.score_B += np.sum(
-            self.board[self.CELL.index("rampart_B")] *
-            self.SCORE_MULTIPLIER["rampart"]
+        self.score_B += (
+            np.sum(self.board[self.CELL.index("rampart_B")])
+            * self.SCORE_MULTIPLIER["rampart"]
         )
 
         print(f"score_A:{self.score_A}, score_B:{self.score_B}")
@@ -518,7 +548,7 @@ class Game(gym.Env):
         if self.turn >= self.end_turn:
             self.done = True
 
-    def step(self, actions):
+    def step(self, actions: Iterable[int]):
         """
         gymの必須関数
         1ターン進める処理を実行
@@ -546,6 +576,11 @@ class Game(gym.Env):
         self.update_position()
         self.update_open_position()
         self.update_blank()
+        print(
+            self.compile_layers(
+                f"position_{self.current_team}", f"open_position_{self.current_team}"
+            )
+        )
         self.change_player()
         self.turn += 1
         self.calculate_score()
@@ -553,7 +588,7 @@ class Game(gym.Env):
         self.is_done()
         return self.board, reward, self.done, {}
 
-    def render(self, mode="human", input_with="cli"):
+    def render(self, mode: str = "human", input_with: str = "cli"):
         """
         gymの必須関数
         描画を行う
@@ -585,6 +620,12 @@ class Game(gym.Env):
         WORKER_B_IMG = pygame.transform.scale(
             pygame.image.load(self.cwd + "/assets/worker_B.png"), IMG_SCALER
         )
+        WORKER_A_HOVER_IMG = pygame.transform.scale(
+            pygame.image.load(self.cwd + "/assets/worker_A_hover.png"), IMG_SCALER
+        )
+        WORKER_B_HOVER_IMG = pygame.transform.scale(
+            pygame.image.load(self.cwd + "/assets/worker_B_hover.png"), IMG_SCALER
+        )
 
         def drawGrids():
             # 縦線描画
@@ -605,7 +646,7 @@ class Game(gym.Env):
                     (self.window_size_x, i * self.cell_size),
                     1,
                 )
-        
+
         def placeImage(img, i, j, workerNumber=None, scale=1.0):
             """
             i, j番目に画像描画する関数
@@ -627,32 +668,26 @@ class Game(gym.Env):
                 font = pygame.font.SysFont(None, 30)
                 text = font.render(workerNumber, False, self.BLACK)
                 text_rect = text.get_rect(
-                    center=((j + 0.5) * self.cell_size,
-                            (i + 0.2) * self.cell_size)
+                    center=((j + 0.5) * self.cell_size, (i + 0.2) * self.cell_size)
                 )
                 window_surface.blit(text, text_rect)
 
-        view = [
-            [
-                [
-                    self.CELL[i]
-                    for i, item in enumerate(self.board[:, y, x].astype(bool))
-                    if item
-                ]
-                for x in range(self.width)
-            ]
-            for y in range(self.height)
-        ]
-
-        pygame.init()
-        if mode == "console":
-            [print(row) for row in view]
-        elif mode == "human":
-            window_surface = pygame.display.set_mode(
-                (self.window_size_x, self.window_size_y + self.cell_size * 2)
+        def nonAllowedMovements(x, y, directions):
+            coordinates = np.round(
+                np.array(
+                    [
+                        [
+                            np.cos(2 * n * np.pi / directions) + x,
+                            np.sin(2 * n * np.pi / directions) + y,
+                        ]
+                        for n in range(directions)
+                    ]
+                )
             )
-            pygame.display.set_caption("game")
 
+            return coordinates
+
+        def drawAll():
             for i in range(self.height):
                 for j in range(self.width):
                     placeImage(BLANK_IMG, i, j)
@@ -674,6 +709,16 @@ class Game(gym.Env):
                         placeImage(
                             WORKER_B_IMG, i, j, workerNumber=cellInfo[-1][-1], scale=0.7
                         )
+                    elif "rampart_A" in cellInfo and worker_A_exist:
+                        placeImage(RAMPART_A_IMG, i, j)
+                        placeImage(
+                            WORKER_A_IMG, i, j, workerNumber=cellInfo[-1][-1], scale=0.8
+                        )
+                    elif "rampart_B" in cellInfo and worker_B_exist:
+                        placeImage(RAMPART_B_IMG, i, j)
+                        placeImage(
+                            WORKER_B_IMG, i, j, workerNumber=cellInfo[-1][-1], scale=0.8
+                        )
                     elif "pond" in cellInfo and "rampart_A" in cellInfo:
                         placeImage(POND_IMG, i, j)
                         placeImage(RAMPART_A_IMG, i, j, scale=0.8)
@@ -683,11 +728,9 @@ class Game(gym.Env):
                     elif "castle" in cellInfo:
                         placeImage(CASTLE_IMG, i, j)
                     elif worker_A_exist:
-                        placeImage(WORKER_A_IMG, i, j,
-                                   workerNumber=cellInfo[-1][-1])
+                        placeImage(WORKER_A_IMG, i, j, workerNumber=cellInfo[-1][-1])
                     elif worker_B_exist:
-                        placeImage(WORKER_B_IMG, i, j,
-                                   workerNumber=cellInfo[-1][-1])
+                        placeImage(WORKER_B_IMG, i, j, workerNumber=cellInfo[-1][-1])
                     elif "pond" in cellInfo:
                         placeImage(POND_IMG, i, j)
                     elif "rampart_A" in cellInfo:
@@ -696,20 +739,65 @@ class Game(gym.Env):
                         placeImage(RAMPART_B_IMG, i, j)
                     elif "blank" in cellInfo:
                         placeImage(BLANK_IMG, i, j)
-
             drawGrids()
+
+        def drawTurnInfo(actingWorker=None):
+            pygame.draw.rect(
+                window_surface,
+                self.BLACK,
+                (
+                    0,
+                    self.cell_size * self.height,
+                    self.cell_size * self.width,
+                    self.cell_size * 2,
+                ),
+            )
             font = pygame.font.SysFont(None, 60)
-            text = font.render(f"{self.current_team}'s turn", False, self.WHITE)
+            if actingWorker:
+                text = font.render(
+                    f"{self.current_team}'s turn {actingWorker}/{self.worker_count}",
+                    False,
+                    self.WHITE,
+                )
+            else:
+                text = font.render(f"{self.current_team}'s turn", False, self.WHITE)
+
             text_rect = text.get_rect(
-                center=(self.cell_size * self.width / 2,
-                        self.cell_size * (self.height + 1))
+                center=(
+                    self.cell_size * self.width / 2,
+                    self.cell_size * (self.height + 1),
+                )
             )
             window_surface.blit(text, text_rect)
             pygame.display.update()
 
+        view = [
+            [
+                [
+                    self.CELL[i]
+                    for i, item in enumerate(self.board[:, y, x].astype(bool))
+                    if item
+                ]
+                for x in range(self.width)
+            ]
+            for y in range(self.height)
+        ]
+        pygame.init()
+        if mode == "console":
+            [print(row) for row in view]
+        elif mode == "human":
+            window_surface = pygame.display.set_mode(
+                (self.window_size_x, self.window_size_y + self.cell_size * 2)
+            )
+            pygame.display.set_caption("game")
+
+            drawAll()
+            print(self.compile_layers("position_A", one_hot=True))
+
             if input_with != "pygame":
-                return 
-            
+                drawTurnInfo()
+                return
+            showPosition = False
             actions = []
             actingWorker = 0
             while actingWorker < self.worker_count:
@@ -723,46 +811,194 @@ class Game(gym.Env):
                         actingWorker
                     ].get_coordinate()
 
-                    # move
-                    if event.type == MOUSEBUTTONDOWN:
-                        directionVector = np.array([cellX - workerX, workerY -cellY])
-                        actions.append(
-                            int(np.round(np.degrees(np.arctan2(directionVector[0], directionVector[1]) / 45)) % 8 + 1)
-                        )
-                        actingWorker += 1
-                        placeImage(BLANK_IMG, workerY, workerX)
-                        placeImage(eval(f"WORKER_{self.current_team}_IMG"), cellY, cellX)
+                    if event.type == KEYDOWN:
+                        if event.key == pygame.K_RETURN:
+                            if showPosition:
+                                drawAll()
+                            showPosition = not showPosition
+
+                    if showPosition:
+                        positionALayer = self.compile_layers("position_A", one_hot=True)
+                        positionBLayer = self.compile_layers("position_B", one_hot=True)
+                        openPositionALayer = self.compile_layers("open_position_A", one_hot=True)
+                        openPositionBLayer = self.compile_layers("open_position_B", one_hot=True)
+                        for i in range(self.height):
+                            for j in range(self.width):
+                                if positionALayer[i][j] == 1:
+                                    color = self.RED
+                                elif positionBLayer[i][j] == 1:
+                                    color = self.BLUE
+                                elif openPositionALayer[i][j] == 1:
+                                    color = self.PINK
+                                elif openPositionBLayer[i][j] == 1:
+                                    color = self.SKY
+                                else:
+                                    placeImage(BLANK_IMG, i, j)
+                                    continue
+                                    
+                                pygame.draw.rect(
+                                        window_surface,
+                                        color,
+                                        (
+                                            j * self.cell_size,
+                                            i * self.cell_size,
+                                            self.cell_size,
+                                            self.cell_size,
+                                        ),
+                                    )
                         drawGrids()
-                        pygame.display.update()  
-                    elif event.type == KEYDOWN:
-                        # build
-                        if event.key == pygame.K_SPACE:
-                            directionVector = np.array([cellX - workerX, workerY -cellY])
-                            actions.append(
-                                int(np.round(np.degrees(np.arctan2(directionVector[0], directionVector[1]) / 45)) % 8 + 1)
+                        continue
+
+                    placeImage(
+                        eval(f"WORKER_{self.current_team}_HOVER_IMG"),
+                        workerY,
+                        workerX,
+                        workerNumber=str(actingWorker),
+                        scale=1.0,
+                    )
+                    pygame.display.update()
+
+                    if event.type == KEYDOWN:
+                        if event.key == pygame.K_1:
+                            if not np.any(
+                                np.all(
+                                    np.append(
+                                        nonAllowedMovements(workerX, workerY, 8),
+                                        [[workerX, workerY]],
+                                        axis=0,
+                                    )
+                                    == np.array([cellX, cellY]),
+                                    axis=1,
+                                )
+                            ):
+                                continue
+                            directionVector = np.array(
+                                [cellX - workerX, workerY - cellY]
                             )
-                            actingWorker += 1
-                            placeImage(eval(f"RAMPART_{self.current_team}_IMG"), cellY, cellX)
+                            if directionVector[0] == directionVector[1] == 0:
+                                actions.append(0)
+                            else:
+                                actions.append(
+                                    int(
+                                        (
+                                            (
+                                                np.round(
+                                                    np.degrees(
+                                                        np.arctan2(
+                                                            directionVector[0],
+                                                            directionVector[1],
+                                                        )
+                                                    )
+                                                )
+                                                / 45
+                                            )
+                                            % 8
+                                        )
+                                        + 1
+                                    )
+                                )
+                            placeImage(BLANK_IMG, workerY, workerX)
+                            placeImage(
+                                eval(f"WORKER_{self.current_team}_IMG"),
+                                cellY,
+                                cellX,
+                                workerNumber=str(actingWorker),
+                            )
                             drawGrids()
+                            actingWorker += 1
                             pygame.display.update()
-                        # break
-                        elif event.key == pygame.K_BACKSPACE:
-                            directionVector = np.array([cellX - workerX, workerY -cellY])
+                        # build
+                        elif event.key == pygame.K_2:
+                            if not np.any(
+                                np.all(
+                                    nonAllowedMovements(workerX, workerY, 4)
+                                    == np.array([cellX, cellY]),
+                                    axis=1,
+                                )
+                            ):
+                                continue
+                            directionVector = np.array(
+                                [cellX - workerX, workerY - cellY]
+                            )
                             actions.append(
-                                int(np.round(np.degrees(np.arctan2(directionVector[0], directionVector[1]) / 45)) % 8 + 1)
+                                int(
+                                    (
+                                        np.round(
+                                            np.degrees(
+                                                np.arctan2(
+                                                    -directionVector[1],
+                                                    directionVector[0],
+                                                )
+                                            )
+                                        )
+                                        / 90
+                                    )
+                                    + 10
+                                )
                             )
                             actingWorker += 1
-                            placeImage(BLANK_IMG, cellY, cellX)
+                            placeImage(BLANK_IMG, workerY, workerX)
+                            placeImage(
+                                eval(f"WORKER_{self.current_team}_IMG"),
+                                workerY,
+                                workerX,
+                                workerNumber=str(actingWorker - 1),
+                            )
+                            placeImage(
+                                eval(f"RAMPART_{self.current_team}_IMG"), cellY, cellX
+                            )
                             drawGrids()
                             pygame.display.update()
 
+                        # break
+                        elif event.key == pygame.K_3:
+                            if not np.any(
+                                np.all(
+                                    nonAllowedMovements(workerX, workerY, 4)
+                                    == np.array([cellX, cellY]),
+                                    axis=1,
+                                )
+                            ):
+                                continue
+                            directionVector = np.array(
+                                [cellX - workerX, workerY - cellY]
+                            )
+                            actions.append(
+                                int(
+                                    (
+                                        np.round(
+                                            np.degrees(
+                                                np.arctan2(
+                                                    -directionVector[1],
+                                                    directionVector[0],
+                                                )
+                                            )
+                                        )
+                                        / 90
+                                    )
+                                    + 14
+                                )
+                            )
+                            actingWorker += 1
+
+                            placeImage(BLANK_IMG, workerY, workerX)
+                            placeImage(
+                                eval(f"WORKER_{self.current_team}_IMG"),
+                                workerY,
+                                workerX,
+                                workerNumber=str(actingWorker - 1),
+                            )
+                            placeImage(BLANK_IMG, cellY, cellX)
+                            drawGrids()
+                            pygame.display.update()
+                drawTurnInfo(actingWorker=actingWorker + 1)
             return actions
 
 
 if __name__ == "__main__":
 
     def turn():
-        env.render()
+        env.render(input_with="cli")
 
         [print(f"{i:2}: {action}") for i, action in enumerate(env.ACTIONS)]
         print(
@@ -772,54 +1008,33 @@ if __name__ == "__main__":
 
         return env.step(actions)
 
-    env = Game()
+    env = Game(controller="pygame")
 
     print(f"width:{env.width}, height:{env.height}, workers:{env.worker_count}")
-
     observation = env.reset()
     done = False
 
-    while not done:
-        print(
-            f"input team {env.current_team} actions (need {env.worker_count} input) : "
-        )
-        actions = env.render(input_with="pygame")
-        observation, reward, done, _ = env.step(actions)
+    if env.controller == "pygame":
+        while not done:
+            print(
+                f"input team {env.current_team} actions (need {env.worker_count} input) : "
+            )
+            actions = env.render(input_with="pygame")
+            observation, reward, done, _ = env.step(actions)
 
-        print(
-            f"input team {env.current_team} actions (need {env.worker_count} input) : "
-        )
-        actions = env.render(input_with="pygame")
-        observation, reward, done, _ = env.step(actions)
+            print(
+                f"input team {env.current_team} actions (need {env.worker_count} input) : "
+            )
+            actions = env.render(input_with="pygame")
+            observation, reward, done, _ = env.step(actions)
 
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+    elif env.controller == "cli":
+        while not done:
+            observation, reward, done, _ = turn()
 
-    env.render()
-
-    # def turn():
-    #     env.render()
-
-    #     [print(f"{i:2}: {action}") for i, action in enumerate(env.ACTIONS)]
-    #     print(
-    #         f"input team {env.current_team} actions (need {env.worker_count} input) : "
-    #     )
-    #     actions = [int(input()) for _ in range(env.worker_count)]
-    #     return env.step(actions)
-
-    # env = Game()
-
-    # print(f"width:{env.width}, height:{env.height}, workers:{env.worker_count}")
-
-    # observation = env.reset()
-    # done = False
-
-    # while not done:
-    #     observation, reward, done, _ = turn()
-
-    #     for event in pygame.event.get():
-    #         if event.type == pygame.QUIT:
-    #             pygame.quit()
-
-    # env.render()
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
