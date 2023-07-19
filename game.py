@@ -7,6 +7,7 @@ import pyautogui
 import tkinter as tk
 import pygame
 from pygame.locals import *
+from collections import deque
 
 
 class Worker:
@@ -16,7 +17,7 @@ class Worker:
         self.name = name
         self.team = name[-2]
         self.num = name[-1]
-        self.another_team = self.TEAMS[1 - self.TEAMS.index(self.team)]
+        self.opponent_team = self.TEAMS[1 - self.TEAMS.index(self.team)]
         self.y = y
         self.x = x
         self.is_action = False
@@ -25,7 +26,7 @@ class Worker:
     def stay(self):
         self.action_log.append(("stay", (self.y, self.x)))
         self.is_action = True
-            
+
     def move(self, y, x):
         self.x = x
         self.y = y
@@ -257,16 +258,24 @@ class Game(gym.Env):
         else:
             return compiled
 
-    def get_team_worker_coordinate(self, team):
+    def get_team_worker_coordinate(self, team, actioned=True):
         """
         内部関数
         行動済みの職人の座標を取得
         team: str("A" or "B") 取得するチームを指定
         """
-        res=  [
-            worker.get_coordinate() for worker in self.workers[team] if worker.is_action
-        ]
-        return res
+        if actioned:
+            return [
+                worker.get_coordinate()
+                for worker in self.workers[team]
+                if worker.is_action
+            ]
+        else:
+            return [
+                worker.get_coordinate()
+                for worker in self.workers[team]
+                if not worker.is_action
+            ]
 
     def is_movable(self, worker: Worker, y, x):
         """
@@ -277,17 +286,12 @@ class Game(gym.Env):
             not worker.is_action
             and 0 <= y < self.height
             and 0 <= x < self.width
-            and (
-                not self.compile_layers(
-                    f"rampart_{worker.another_team}",
-                    "pond",
-                    *[
-                        f"worker_{worker.another_team}{i}"
-                        for i in range(self.WORKER_MAX)
-                    ],
-                )[y, x]
-            )
-            and ((y, x) not in self.get_team_worker_coordinate(worker.team))
+            and not self.compile_layers(
+                f"rampart_{worker.opponent_team}",
+                "pond",
+                *[f"worker_{worker.opponent_team}{i}" for i in range(self.WORKER_MAX)],
+            )[y, x]
+            and (y, x) not in self.get_team_worker_coordinate(worker.team)
         ):
             return True
         else:
@@ -306,7 +310,7 @@ class Game(gym.Env):
                 "rampart_A",
                 "rampart_B",
                 "castle",
-                *[f"worker_{worker.another_team}{i}" for i in range(self.WORKER_MAX)],
+                *[f"worker_{worker.opponent_team}{i}" for i in range(self.WORKER_MAX)],
             )[y, x]
         ):
             return True
@@ -334,49 +338,55 @@ class Game(gym.Env):
         入力行動に対する方向を取得
         """
         direction = np.zeros(2)
-        if "N" in self.ACTIONS[action]:
-            direction += self.DIRECTIONS["N"]
-        if "E" in self.ACTIONS[action]:
-            direction += self.DIRECTIONS["E"]
-        if "S" in self.ACTIONS[action]:
-            direction += self.DIRECTIONS["S"]
-        if "W" in self.ACTIONS[action]:
-            direction += self.DIRECTIONS["W"]
+        for key, value in self.DIRECTIONS.items():
+            if key in self.ACTIONS[action]:
+                direction += value
         return direction
 
-    def worker_action(self, worker: Worker, action):
+    def action_workers(self, workers: list[tuple[Worker, int]]):
         """
         内部関数
         職人を行動させる
         """
-        if "stay" == self.ACTIONS[action]:
-            worker.stay()
+        while workers:
+            worker, action = workers.pop(0)
+            y, x = map(
+                int, np.array(worker.get_coordinate()) + self.get_direction(action)
+            )
+            if "stay" in self.ACTIONS[action] and self.is_movable(
+                worker, worker.y, worker.x
+            ):
+                worker.stay()
+                self.successful.append(True)
 
-        direction = self.get_direction(action)
-        y, x = map(int, np.array(worker.get_coordinate()) + direction)
+            elif "move" in self.ACTIONS[action] and self.is_movable(worker, y, x):
+                if (y, x) in self.get_team_worker_coordinate(
+                    worker.team, actioned=False
+                ):
+                    workers.append((worker, action))
+                    continue
+                self.board[self.CELL.index(worker.name), worker.y, worker.x] = 0
+                self.board[self.CELL.index(worker.name), y, x] = 1
+                worker.move(y, x)
+                self.successful.append(True)
 
-        if "move" in self.ACTIONS[action] and self.is_movable(worker, y, x):
-            self.board[self.CELL.index(worker.name), worker.y, worker.x] = 0
-            self.board[self.CELL.index(worker.name), y, x] = 1
-            worker.move(y, x)
+            elif "build" in self.ACTIONS[action] and self.is_buildable(worker, y, x):
+                self.board[self.CELL.index(f"rampart_{worker.team}"), y, x] = 1
+                worker.build(y, x)
+                self.successful.append(True)
 
-        elif "build" in self.ACTIONS[action] and self.is_buildable(worker, y, x):
-            self.board[self.CELL.index(f"rampart_{worker.team}"), y, x] = 1
-            worker.build(y, x)
+            elif "break" in self.ACTIONS[action] and self.is_breakable(worker, y, x):
+                if self.board[self.CELL.index("rampart_A"), y, x]:
+                    self.board[self.CELL.index("rampart_A"), y, x] = 0
+                else:
+                    self.board[self.CELL.index("rampart_B"), y, x] = 0
+                worker.break_(y, x)
+                self.successful.append(True)
 
-        elif "break" in self.ACTIONS[action] and self.is_breakable(worker, y, x):
-            if self.board[self.CELL.index("rampart_A"), y, x]:
-                self.board[self.CELL.index("rampart_A"), y, x] = 0
             else:
-                self.board[self.CELL.index("rampart_B"), y, x] = 0
-            worker.break_(y, x)
-
-        else:
-            print("行動できない入力です")
-            return False
-
-        self.update_blank()
-        return True
+                print("行動できない入力です")
+                worker.stay()
+                self.successful.append(False)
 
     def fill_area(self, array):
         """
@@ -429,8 +439,6 @@ class Game(gym.Env):
             self.board[self.CELL.index("position_B")]
         )
 
-        self.update_blank()
-
     def update_open_position(self):
         """
         内部関数
@@ -460,7 +468,6 @@ class Game(gym.Env):
             1,
             0,
         ) - self.compile_layers("rampart_A", "position_A", one_hot=True)
-        self.update_blank()
 
     def calculate_score(self):
         """
@@ -501,9 +508,9 @@ class Game(gym.Env):
 
         print(f"score_A:{self.score_A}, score_B:{self.score_B}")
 
-    def get_reward(self, successful):
+    def get_reward(self):
         """報酬更新処理実装予定"""
-        if not successful:
+        if not all(self.successful):
             return np.NINF
 
     def is_done(self):
@@ -534,16 +541,15 @@ class Game(gym.Env):
             if "break" not in self.ACTIONS[action]
         ]
 
-        successful = all(
-            [self.worker_action(worker, action)
-             for worker, action in sorted_workers]
-        )
+        self.successful = []
+        self.action_workers(sorted_workers)
         self.update_position()
         self.update_open_position()
+        self.update_blank()
         self.change_player()
         self.turn += 1
         self.calculate_score()
-        reward = self.get_reward(successful)
+        reward = self.get_reward()
         self.is_done()
         return self.board, reward, self.done, {}
 
