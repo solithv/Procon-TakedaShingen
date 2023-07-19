@@ -14,10 +14,15 @@ def main():
         controller="pygame",
     )
     observation = env.reset()
-    done = False
-    while not done:
+    terminated, truncated = [False] * 2
+    while not terminated and not truncated:
         env.render()
-        observation, reward, done, *_ = env.step(env.get_actions_from_render())
+        # terminated: エピソード終了フラグ
+        # truncated: ステップ数上限での終了フラグ
+        observation, reward, terminated, truncated, _ = env.step(
+            env.get_actions_from_render()
+        )
+    env.close()
 
 
 if __name__ == "__main__":

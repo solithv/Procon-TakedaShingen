@@ -88,7 +88,7 @@ class Game(gym.Env):
         self.action_space = gym.spaces.Discrete(len(self.ACTIONS))
         self.observation_space = gym.spaces.Box(
             low=0,
-            high=1,
+            high=255,
             shape=(len(self.CELL), self.FIELD_MAX, self.FIELD_MAX),
             dtype=np.uint8,
         )
@@ -180,7 +180,8 @@ class Game(gym.Env):
         self.score_A, self.score_B = 0, 0
         self.previous_score_A, self.previous_score_B = 0, 0
         self.turn = 1
-        self.done = False
+        self.terminated = False
+        self.truncated = False
         self.load_from_csv(self.csv_path)
 
         self.cell_size = min(
@@ -192,7 +193,7 @@ class Game(gym.Env):
         self.window_size_y = self.height * self.cell_size
 
         self.update_blank()
-        return self.board
+        return self.board, {}
 
     def compile_layers(self, *layers: tuple[str], one_hot: bool = True):
         """
@@ -518,7 +519,8 @@ class Game(gym.Env):
     def is_done(self):
         """ゲーム終了判定実装予定"""
         if self.turn >= self.max_episode_steps:
-            self.done = True
+            self.terminated = True
+            self.truncated = True
 
     def step(self, actions: Iterable[int]):
         """
@@ -553,7 +555,7 @@ class Game(gym.Env):
         self.calculate_score()
         reward = self.get_reward()
         self.is_done()
-        return self.board, reward, self.done, {}, {}
+        return self.board, reward, self.terminated, self.truncated, {}
 
     def render(self):
         """
