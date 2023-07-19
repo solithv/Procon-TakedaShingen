@@ -359,7 +359,7 @@ class Game(gym.Env):
         内部関数
         囲まれている領域を取得
         """
-        array = np.where(array, 0, 1)
+        array = np.where(array == 1, 0, 1)
         # 配列の形状を取得
         rows, cols = array.shape
 
@@ -425,11 +425,17 @@ class Game(gym.Env):
         )
         self.board[self.CELL.index("open_position_A")] = np.where(
             np.where(
-                (
-                    self.previous_position_A
-                    - self.board[self.CELL.index("position_A")]
-                    + self.previous_open_position_A
+                np.where(
+                    (
+                        self.previous_position_A
+                        - self.board[self.CELL.index("position_A")]
+                        + self.previous_open_position_A
+                    )
+                    > 0,
+                    1,
+                    0,
                 )
+                - self.board[self.CELL.index("rampart_A")]
                 > 0,
                 1,
                 0,
@@ -443,11 +449,17 @@ class Game(gym.Env):
         self.board[self.CELL.index("open_position_A"), self.height :, :] = -1
         self.board[self.CELL.index("open_position_B")] = np.where(
             np.where(
-                (
-                    self.previous_position_B
-                    - self.board[self.CELL.index("position_B")]
-                    + self.previous_open_position_B
+                np.where(
+                    (
+                        self.previous_position_B
+                        - self.board[self.CELL.index("position_B")]
+                        + self.previous_open_position_B
+                    )
+                    > 0,
+                    1,
+                    0,
                 )
+                - self.board[self.CELL.index("rampart_B")]
                 > 0,
                 1,
                 0,
