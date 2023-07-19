@@ -3,10 +3,9 @@ import csv
 import glob
 import os
 import random
-import re
 from collections import defaultdict
 from typing import Iterable, Optional
-
+import re
 import gymnasium as gym
 import numpy as np
 import pyautogui
@@ -359,7 +358,7 @@ class Game(gym.Env):
         内部関数
         囲まれている領域を取得
         """
-        array = np.where(array, 0, 1)
+        array = np.where(array == 1, 0, 1)
         # 配列の形状を取得
         rows, cols = array.shape
 
@@ -434,7 +433,7 @@ class Game(gym.Env):
                 1,
                 0,
             )
-            - self.compile_layers("rampart_B", "position_B")
+            - self.compile_layers("rampart_A", "rampart_B", "position_B")
             > 0,
             1,
             0,
@@ -452,7 +451,7 @@ class Game(gym.Env):
                 1,
                 0,
             )
-            - self.compile_layers("rampart_A", "position_A")
+            - self.compile_layers("rampart_B", "rampart_A", "position_A")
             > 0,
             1,
             0,
@@ -576,9 +575,6 @@ class Game(gym.Env):
         IMG_SCALER = np.array((self.cell_size, self.cell_size))
         BLANK_IMG = pygame.transform.scale(
             pygame.image.load(self.cwd + "/assets/blank.png"), IMG_SCALER
-        )
-        UNAVAILABLE_IMG = pygame.transform.scale(
-            pygame.image.load(self.cwd + "/assets/unavailable.png"), IMG_SCALER
         )
         POND_IMG = pygame.transform.scale(
             pygame.image.load(self.cwd + "/assets/pond.png"), IMG_SCALER
@@ -994,7 +990,7 @@ if __name__ == "__main__":
 
         return env.step(actions)
 
-    fields = glob.glob("./field_data/*.csv")
+    fields = glob.glob(os.path.normpath("./field_data/*.csv"))
 
     env = Game(csv_path=random.choice(fields), render_mode="human", controller="pygame")
 
