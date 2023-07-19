@@ -462,7 +462,7 @@ class Game(gym.Env):
         )
 
         self.board[self.CELL.index("open_position_A")] = np.where(
-            (self.previous_position_A + self.previous_open_position_A) > 0,
+            (self.previous_position_A + self.previous_open_position_A),
             1,
             0,
         ) - self.compile_layers("rampart_A", "rampart_B", "position_A", "position_B")
@@ -475,7 +475,7 @@ class Game(gym.Env):
         self.board[self.CELL.index("open_position_A"), self.height :, :] = -1
 
         self.board[self.CELL.index("open_position_B")] = np.where(
-            (self.previous_position_B + self.previous_open_position_B) > 0,
+            (self.previous_position_B + self.previous_open_position_B),
             1,
             0,
         ) - self.compile_layers("rampart_A", "rampart_B", "position_A", "position_B")
