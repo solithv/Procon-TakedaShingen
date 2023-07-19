@@ -1,6 +1,6 @@
 import copy
 import os
-
+import assets
 import gymnasium as gym
 import numpy as np
 import pyautogui
@@ -556,28 +556,28 @@ class Game(gym.Env):
         """
         IMG_SCALER = np.array((self.cell_size, self.cell_size))
         BLANK_IMG = pygame.transform.scale(
-            pygame.image.load(self.cwd + "/assets/blank.png"), IMG_SCALER
+            pygame.image.load(self.cwd + "/Seminar/assets/blank.png"), IMG_SCALER
         )
         UNAVAILABLE_IMG = pygame.transform.scale(
-            pygame.image.load(self.cwd + "/assets/unavailable.png"), IMG_SCALER
+            pygame.image.load(self.cwd + "/Seminar/assets/unavailable.png"), IMG_SCALER
         )
         POND_IMG = pygame.transform.scale(
-            pygame.image.load(self.cwd + "/assets/pond.png"), IMG_SCALER
+            pygame.image.load(self.cwd + "/Seminar/assets/pond.png"), IMG_SCALER
         )
         CASTLE_IMG = pygame.transform.scale(
-            pygame.image.load(self.cwd + "/assets/castle.png"), IMG_SCALER
+            pygame.image.load(self.cwd + "/Seminar/assets/castle.png"), IMG_SCALER
         )
         RAMPART_A_IMG = pygame.transform.scale(
-            pygame.image.load(self.cwd + "/assets/rampart_A.png"), IMG_SCALER
+            pygame.image.load(self.cwd + "/Seminar/assets/rampart_A.png"), IMG_SCALER
         )
         RAMPART_B_IMG = pygame.transform.scale(
-            pygame.image.load(self.cwd + "/assets/rampart_B.png"), IMG_SCALER
+            pygame.image.load(self.cwd + "/Seminar/assets/rampart_B.png"), IMG_SCALER
         )
         WORKER_A_IMG = pygame.transform.scale(
-            pygame.image.load(self.cwd + "/assets/worker_A.png"), IMG_SCALER
+            pygame.image.load(self.cwd + "/Seminar/assets/worker_A.png"), IMG_SCALER
         )
         WORKER_B_IMG = pygame.transform.scale(
-            pygame.image.load(self.cwd + "/assets/worker_B.png"), IMG_SCALER
+            pygame.image.load(self.cwd + "/Seminar/assets/worker_B.png"), IMG_SCALER
         )
 
         def drawGrids():
