@@ -5,7 +5,7 @@ import os
 import random
 import re
 from collections import defaultdict
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Union
 
 import gymnasium as gym
 import numpy as np
@@ -76,17 +76,19 @@ class Game(gym.Env):
 
     def __init__(
         self,
-        csv_path: str,
+        csv_paths: Union[str, list[str]],
         render_mode="ansi",
         max_episode_steps=100,
         first_player: Optional[int] = None,
         controller: str = "cli",
     ):
         super().__init__()
-        self.csv_path = csv_path
+        self.csv_paths = csv_paths
         self.render_mode = render_mode
         self.max_episode_steps = max_episode_steps
-        self.action_space = gym.spaces.Discrete(len(self.ACTIONS))
+        self.action_space = gym.spaces.Box(
+            low=0, high=len(self.ACTIONS), shape=(self.WORKER_MAX,)
+        )
         self.observation_space = gym.spaces.Box(
             low=0,
             high=255,
@@ -184,7 +186,11 @@ class Game(gym.Env):
         self.reward = 0
         self.terminated = False
         self.truncated = False
-        self.load_from_csv(self.csv_path)
+
+        if isinstance(self.csv_paths, list):
+            self.load_from_csv(random.choice(self.csv_paths))
+        else:
+            self.load_from_csv(self.csv_paths)
 
         self.cell_size = min(
             self.display_size_x * 0.9 // self.width,
@@ -329,7 +335,7 @@ class Game(gym.Env):
                     )
                     in stack_destinations
                 ):
-                    print(f"{worker.name}: 行動できませんでした。待機します。")
+                    # print(f"{worker.name}: 行動できませんでした。待機します。")
                     worker.stay()
                     self.successful.append(False)
                     workers.remove((worker, action))
@@ -379,7 +385,7 @@ class Game(gym.Env):
                 self.successful.append(True)
 
             else:
-                print(f"{worker.name}: 行動できませんでした。待機します。")
+                # print(f"{worker.name}: 行動できませんでした。待機します。")
                 worker.stay()
                 self.successful.append(False)
 
@@ -387,7 +393,7 @@ class Game(gym.Env):
                 break
 
         for worker, action in workers:
-            print(f"{worker.name}: 行動できませんでした。待機します。")
+            # print(f"{worker.name}: 行動できませんでした。待機します。")
             worker.stay()
             self.successful.append(False)
 
@@ -544,7 +550,7 @@ class Game(gym.Env):
             * self.SCORE_MULTIPLIER["rampart"]
         )
 
-        print(f"score_A:{self.score_A}, score_B:{self.score_B}")
+        # print(f"score_A:{self.score_A}, score_B:{self.score_B}")
 
     def get_reward(self):
         """報酬更新処理実装予定"""
@@ -572,21 +578,19 @@ class Game(gym.Env):
         gymの必須関数
         1ターン進める処理を実行
         """
-        assert self.worker_count == len(
-            actions
-        ), f"input length error {self.worker_count}, {len(actions)}"
+        actions = list(map(int, actions))
         current_workers = (
             self.workers["A"] if not self.current_player else self.workers["B"]
         )
         [worker.turn_init() for worker in current_workers]
         sorted_workers = [
             (worker, action)
-            for worker, action in zip(current_workers, actions)
+            for worker, action in zip(current_workers, actions[: self.worker_count])
             if "break" in self.ACTIONS[action]
         ]
         sorted_workers += [
             (worker, action)
-            for worker, action in zip(current_workers, actions)
+            for worker, action in zip(current_workers, actions[: self.worker_count])
             if "break" not in self.ACTIONS[action]
         ]
 
@@ -1028,7 +1032,9 @@ class Game(gym.Env):
 if __name__ == "__main__":
     fields = glob.glob(os.path.normpath("./field_data/*.csv"))
 
-    env = Game(csv_path=random.choice(fields), render_mode="human", controller="pygame")
+    env = Game(
+        csv_paths=random.choice(fields), render_mode="human", controller="pygame"
+    )
 
     observation = env.reset()
     terminated, truncated = [False] * 2

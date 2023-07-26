@@ -9,7 +9,7 @@ def main():
     env = gym.make(
         "TaniJoh-v0",
         # max_episode_steps=10,
-        csv_path=random.choice(fields),
+        csv_path=fields,
         render_mode="human",
         controller="pygame",
     )
