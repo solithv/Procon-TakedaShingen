@@ -1008,14 +1008,14 @@ if __name__ == "__main__":
                 f"input team {env.current_team} actions (need {env.worker_count} input) : "
             )
             env.render()
-            observation, reward, done, _ = env.step(env.get_actions_from_render())
+            observation, reward, done, *_ = env.step(env.get_actions_from_render())
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
     elif env.controller == "cli":
         while not done:
-            observation, reward, done, _ = turn()
+            observation, reward, done, *_ = turn()
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
