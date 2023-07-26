@@ -3,9 +3,10 @@ import csv
 import glob
 import os
 import random
+import re
 from collections import defaultdict
 from typing import Iterable, Optional
-import re
+
 import gymnasium as gym
 import numpy as np
 import pyautogui
@@ -20,12 +21,12 @@ except:
 
 class Game(gym.Env):
     metadata = {"render_modes": ["human", "ansi"], "render_fps": 5}
-    SCORE_MULTIPLIER = {"castle": 100, "position": 50, "rampart": 10}
+    SCORE_MULTIPLIER = {"castle": 100, "position": 30, "rampart": 10}
     TEAM = ("A", "B")
     FIELD_MIN, FIELD_MAX = 11, 25
     WORKER_MIN, WORKER_MAX = 2, 6
     CELL = (
-        "blank",  # 論理反転
+        "blank",
         "position_A",
         "position_B",
         "open_position_A",
@@ -88,7 +89,7 @@ class Game(gym.Env):
         self.action_space = gym.spaces.Discrete(len(self.ACTIONS))
         self.observation_space = gym.spaces.Box(
             low=0,
-            high=1,
+            high=255,
             shape=(len(self.CELL), self.FIELD_MAX, self.FIELD_MAX),
             dtype=np.uint8,
         )
@@ -180,7 +181,9 @@ class Game(gym.Env):
         self.score_A, self.score_B = 0, 0
         self.previous_score_A, self.previous_score_B = 0, 0
         self.turn = 1
-        self.done = False
+        self.reward = 0
+        self.terminated = False
+        self.truncated = False
         self.load_from_csv(self.csv_path)
 
         self.cell_size = min(
@@ -192,7 +195,7 @@ class Game(gym.Env):
         self.window_size_y = self.height * self.cell_size
 
         self.update_blank()
-        return self.board
+        return self.board, {}
 
     def compile_layers(self, *layers: tuple[str], one_hot: bool = True):
         """
@@ -300,11 +303,46 @@ class Game(gym.Env):
                 direction += value
         return direction
 
+    def check_stack_workers(self, workers: list[tuple[Worker, int]]):
+        destinations = defaultdict(int)
+        for worker, action in workers:
+            if "move" in self.ACTIONS[action]:
+                destinations[
+                    tuple(
+                        (
+                            np.array(worker.get_coordinate())
+                            + self.get_direction(action)
+                        ).tolist(),
+                    )
+                ] += 1
+        if any(value > 1 for value in destinations.values()):
+            stack_destinations = [
+                key for key, value in destinations.items() if value > 1
+            ]
+            for worker, action in workers.copy():
+                if "move" in self.ACTIONS[action] and (
+                    tuple(
+                        (
+                            np.array(worker.get_coordinate())
+                            + self.get_direction(action)
+                        ).tolist(),
+                    )
+                    in stack_destinations
+                ):
+                    print(f"{worker.name}: 行動できませんでした。待機します。")
+                    worker.stay()
+                    self.successful.append(False)
+                    workers.remove((worker, action))
+        return workers
+
     def action_workers(self, workers: list[tuple[Worker, int]]):
         """
         内部関数
         職人を行動させる
         """
+        workers = self.check_stack_workers(workers)
+        if not workers:
+            return
         for _ in range(self.worker_count):
             worker, action = workers.pop(0)
             y, x = map(
@@ -341,7 +379,7 @@ class Game(gym.Env):
                 self.successful.append(True)
 
             else:
-                print("行動できない入力です")
+                print(f"{worker.name}: 行動できませんでした。待機します。")
                 worker.stay()
                 self.successful.append(False)
 
@@ -422,39 +460,29 @@ class Game(gym.Env):
         self.previous_open_position_B = copy.deepcopy(
             self.board[self.CELL.index("open_position_B")]
         )
+
         self.board[self.CELL.index("open_position_A")] = np.where(
-            np.where(
-                (
-                    self.previous_position_A
-                    - self.board[self.CELL.index("position_A")]
-                    + self.previous_open_position_A
-                )
-                > 0,
-                1,
-                0,
-            )
-            - self.compile_layers("rampart_A", "rampart_B", "position_B")
-            > 0,
+            (self.previous_position_A + self.previous_open_position_A),
             1,
             0,
+        ) - self.compile_layers("rampart_A", "rampart_B", "position_A", "position_B")
+        self.board[self.CELL.index("open_position_A")] = np.where(
+            self.board[self.CELL.index("open_position_A")] == np.uint8(-1),
+            0,
+            self.board[self.CELL.index("open_position_A")],
         )
         self.board[self.CELL.index("open_position_A"), :, self.width :] = -1
         self.board[self.CELL.index("open_position_A"), self.height :, :] = -1
+
         self.board[self.CELL.index("open_position_B")] = np.where(
-            np.where(
-                (
-                    self.previous_position_B
-                    - self.board[self.CELL.index("position_B")]
-                    + self.previous_open_position_B
-                )
-                > 0,
-                1,
-                0,
-            )
-            - self.compile_layers("rampart_B", "rampart_A", "position_A")
-            > 0,
+            (self.previous_position_B + self.previous_open_position_B),
             1,
             0,
+        ) - self.compile_layers("rampart_A", "rampart_B", "position_A", "position_B")
+        self.board[self.CELL.index("open_position_B")] = np.where(
+            self.board[self.CELL.index("open_position_B")] == np.uint8(-1),
+            0,
+            self.board[self.CELL.index("open_position_B")],
         )
         self.board[self.CELL.index("open_position_B"), :, self.width :] = -1
         self.board[self.CELL.index("open_position_B"), self.height :, :] = -1
@@ -520,15 +548,24 @@ class Game(gym.Env):
 
     def get_reward(self):
         """報酬更新処理実装予定"""
+        reward = self.score_A - self.score_B
+        reward += np.abs(reward) * (
+            (self.score_A - self.previous_score_A)
+            - (self.score_B - self.previous_score_B)
+        )
+        if self.score_A == self.previous_score_A:
+            reward *= 0.75 if reward > 0 else 1.25
         if not all(self.successful):
-            return np.NINF
-        else:
-            return 0
+            reward -= 10000
+        return float(reward)
 
     def is_done(self):
         """ゲーム終了判定実装予定"""
+        # terminated : エピソード終了フラグ
+        # truncated  : ステップ数上限での終了フラグ
         if self.turn >= self.max_episode_steps:
-            self.done = True
+            self.truncated = True
+        # self.terminated = True
 
     def step(self, actions: Iterable[int]):
         """
@@ -558,12 +595,12 @@ class Game(gym.Env):
         self.update_position()
         self.update_open_position()
         self.update_blank()
+        self.calculate_score()
+        self.reward = self.get_reward()
+        self.is_done()
         self.change_player()
         self.turn += 1
-        self.calculate_score()
-        reward = self.get_reward()
-        self.is_done()
-        return self.board, reward, self.done, {}, {}
+        return self.board, self.reward, self.terminated, self.truncated, {}
 
     def render(self):
         """
@@ -973,46 +1010,37 @@ class Game(gym.Env):
                 drawTurnInfo(actingWorker=actingWorker + 1)
             self.actions = actions
 
-    def get_actions_from_render(self):
-        return self.actions
+    def get_actions(self):
+        if self.controller == "pygame":
+            return self.actions
+        elif self.controller == "cli":
+            [print(f"{i:2}: {action}") for i, action in enumerate(env.ACTIONS)]
+            print(
+                f"input team {env.current_team} actions (need {env.worker_count} input) : "
+            )
+            actions = [int(input()) for _ in range(env.worker_count)]
+            return actions
+
+    def close(self):
+        pygame.quit()
 
 
 if __name__ == "__main__":
-
-    def turn():
-        env.render()
-
-        [print(f"{i:2}: {action}") for i, action in enumerate(env.ACTIONS)]
-        print(
-            f"input team {env.current_team} actions (need {env.worker_count} input) : "
-        )
-        actions = [int(input()) for _ in range(env.worker_count)]
-
-        return env.step(actions)
-
     fields = glob.glob(os.path.normpath("./field_data/*.csv"))
 
     env = Game(csv_path=random.choice(fields), render_mode="human", controller="pygame")
 
     observation = env.reset()
-    done = False
+    terminated, truncated = [False] * 2
     print(f"width:{env.width}, height:{env.height}, workers:{env.worker_count}")
 
-    if env.controller == "pygame":
-        while not done:
-            print(
-                f"input team {env.current_team} actions (need {env.worker_count} input) : "
-            )
-            env.render()
-            observation, reward, done, _ = env.step(env.get_actions_from_render())
+    while not terminated and not truncated:
+        print(
+            f"input team {env.current_team} actions (need {env.worker_count} input) : "
+        )
+        env.render()
+        observation, reward, terminated, truncated, _ = env.step(env.get_actions())
 
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    pygame.quit()
-    elif env.controller == "cli":
-        while not done:
-            observation, reward, done, _ = turn()
-
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    pygame.quit()
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
