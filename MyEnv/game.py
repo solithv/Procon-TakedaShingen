@@ -86,8 +86,8 @@ class Game(gym.Env):
         self.csv_paths = csv_paths
         self.render_mode = render_mode
         self.max_episode_steps = max_episode_steps
-        self.action_space = gym.spaces.Box(
-            low=0, high=len(self.ACTIONS), shape=(self.WORKER_MAX,)
+        self.action_space = gym.spaces.MultiDiscrete(
+            [len(self.ACTIONS)] * self.WORKER_MAX
         )
         self.observation_space = gym.spaces.Box(
             low=0,
@@ -578,7 +578,6 @@ class Game(gym.Env):
         gymの必須関数
         1ターン進める処理を実行
         """
-        actions = list(map(int, actions))
         current_workers = (
             self.workers["A"] if not self.current_player else self.workers["B"]
         )
