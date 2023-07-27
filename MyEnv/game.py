@@ -573,6 +573,15 @@ class Game(gym.Env):
             self.truncated = True
         # self.terminated = True
 
+    def reshape_observation(self):
+        """各座標の要素に状態を入れたほうがいいかも？
+        忘れないうちに機能だけ実装
+
+        Returns:
+            _type_: 変換後の配列
+        """
+        return self.board.transpose((1, 2, 0))
+
     def step(self, actions: Iterable[int]):
         """
         gymの必須関数
