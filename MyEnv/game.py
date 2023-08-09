@@ -1024,6 +1024,28 @@ class Game(gym.Env):
     def close(self):
         pygame.quit()
 
+    def random_act(self, worker_num: int):
+        """
+        行動可能な範囲でランダムな行動を返す
+        """
+        n,i = len(self.ACTIONS)
+        act_able = []
+        for w in n:
+            direction = self.get_direction(w)
+            pos = Worker.get_coordinate()
+            act_pos = np.array(pos) + np.array(direction)
+            if {("break" in self.ACTIONS[w] and self.is_breakable(self.workers[worker_num],act_pos[0],act_pos[1])) 
+                or ("move" in self.ACTIONS[w] and self.is_movable(self.workers[worker_num],act_pos[0],act_pos[1]))
+                or ("build" in self.ACTIONS[w] and self.is_buildable(self.workers[worker_num],act_pos[0],act_pos[1]))}:
+
+                act_able.append(self.ACTIONS[w])
+            elif w == 0:
+                act_able.append(self.ACTIONS[0])
+            else:
+                i = i-1
+        act = act_able[random.randint(0,i-1)]
+        return act
+
 
 if __name__ == "__main__":
     fields = glob.glob(os.path.normpath("./field_data/*.csv"))
@@ -1034,26 +1056,6 @@ if __name__ == "__main__":
     terminated, truncated = [False] * 2
     print(f"width:{env.width}, height:{env.height}, workers:{env.worker_count}")
 
-<<<<<<< HEAD
-    if env.controller == "pygame":
-        while not done:
-            print(
-                f"input team {env.current_team} actions (need {env.worker_count} input) : "
-            )
-            env.render()
-            observation, reward, done, *_ = env.step(env.get_actions_from_render())
-
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    pygame.quit()
-    elif env.controller == "cli":
-        while not done:
-            observation, reward, done, *_ = turn()
-
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    pygame.quit()
-=======
     while not terminated and not truncated:
         print(
             f"input team {env.current_team} actions (need {env.worker_count} input) : "
@@ -1064,4 +1066,4 @@ if __name__ == "__main__":
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
->>>>>>> origin/develop_takano
+            
