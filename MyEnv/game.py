@@ -352,7 +352,7 @@ class Game(gym.Env):
                 worker, worker.y, worker.x
             ):
                 worker.stay()
-                self.successful.append(True)
+                self.successful.append(False)
 
             elif "move" in self.ACTIONS[action] and self.is_movable(worker, y, x):
                 if (y, x) in self.get_team_worker_coordinate(
