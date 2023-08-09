@@ -1024,26 +1024,28 @@ class Game(gym.Env):
     def close(self):
         pygame.quit()
 
-    def random_act(self, worker_num: int):
+    def random_act(self):
         """
         行動可能な範囲でランダムな行動を返す
         """
-        n,i = len(self.ACTIONS)
-        act_able = []
-        for w in n:
-            direction = self.get_direction(w)
-            pos = Worker.get_coordinate()
-            act_pos = np.array(pos) + np.array(direction)
-            if {("break" in self.ACTIONS[w] and self.is_breakable(self.workers[worker_num],act_pos[0],act_pos[1])) 
-                or ("move" in self.ACTIONS[w] and self.is_movable(self.workers[worker_num],act_pos[0],act_pos[1]))
-                or ("build" in self.ACTIONS[w] and self.is_buildable(self.workers[worker_num],act_pos[0],act_pos[1]))}:
+        n = len(self.ACTIONS)
+        act = []
+        for r in range(env.worker_count):
+            i = len(self.ACTIONS)
+            act_able = []
+            pos = self.workers[self.current_team][r].get_coordinate()
 
-                act_able.append(self.ACTIONS[w])
-            elif w == 0:
-                act_able.append(self.ACTIONS[0])
-            else:
-                i = i-1
-        act = act_able[random.randint(0,i-1)]
+            for w in range(n):
+                direction = self.get_direction(w)
+                act_pos = np.array(pos) + np.array(direction)
+                if not{("break" in self.ACTIONS[w] and self.is_breakable(self.workers[self.current_team][r],act_pos[0],act_pos[1])) 
+                    or ("move" in self.ACTIONS[w] and self.is_movable(self.workers[self.current_team][r],act_pos[0],act_pos[1]))
+                    or ("build" in self.ACTIONS[w] and self.is_buildable(self.workers[self.current_team][r],act_pos[0],act_pos[1]))
+                    or w == 0}:
+                    i = i-1
+                else:
+                    act_able.append(w)
+            act.append(act_able[random.randint(0,i-1)])
         return act
 
 
@@ -1061,7 +1063,7 @@ if __name__ == "__main__":
             f"input team {env.current_team} actions (need {env.worker_count} input) : "
         )
         env.render()
-        observation, reward, terminated, truncated, _ = env.step(env.get_actions())
+        observation, reward, terminated, truncated, _ = env.step(env.random_act())
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
