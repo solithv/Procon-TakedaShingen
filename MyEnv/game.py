@@ -5,7 +5,7 @@ import os
 import random
 import re
 from collections import defaultdict
-from typing import Iterable, Optional
+from typing import Union, Optional
 
 import gymnasium as gym
 import numpy as np
@@ -567,7 +567,7 @@ class Game(gym.Env):
             self.truncated = True
         # self.terminated = True
 
-    def step(self, actions: Iterable[int]):
+    def step(self, actions: Union[list[int], tuple[int]]):
         """
         gymの必須関数
         1ターン進める処理を実行
@@ -575,18 +575,15 @@ class Game(gym.Env):
         assert self.worker_count == len(
             actions
         ), f"input length error {self.worker_count}, {len(actions)}"
-        current_workers = (
-            self.workers["A"] if not self.current_player else self.workers["B"]
-        )
-        [worker.turn_init() for worker in current_workers]
+        [worker.turn_init() for worker in self.workers[self.current_team]]
         sorted_workers = [
             (worker, action)
-            for worker, action in zip(current_workers, actions)
+            for worker, action in zip(self.workers[self.current_team], actions)
             if "break" in self.ACTIONS[action]
         ]
         sorted_workers += [
             (worker, action)
-            for worker, action in zip(current_workers, actions)
+            for worker, action in zip(self.workers[self.current_team], actions)
             if "break" not in self.ACTIONS[action]
         ]
 
@@ -1014,11 +1011,11 @@ class Game(gym.Env):
         if self.controller == "pygame":
             return self.actions
         elif self.controller == "cli":
-            [print(f"{i:2}: {action}") for i, action in enumerate(env.ACTIONS)]
+            [print(f"{i:2}: {action}") for i, action in enumerate(self.ACTIONS)]
             print(
-                f"input team {env.current_team} actions (need {env.worker_count} input) : "
+                f"input team {self.current_team} actions (need {self.worker_count} input) : "
             )
-            actions = [int(input()) for _ in range(env.worker_count)]
+            actions = [int(input()) for _ in range(self.worker_count)]
             return actions
 
     def close(self):
@@ -1028,31 +1025,32 @@ class Game(gym.Env):
         """
         行動可能な範囲でランダムな行動を返す
         """
+        [worker.turn_init() for worker in self.workers[self.current_team]]
         n = len(self.ACTIONS)
         act = []
-        for r in range(env.worker_count):
-            i = len(self.ACTIONS)
+        for r in self.workers[self.current_team]:
             act_able = []
-            pos = self.workers[self.current_team][r].get_coordinate()
+            pos = r.get_coordinate()
 
             for w in range(n):
                 direction = self.get_direction(w)
-                act_pos = np.array(pos) + np.array(direction)
-                if not{("break" in self.ACTIONS[w] and self.is_breakable(self.workers[self.current_team][r],act_pos[0],act_pos[1])) 
-                    or ("move" in self.ACTIONS[w] and self.is_movable(self.workers[self.current_team][r],act_pos[0],act_pos[1]))
-                    or ("build" in self.ACTIONS[w] and self.is_buildable(self.workers[self.current_team][r],act_pos[0],act_pos[1]))
-                    or w == 0}:
-                    i = i-1
-                else:
+                act_pos = (np.array(pos) + np.array(direction)).astype(int)
+                if (
+                    ("break" in self.ACTIONS[w] and self.is_breakable(r, *act_pos))
+                    or ("move" in self.ACTIONS[w] and self.is_movable(r, *act_pos))
+                    or ("build" in self.ACTIONS[w] and self.is_buildable(r, *act_pos))
+                    or w == 0
+                ):
                     act_able.append(w)
-            act.append(act_able[random.randint(0,i-1)])
+
+            act.append(*random.sample(act_able, 1))
         return act
 
 
 if __name__ == "__main__":
     fields = glob.glob(os.path.normpath("./field_data/*.csv"))
 
-    env = Game(csv_path=random.choice(fields), render_mode="human", controller="pygame")
+    env = Game(csv_path=random.choice(fields), render_mode="human", controller="random")
 
     observation = env.reset()
     terminated, truncated = [False] * 2
@@ -1064,6 +1062,7 @@ if __name__ == "__main__":
         )
         env.render()
         observation, reward, terminated, truncated, _ = env.step(env.random_act())
+        input()
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
