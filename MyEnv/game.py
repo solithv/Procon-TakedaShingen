@@ -1030,22 +1030,22 @@ class Game(gym.Env):
         """
         n = len(self.ACTIONS)
         act = []
-        for r in range(env.worker_count):
-            i = len(self.ACTIONS)
+        for r in range(self.worker_count):
+            i = len(self.ACTIONS) - 1
             act_able = []
-            pos = self.workers[self.current_team][r].get_coordinate()
+            pos = self.workers[env.current_team][r].get_coordinate()
 
             for w in range(n):
                 direction = self.get_direction(w)
-                act_pos = np.array(pos) + np.array(direction)
-                if not{("break" in self.ACTIONS[w] and self.is_breakable(self.workers[self.current_team][r],act_pos[0],act_pos[1])) 
-                    or ("move" in self.ACTIONS[w] and self.is_movable(self.workers[self.current_team][r],act_pos[0],act_pos[1]))
+                act_pos = np.array(pos) + direction
+                if not{("break" in self.ACTIONS[w] and self.is_breakable(self.workers[self.current_team][r],act_pos[0],act_pos[1]))
+                    or ("move"  in self.ACTIONS[w] and self.is_movable(self.workers[self.current_team][r],act_pos[0],act_pos[1]))
                     or ("build" in self.ACTIONS[w] and self.is_buildable(self.workers[self.current_team][r],act_pos[0],act_pos[1]))
                     or w == 0}:
                     i = i-1
                 else:
                     act_able.append(w)
-            act.append(act_able[random.randint(0,i-1)])
+            act.append(act_able[random.randint(0,i)])
         return act
 
 
@@ -1060,7 +1060,7 @@ if __name__ == "__main__":
 
     while not terminated and not truncated:
         print(
-            f"input team {env.current_team} actions (need {env.worker_count} input) : "
+            f"input team {env.current_team} actions (nfeed {env.worker_count} input) : "
         )
         env.render()
         observation, reward, terminated, truncated, _ = env.step(env.random_act())
