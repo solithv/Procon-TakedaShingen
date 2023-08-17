@@ -11,27 +11,28 @@ def main():
     config = srl.EnvConfig(
         "TaniJoh-v1",
         kwargs={
-            # "max_episode_steps":10,
-            "csv_path": random.choice(fields),
+            "max_episode_steps": 2,
+            "csv_path": fields,
             "render_mode": "human",
             "controller": "cli",
         },
     )
     env = srl.make_env(config)
-    state = env.reset(render_mode="window")
-    # observation = env.reset()
-    total_reward = 0
-    env.render()
-
-    while not env.done:
-        # action = env.env.get_actions()
-        action = env.sample_action()
-        env.step(action)
-        total_reward += env.reward
-        print(
-            f"step {env.step_num}, action {action}, reward {env.reward}, done {env.done}"
-        )
+    for _ in range(5):
+        state = env.reset(render_mode="window")
+        # observation = env.reset()
+        total_reward = 0
         env.render()
+
+        while not env.done:
+            # action = env.env.get_actions()
+            action = env.sample_action()
+            env.step(action)
+            total_reward += env.reward
+            print(
+                f"step {env.step_num}, action {action}, reward {env.reward}, done {env.done}"
+            )
+            env.render()
     env.close()
 
 

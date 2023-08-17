@@ -6,6 +6,7 @@ import random
 import re
 from collections import defaultdict
 from typing import Optional, Union
+import pickle
 
 import numpy as np
 import pyautogui
@@ -78,7 +79,7 @@ class Game(TurnBase2Player):
 
     def __init__(
         self,
-        csv_path: str,
+        csv_path: Union[str, list[str]],
         render_mode="ansi",
         max_episode_steps=100,
         first_player: Optional[int] = None,
@@ -159,13 +160,15 @@ class Game(TurnBase2Player):
         self.board[0, self.height :, :] = -1
         self.board[0, :, self.width :] = -1
 
-    def load_from_csv(self, path: str):
+    def load_from_csv(self, path: Union[str, list[str]]):
         """
         内部関数
         csvデータからフィールドを作成する
         Args:
             path (str): csvデータのパス
         """
+        if isinstance(path, (list, tuple)):
+            path = random.choice(path)
         size = int(re.sub(r"[\D]", "", os.path.normpath(path).split(os.path.sep)[-1]))
         self.board = np.zeros((len(self.CELL), size, size), dtype=np.uint8)
         self.workers: defaultdict[str, list[Worker]] = defaultdict(list)
@@ -588,7 +591,7 @@ class Game(TurnBase2Player):
         if self.score_A == self.previous_score_A:
             reward *= 0.75 if reward > 0 else 1.25
         if self.current_player == self.TEAM.index("A") and not all(self.successful):
-            reward -= 10000
+            reward -= 10000 * sum(self.successful)
         return float(reward)
 
     def get_reward_B(self):
@@ -601,7 +604,7 @@ class Game(TurnBase2Player):
         if self.score_B == self.previous_score_B:
             reward *= 0.75 if reward > 0 else 1.25
         if self.current_player == self.TEAM.index("B") and not all(self.successful):
-            reward -= 10000
+            reward -= 10000 * sum(self.successful)
         return float(reward)
 
     def is_done(self):
@@ -1105,7 +1108,21 @@ class Game(TurnBase2Player):
         return act
 
     def backup(self):
-        return None
+        return pickle.dumps(
+            [
+                self.board,
+                self.turn,
+                self.current_player,
+                self.previous_score_A,
+                self.previous_score_B,
+            ]
+        )
 
     def restore(self, data):
-        pass
+        (
+            self.board,
+            self.turn,
+            self.current_player,
+            self.previous_score_A,
+            self.previous_score_B,
+        ) = pickle.loads(data)
