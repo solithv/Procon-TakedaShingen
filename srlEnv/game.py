@@ -385,9 +385,7 @@ class Game(TurnBase2Player):
             y, x = map(
                 int, np.array(worker.get_coordinate()) + self.get_direction(action)
             )
-            if "stay" in self.ACTIONS[action] and self.is_movable(
-                worker, worker.y, worker.x
-            ):
+            if "stay" in self.ACTIONS[action]:
                 worker.stay()
                 self.successful.append(False)
 
@@ -1095,6 +1093,9 @@ class Game(TurnBase2Player):
         [worker.turn_init() for worker in self.workers[self.current_team]]
         n = len(self.ACTIONS)
         act = []
+        self.worker_positions = [
+            worker.get_coordinate() for worker in self.workers[self.current_team]
+        ]
         for r in self.workers[self.current_team]:
             act_able = []
             pos = r.get_coordinate()
@@ -1111,6 +1112,8 @@ class Game(TurnBase2Player):
                     act_able.append(w)
 
             act.append(*random.sample(act_able, 1))
+        while self.WORKER_MAX > len(act):
+            act.append(0)
         return act
 
     def backup(self):

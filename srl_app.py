@@ -11,13 +11,14 @@ def main():
     config = srl.EnvConfig(
         "TaniJoh-v1",
         kwargs={
-            "max_episode_steps": 2,
+            "max_episode_steps": 5,
             "csv_path": fields,
             "render_mode": "human",
             "controller": "cli",
         },
     )
     env = srl.make_env(config)
+    env.env: srlEnv.Game
     for _ in range(5):
         state = env.reset(render_mode="window")
         # observation = env.reset()
