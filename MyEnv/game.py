@@ -21,16 +21,16 @@ except:
 
 class Game(gym.Env):
     metadata = {"render_modes": ["human", "ansi"], "render_fps": 5}
-    SCORE_MULTIPLIER = {"castle": 100, "position": 30, "rampart": 10}
+    SCORE_MULTIPLIER = {"castle": 100, "territory": 30, "rampart": 10}
     TEAM = ("A", "B")
     FIELD_MIN, FIELD_MAX = 11, 25
     WORKER_MIN, WORKER_MAX = 2, 6
     CELL = (
         "blank",
-        "position_A",
-        "position_B",
-        "open_position_A",
-        "open_position_B",
+        "territory_A",
+        "territory_B",
+        "open_territory_A",
+        "open_territory_B",
         "rampart_A",
         "rampart_B",
         "castle",
@@ -431,61 +431,61 @@ class Game(gym.Env):
         array[self.height :, :] = -1
         return array
 
-    def update_position(self):
+    def update_territory(self):
         """
         内部関数
         陣地を更新
         """
-        self.previous_position_A = copy.deepcopy(
-            self.board[self.CELL.index("position_A")]
+        self.previous_territory_A = copy.deepcopy(
+            self.board[self.CELL.index("territory_A")]
         )
-        self.previous_position_B = copy.deepcopy(
-            self.board[self.CELL.index("position_B")]
+        self.previous_territory_B = copy.deepcopy(
+            self.board[self.CELL.index("territory_B")]
         )
-        self.board[self.CELL.index("position_A")] = self.fill_area(
+        self.board[self.CELL.index("territory_A")] = self.fill_area(
             self.board[self.CELL.index("rampart_A")]
         )
-        self.board[self.CELL.index("position_B")] = self.fill_area(
+        self.board[self.CELL.index("territory_B")] = self.fill_area(
             self.board[self.CELL.index("rampart_B")]
         )
 
-    def update_open_position(self):
+    def update_open_territory(self):
         """
         内部関数
         開放陣地を更新
         """
-        self.previous_open_position_A = copy.deepcopy(
-            self.board[self.CELL.index("open_position_A")]
+        self.previous_open_territory_A = copy.deepcopy(
+            self.board[self.CELL.index("open_territory_A")]
         )
-        self.previous_open_position_B = copy.deepcopy(
-            self.board[self.CELL.index("open_position_B")]
+        self.previous_open_territory_B = copy.deepcopy(
+            self.board[self.CELL.index("open_territory_B")]
         )
 
-        self.board[self.CELL.index("open_position_A")] = np.where(
-            (self.previous_position_A + self.previous_open_position_A),
+        self.board[self.CELL.index("open_territory_A")] = np.where(
+            (self.previous_territory_A + self.previous_open_territory_A),
             1,
             0,
-        ) - self.compile_layers("rampart_A", "rampart_B", "position_A", "position_B")
-        self.board[self.CELL.index("open_position_A")] = np.where(
-            self.board[self.CELL.index("open_position_A")] == np.uint8(-1),
+        ) - self.compile_layers("rampart_A", "rampart_B", "territory_A", "territory_B")
+        self.board[self.CELL.index("open_territory_A")] = np.where(
+            self.board[self.CELL.index("open_territory_A")] == np.uint8(-1),
             0,
-            self.board[self.CELL.index("open_position_A")],
+            self.board[self.CELL.index("open_territory_A")],
         )
-        self.board[self.CELL.index("open_position_A"), :, self.width :] = -1
-        self.board[self.CELL.index("open_position_A"), self.height :, :] = -1
+        self.board[self.CELL.index("open_territory_A"), :, self.width :] = -1
+        self.board[self.CELL.index("open_territory_A"), self.height :, :] = -1
 
-        self.board[self.CELL.index("open_position_B")] = np.where(
-            (self.previous_position_B + self.previous_open_position_B),
+        self.board[self.CELL.index("open_territory_B")] = np.where(
+            (self.previous_territory_B + self.previous_open_territory_B),
             1,
             0,
-        ) - self.compile_layers("rampart_A", "rampart_B", "position_A", "position_B")
-        self.board[self.CELL.index("open_position_B")] = np.where(
-            self.board[self.CELL.index("open_position_B")] == np.uint8(-1),
+        ) - self.compile_layers("rampart_A", "rampart_B", "territory_A", "territory_B")
+        self.board[self.CELL.index("open_territory_B")] = np.where(
+            self.board[self.CELL.index("open_territory_B")] == np.uint8(-1),
             0,
-            self.board[self.CELL.index("open_position_B")],
+            self.board[self.CELL.index("open_territory_B")],
         )
-        self.board[self.CELL.index("open_position_B"), :, self.width :] = -1
-        self.board[self.CELL.index("open_position_B"), self.height :, :] = -1
+        self.board[self.CELL.index("open_territory_B"), :, self.width :] = -1
+        self.board[self.CELL.index("open_territory_B"), self.height :, :] = -1
 
     def calculate_score(self):
         """
@@ -497,7 +497,7 @@ class Game(gym.Env):
         self.score_A = (
             np.sum(
                 self.board[self.CELL.index("castle"), : self.height, : self.width]
-                * self.compile_layers("position_A", "open_position_A")[
+                * self.compile_layers("territory_A", "open_territory_A")[
                     : self.height, : self.width
                 ]
             )
@@ -506,11 +506,11 @@ class Game(gym.Env):
         self.score_A += (
             np.sum(
                 (1 - self.board[self.CELL.index("castle"), : self.height, : self.width])
-                * self.compile_layers("position_A", "open_position_A")[
+                * self.compile_layers("territory_A", "open_territory_A")[
                     : self.height, : self.width
                 ]
             )
-            * self.SCORE_MULTIPLIER["position"]
+            * self.SCORE_MULTIPLIER["territory"]
         )
         self.score_A += (
             np.sum(
@@ -522,7 +522,7 @@ class Game(gym.Env):
         self.score_B = (
             np.sum(
                 self.board[self.CELL.index("castle"), : self.height, : self.width]
-                * self.compile_layers("position_B", "open_position_B")[
+                * self.compile_layers("territory_B", "open_territory_B")[
                     : self.height, : self.width
                 ]
             )
@@ -531,11 +531,11 @@ class Game(gym.Env):
         self.score_B += (
             np.sum(
                 (1 - self.board[self.CELL.index("castle"), : self.height, : self.width])
-                * self.compile_layers("position_B", "open_position_B")[
+                * self.compile_layers("territory_B", "open_territory_B")[
                     : self.height, : self.width
                 ]
             )
-            * self.SCORE_MULTIPLIER["position"]
+            * self.SCORE_MULTIPLIER["territory"]
         )
         self.score_B += (
             np.sum(
@@ -589,8 +589,8 @@ class Game(gym.Env):
 
         self.successful = []
         self.action_workers(sorted_workers)
-        self.update_position()
-        self.update_open_position()
+        self.update_territory()
+        self.update_open_territory()
         self.update_blank()
         self.calculate_score()
         self.reward = self.get_reward()
@@ -806,7 +806,7 @@ class Game(gym.Env):
             if self.controller != "pygame":
                 drawTurnInfo()
                 return
-            showPosition = False
+            showterritory = False
             actions = []
             actingWorker = 0
             while actingWorker < self.worker_count:
@@ -822,28 +822,28 @@ class Game(gym.Env):
 
                     if event.type == KEYDOWN:
                         if event.key == pygame.K_RETURN:
-                            if showPosition:
+                            if showterritory:
                                 drawAll()
-                            showPosition = not showPosition
+                            showterritory = not showterritory
 
-                    if showPosition:
-                        positionALayer = self.compile_layers("position_A", one_hot=True)
-                        positionBLayer = self.compile_layers("position_B", one_hot=True)
-                        openPositionALayer = self.compile_layers(
-                            "open_position_A", one_hot=True
+                    if showterritory:
+                        territoryALayer = self.compile_layers("territory_A", one_hot=True)
+                        territoryBLayer = self.compile_layers("territory_B", one_hot=True)
+                        openterritoryALayer = self.compile_layers(
+                            "open_territory_A", one_hot=True
                         )
-                        openPositionBLayer = self.compile_layers(
-                            "open_position_B", one_hot=True
+                        openterritoryBLayer = self.compile_layers(
+                            "open_territory_B", one_hot=True
                         )
                         for i in range(self.height):
                             for j in range(self.width):
-                                if positionALayer[i][j] == 1:
+                                if territoryALayer[i][j] == 1:
                                     color = self.RED
-                                elif positionBLayer[i][j] == 1:
+                                elif territoryBLayer[i][j] == 1:
                                     color = self.BLUE
-                                elif openPositionALayer[i][j] == 1:
+                                elif openterritoryALayer[i][j] == 1:
                                     color = self.PINK
-                                elif openPositionBLayer[i][j] == 1:
+                                elif openterritoryBLayer[i][j] == 1:
                                     color = self.SKY
                                 else:
                                     placeImage(BLANK_IMG, i, j)

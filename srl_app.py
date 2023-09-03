@@ -26,7 +26,7 @@ def main():
 
         while not env.done:
             # action = env.env.get_actions()
-            action = env.sample_action()
+            action = env.random_act()
             env.step(action)
             total_reward += env.reward
             print(
