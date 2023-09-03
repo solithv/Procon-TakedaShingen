@@ -287,6 +287,7 @@ class Game(TurnBase2Player):
                 *[f"worker_{worker.opponent_team}{i}" for i in range(self.WORKER_MAX)],
             )[y, x]
             and (y, x) not in self.get_team_worker_coordinate(worker.team)
+            and (y, x) not in self.worker_positions
         ):
             return True
         else:
@@ -375,6 +376,7 @@ class Game(TurnBase2Player):
         内部関数
         職人を行動させる
         """
+        self.worker_positions = [worker.get_coordinate() for worker, _ in workers]
         workers = self.check_stack_workers(workers)
         if not workers:
             return
@@ -888,8 +890,12 @@ class Game(TurnBase2Player):
                             showterritory = not showterritory
 
                     if showterritory:
-                        territoryALayer = self.compile_layers("territory_A", one_hot=True)
-                        territoryBLayer = self.compile_layers("territory_B", one_hot=True)
+                        territoryALayer = self.compile_layers(
+                            "territory_A", one_hot=True
+                        )
+                        territoryBLayer = self.compile_layers(
+                            "territory_B", one_hot=True
+                        )
                         openterritoryALayer = self.compile_layers(
                             "open_territory_A", one_hot=True
                         )
