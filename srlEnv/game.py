@@ -1,12 +1,11 @@
 import copy
 import csv
-import glob
 import os
+import pickle
 import random
 import re
 from collections import defaultdict
 from typing import Optional, Union
-import pickle
 
 import numpy as np
 import pyautogui
@@ -156,21 +155,22 @@ class Game(TurnBase2Player):
         内部関数
         blank層を更新
         """
-        self.board[0] = np.where(self.board[1:].any(axis=0), 0, 1)
-        self.board[0, self.height :, :] = -1
-        self.board[0, :, self.width :] = -1
+        self.board[:, :, 0] = np.where(self.board[:, :, 1:].any(axis=2), 0, 1)
+        self.board[self.height :, :, 0] = -1
+        self.board[:, self.width :, 0] = -1
 
     def load_from_csv(self, path: Union[str, list[str]]):
         """
         内部関数
         csvデータからフィールドを作成する
         Args:
-            path (str): csvデータのパス
+            path (Union[str, list[str]]): csvデータのパス
         """
         if isinstance(path, (list, tuple)):
             path = random.choice(path)
         size = int(re.sub(r"[\D]", "", os.path.normpath(path).split(os.path.sep)[-1]))
-        self.board = np.zeros((len(self.CELL), size, size), dtype=np.uint8)
+        name = os.path.normpath(path).split(os.path.sep)[-1].split(".")[0]
+        self.board = np.zeros((size, size, len(self.CELL)), dtype=np.uint8)
         self.workers: defaultdict[str, list[Worker]] = defaultdict(list)
         self.width, self.height = [size] * 2
 
@@ -180,22 +180,22 @@ class Game(TurnBase2Player):
             for y, row in enumerate(reader):
                 for x, item in enumerate(row):
                     if item == "0":
-                        self.board[self.CELL.index("blank"), y, x] = 1
+                        self.board[y, x, self.CELL.index("blank")] = 1
                     elif item == "1":
-                        self.board[self.CELL.index("pond"), y, x] = 1
+                        self.board[y, x, self.CELL.index("pond")] = 1
                     elif item == "2":
-                        self.board[self.CELL.index("castle"), y, x] = 1
+                        self.board[y, x, self.CELL.index("castle")] = 1
                     elif item == "a":
-                        self.board[self.CELL.index(f"worker_A{a_count}"), y, x] = 1
+                        self.board[y, x, self.CELL.index(f"worker_A{a_count}")] = 1
                         self.workers["A"].append(Worker(f"worker_A{a_count}", y, x))
                         a_count += 1
                     elif item == "b":
-                        self.board[self.CELL.index(f"worker_B{b_count}"), y, x] = 1
+                        self.board[y, x, self.CELL.index(f"worker_B{b_count}")] = 1
                         self.workers["B"].append(Worker(f"worker_B{b_count}", y, x))
                         b_count += 1
         self.board = np.pad(
             self.board,
-            [(0, 0), (0, self.FIELD_MAX - size), (0, self.FIELD_MAX - size)],
+            [(0, self.FIELD_MAX - size), (0, self.FIELD_MAX - size), (0, 0)],
             "constant",
             constant_values=-1,
         )
@@ -203,7 +203,12 @@ class Game(TurnBase2Player):
         self.worker_count = a_count
         self.update_blank()
 
-    def call_reset(self):
+        return name
+
+    def call_reset(self, *args, **kwargs):
+        return self.reset(*args, **kwargs)
+
+    def reset(self):
         """
         srlの必須関数
         環境の初期化
@@ -217,9 +222,7 @@ class Game(TurnBase2Player):
         self.score_A, self.score_B = 0, 0
         self.previous_score_A, self.previous_score_B = 0, 0
         self.turn = 1
-        self.reward_A = 0
-        self.reward_B = 0
-        self.load_from_csv(self.csv_path)
+        name = self.load_from_csv(self.csv_path)
 
         self.cell_size = min(
             self.display_size_x * 0.9 // self.width,
@@ -230,7 +233,8 @@ class Game(TurnBase2Player):
         self.window_size_y = self.height * self.cell_size
 
         self.update_blank()
-        return self.board, {}
+        info = {"csv_name": name}
+        return self.board, info
 
     def compile_layers(self, *layers: tuple[str], one_hot: bool = True):
         """
@@ -238,7 +242,7 @@ class Game(TurnBase2Player):
         one_hot: bool 返り値の各要素を1,0のみにする (default=True)
         """
         compiled = np.sum(
-            [self.board[self.CELL.index(layer)] for layer in layers],
+            [self.board[:, :, self.CELL.index(layer)] for layer in layers],
             axis=0,
             dtype=np.uint8,
         )
@@ -340,6 +344,14 @@ class Game(TurnBase2Player):
         return direction
 
     def check_stack_workers(self, workers: list[tuple[Worker, int]]):
+        """移動先が競合している職人を待機させる
+
+        Args:
+            workers (list[tuple[Worker, int]]): 職人と行動のリスト
+
+        Returns:
+            list[tuple[Worker, int]]: 職人と行動のリスト
+        """
         destinations = defaultdict(int)
         for worker, action in workers:
             if "move" in self.ACTIONS[action]:
@@ -365,9 +377,10 @@ class Game(TurnBase2Player):
                     )
                     in stack_destinations
                 ):
-                    print(f"{worker.name}: 行動できませんでした。待機します。")
+                    # print(f"{worker.name}: 行動できませんでした。待機します。")
                     worker.stay()
                     self.successful.append(False)
+                    self.stayed_workers.append(worker.name)
                     workers.remove((worker, action))
         return workers
 
@@ -388,6 +401,7 @@ class Game(TurnBase2Player):
             if "stay" in self.ACTIONS[action]:
                 worker.stay()
                 self.successful.append(False)
+                self.stayed_workers.append(worker.name)
 
             elif "move" in self.ACTIONS[action] and self.is_movable(worker, y, x):
                 if (y, x) in self.get_team_worker_coordinate(
@@ -395,36 +409,38 @@ class Game(TurnBase2Player):
                 ):
                     workers.append((worker, action))
                     continue
-                self.board[self.CELL.index(worker.name), worker.y, worker.x] = 0
-                self.board[self.CELL.index(worker.name), y, x] = 1
+                self.board[worker.y, worker.x, self.CELL.index(worker.name)] = 0
+                self.board[y, x, self.CELL.index(worker.name)] = 1
                 worker.move(y, x)
                 self.successful.append(True)
 
             elif "build" in self.ACTIONS[action] and self.is_buildable(worker, y, x):
-                self.board[self.CELL.index(f"rampart_{worker.team}"), y, x] = 1
+                self.board[y, x, self.CELL.index(f"rampart_{worker.team}")] = 1
                 worker.build(y, x)
                 self.successful.append(True)
 
             elif "break" in self.ACTIONS[action] and self.is_breakable(worker, y, x):
-                if self.board[self.CELL.index("rampart_A"), y, x]:
-                    self.board[self.CELL.index("rampart_A"), y, x] = 0
+                if self.board[y, x, self.CELL.index("rampart_A")]:
+                    self.board[y, x, self.CELL.index("rampart_A")] = 0
                 else:
-                    self.board[self.CELL.index("rampart_B"), y, x] = 0
+                    self.board[y, x, self.CELL.index("rampart_B")] = 0
                 worker.break_(y, x)
                 self.successful.append(True)
 
             else:
-                print(f"{worker.name}: 行動できませんでした。待機します。")
+                # print(f"{worker.name}: 行動できませんでした。待機します。")
                 worker.stay()
                 self.successful.append(False)
+                self.stayed_workers.append(worker.name)
 
             if not workers:
                 break
 
         for worker, action in workers:
-            print(f"{worker.name}: 行動できませんでした。待機します。")
+            # print(f"{worker.name}: 行動できませんでした。待機します。")
             worker.stay()
             self.successful.append(False)
+            self.stayed_workers.append(worker.name)
 
     def fill_area(self, array: np.ndarray):
         """
@@ -472,16 +488,16 @@ class Game(TurnBase2Player):
         陣地を更新
         """
         self.previous_territory_A = copy.deepcopy(
-            self.board[self.CELL.index("territory_A")]
+            self.board[:, :, self.CELL.index("territory_A")]
         )
         self.previous_territory_B = copy.deepcopy(
-            self.board[self.CELL.index("territory_B")]
+            self.board[:, :, self.CELL.index("territory_B")]
         )
-        self.board[self.CELL.index("territory_A")] = self.fill_area(
-            self.board[self.CELL.index("rampart_A")]
+        self.board[:, :, self.CELL.index("territory_A")] = self.fill_area(
+            self.board[:, :, self.CELL.index("rampart_A")]
         )
-        self.board[self.CELL.index("territory_B")] = self.fill_area(
-            self.board[self.CELL.index("rampart_B")]
+        self.board[:, :, self.CELL.index("territory_B")] = self.fill_area(
+            self.board[:, :, self.CELL.index("rampart_B")]
         )
 
     def update_open_territory(self):
@@ -490,37 +506,37 @@ class Game(TurnBase2Player):
         開放陣地を更新
         """
         self.previous_open_territory_A = copy.deepcopy(
-            self.board[self.CELL.index("open_territory_A")]
+            self.board[:, :, self.CELL.index("open_territory_A")]
         )
         self.previous_open_territory_B = copy.deepcopy(
-            self.board[self.CELL.index("open_territory_B")]
+            self.board[:, :, self.CELL.index("open_territory_B")]
         )
 
-        self.board[self.CELL.index("open_territory_A")] = np.where(
+        self.board[:, :, self.CELL.index("open_territory_A")] = np.where(
             (self.previous_territory_A + self.previous_open_territory_A),
             1,
             0,
         ) - self.compile_layers("rampart_A", "rampart_B", "territory_A", "territory_B")
-        self.board[self.CELL.index("open_territory_A")] = np.where(
-            self.board[self.CELL.index("open_territory_A")] == np.uint8(-1),
+        self.board[:, :, self.CELL.index("open_territory_A")] = np.where(
+            self.board[:, :, self.CELL.index("open_territory_A")] == np.uint8(-1),
             0,
-            self.board[self.CELL.index("open_territory_A")],
+            self.board[:, :, self.CELL.index("open_territory_A")],
         )
-        self.board[self.CELL.index("open_territory_A"), :, self.width :] = -1
-        self.board[self.CELL.index("open_territory_A"), self.height :, :] = -1
+        self.board[:, self.width :, self.CELL.index("open_territory_A")] = -1
+        self.board[self.height :, :, self.CELL.index("open_territory_A")] = -1
 
-        self.board[self.CELL.index("open_territory_B")] = np.where(
+        self.board[:, :, self.CELL.index("open_territory_B")] = np.where(
             (self.previous_territory_B + self.previous_open_territory_B),
             1,
             0,
         ) - self.compile_layers("rampart_A", "rampart_B", "territory_A", "territory_B")
-        self.board[self.CELL.index("open_territory_B")] = np.where(
-            self.board[self.CELL.index("open_territory_B")] == np.uint8(-1),
+        self.board[:, :, self.CELL.index("open_territory_B")] = np.where(
+            self.board[:, :, self.CELL.index("open_territory_B")] == np.uint8(-1),
             0,
-            self.board[self.CELL.index("open_territory_B")],
+            self.board[:, :, self.CELL.index("open_territory_B")],
         )
-        self.board[self.CELL.index("open_territory_B"), :, self.width :] = -1
-        self.board[self.CELL.index("open_territory_B"), self.height :, :] = -1
+        self.board[:, self.width :, self.CELL.index("open_territory_B")] = -1
+        self.board[self.height :, :, self.CELL.index("open_territory_B")] = -1
 
     def calculate_score(self):
         """
@@ -531,7 +547,7 @@ class Game(TurnBase2Player):
 
         self.score_A = (
             np.sum(
-                self.board[self.CELL.index("castle"), : self.height, : self.width]
+                self.board[: self.height, : self.width, self.CELL.index("castle")]
                 * self.compile_layers("territory_A", "open_territory_A")[
                     : self.height, : self.width
                 ]
@@ -540,7 +556,7 @@ class Game(TurnBase2Player):
         )
         self.score_A += (
             np.sum(
-                (1 - self.board[self.CELL.index("castle"), : self.height, : self.width])
+                (1 - self.board[: self.height, : self.width, self.CELL.index("castle")])
                 * self.compile_layers("territory_A", "open_territory_A")[
                     : self.height, : self.width
                 ]
@@ -549,14 +565,14 @@ class Game(TurnBase2Player):
         )
         self.score_A += (
             np.sum(
-                self.board[self.CELL.index("rampart_A"), : self.height, : self.width]
+                self.board[: self.height, : self.width, self.CELL.index("rampart_A")]
             )
             * self.SCORE_MULTIPLIER["rampart"]
         )
 
         self.score_B = (
             np.sum(
-                self.board[self.CELL.index("castle"), : self.height, : self.width]
+                self.board[: self.height, : self.width, self.CELL.index("castle")]
                 * self.compile_layers("territory_B", "open_territory_B")[
                     : self.height, : self.width
                 ]
@@ -565,7 +581,7 @@ class Game(TurnBase2Player):
         )
         self.score_B += (
             np.sum(
-                (1 - self.board[self.CELL.index("castle"), : self.height, : self.width])
+                (1 - self.board[: self.height, : self.width, self.CELL.index("castle")])
                 * self.compile_layers("territory_B", "open_territory_B")[
                     : self.height, : self.width
                 ]
@@ -574,12 +590,15 @@ class Game(TurnBase2Player):
         )
         self.score_B += (
             np.sum(
-                self.board[self.CELL.index("rampart_B"), : self.height, : self.width]
+                self.board[: self.height, : self.width, self.CELL.index("rampart_B")]
             )
             * self.SCORE_MULTIPLIER["rampart"]
         )
 
-        print(f"score_A:{self.score_A}, score_B:{self.score_B}")
+        # print(f"score_A:{self.score_A}, score_B:{self.score_B}")
+
+    def get_reward(self):
+        return self.get_reward_A(), self.get_reward_B()
 
     def get_reward_A(self):
         """Aチーム報酬更新処理実装予定"""
@@ -611,8 +630,13 @@ class Game(TurnBase2Player):
         """ゲーム終了判定実装予定"""
         if self.turn >= self._max_episode_steps:
             return True
+        else:
+            return False
 
-    def call_step(self, actions: Union[list[int], tuple[int]]):
+    def call_step(self, *args, **kwargs):
+        return self.step_(*args, **kwargs)
+
+    def step_(self, actions: Union[list[int], tuple[int]]):
         """
         srlの必須関数
         1ターン進める処理を実行
@@ -630,26 +654,44 @@ class Game(TurnBase2Player):
             if "break" not in self.ACTIONS[action]
         ]
 
+        if self.ACTIONS.index("stay") in actions:
+            print("stay in actions", actions)
         self.successful = []
+        self.stayed_workers = []
         self.action_workers(sorted_workers)
         self.update_territory()
         self.update_open_territory()
         self.update_blank()
         self.calculate_score()
-        self.reward_A = self.get_reward_A()
-        self.reward_B = self.get_reward_B()
+        reward_A, reward_B = self.get_reward()
         done = self.is_done()
         self.change_player()
-        info = {}
+        info = {
+            "turn": self.turn,
+            "current_team": self.current_team,
+            "actions": actions,
+            "stayed_workers": self.stayed_workers,
+            "score_A": self.score_A,
+            "score_B": self.score_B,
+            "reward_A": reward_A,
+            "reward_B": reward_B,
+            "done": done,
+        }
         self.turn += 1
-        return self.board, self.reward_A, self.reward_B, done, info
+        return self.board, reward_A, reward_B, done, info
+
+    def render(self, *args, **kwargs):
+        if self.render_mode == "human":
+            return self.render_rgb_array(*args, **kwargs)
+        elif self.render_mode == "ansi":
+            return self.render_terminal(*args, **kwargs)
 
     def render_terminal(self):
         view = [
             [
                 [
                     self.CELL[i]
-                    for i, item in enumerate(self.board[:, y, x].astype(bool))
+                    for i, item in enumerate(self.board[y, x].astype(bool))
                     if item
                 ]
                 for x in range(self.width)
@@ -693,8 +735,8 @@ class Game(TurnBase2Player):
             pygame.image.load(self.cwd + "/assets/worker_B_hover.png"), IMG_SCALER
         )
 
-        if self.screen is None:
-            self.screen = pw.create_surface(self.width, self.height)
+        # if self.screen is None:
+        #     self.screen = pw.create_surface(self.width, self.height)
 
         def drawGrids():
             # 縦線描画
@@ -844,7 +886,7 @@ class Game(TurnBase2Player):
             [
                 [
                     self.CELL[i]
-                    for i, item in enumerate(self.board[:, y, x].astype(bool))
+                    for i, item in enumerate(self.board[y, x].astype(bool))
                     if item
                 ]
                 for x in range(self.width)
@@ -1074,6 +1116,8 @@ class Game(TurnBase2Player):
 
     def get_actions(self):
         if self.controller == "pygame":
+            while self.WORKER_MAX > len(self.actions):
+                self.actions.append(0)
             return self.actions
         elif self.controller == "cli":
             [print(f"{i:2}: {action}") for i, action in enumerate(self.ACTIONS)]
@@ -1081,6 +1125,8 @@ class Game(TurnBase2Player):
                 f"input team {self.current_team} actions (need {self.worker_count} input) : "
             )
             actions = [int(input()) for _ in range(self.worker_count)]
+            while self.WORKER_MAX > len(actions):
+                actions.append(0)
             return actions
 
     def close(self):
@@ -1091,27 +1137,26 @@ class Game(TurnBase2Player):
         行動可能な範囲でランダムな行動を返す
         """
         [worker.turn_init() for worker in self.workers[self.current_team]]
-        n = len(self.ACTIONS)
-        act = []
         self.worker_positions = [
             worker.get_coordinate() for worker in self.workers[self.current_team]
         ]
-        for r in self.workers[self.current_team]:
+        act = []
+        for worker in self.workers[self.current_team]:
             act_able = []
-            pos = r.get_coordinate()
+            pos = worker.get_coordinate()
 
-            for w in range(n):
+            for w, action in enumerate(self.ACTIONS):
                 direction = self.get_direction(w)
                 act_pos = (np.array(pos) + np.array(direction)).astype(int)
                 if (
-                    ("break" in self.ACTIONS[w] and self.is_breakable(r, *act_pos))
-                    or ("move" in self.ACTIONS[w] and self.is_movable(r, *act_pos))
-                    or ("build" in self.ACTIONS[w] and self.is_buildable(r, *act_pos))
-                    or w == 0
+                    ("break" in action and self.is_breakable(worker, *act_pos))
+                    or ("move" in action and self.is_movable(worker, *act_pos))
+                    or ("build" in action and self.is_buildable(worker, *act_pos))
+                    # or w == 0
                 ):
                     act_able.append(w)
 
-            act.append(*random.sample(act_able, 1))
+            act.append(random.choice(act_able))
         while self.WORKER_MAX > len(act):
             act.append(0)
         return act
