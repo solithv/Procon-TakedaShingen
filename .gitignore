@@ -2,3 +2,7 @@
 __pycache__/
 memo
 test.py
+.Xauthority
+.devcontainer
+model/*
+!model/*.zip.*

@@ -735,9 +735,6 @@ class Game(TurnBase2Player):
             pygame.image.load(self.cwd + "/assets/worker_B_hover.png"), IMG_SCALER
         )
 
-        # if self.screen is None:
-        #     self.screen = pw.create_surface(self.width, self.height)
-
         def drawGrids():
             # 縦線描画
             for i in range(1, self.width):
@@ -909,7 +906,7 @@ class Game(TurnBase2Player):
             if self.controller != "pygame":
                 drawTurnInfo()
                 return
-            showterritory = False
+            showTerritory = False
             actions = []
             actingWorker = 0
             while actingWorker < self.worker_count:
@@ -925,21 +922,21 @@ class Game(TurnBase2Player):
 
                     if event.type == KEYDOWN:
                         if event.key == pygame.K_RETURN:
-                            if showterritory:
+                            if showTerritory:
                                 drawAll()
-                            showterritory = not showterritory
+                            showTerritory = not showTerritory
 
-                    if showterritory:
+                    if showTerritory:
                         territoryALayer = self.compile_layers(
                             "territory_A", one_hot=True
                         )
                         territoryBLayer = self.compile_layers(
                             "territory_B", one_hot=True
                         )
-                        openterritoryALayer = self.compile_layers(
+                        openTerritoryALayer = self.compile_layers(
                             "open_territory_A", one_hot=True
                         )
-                        openterritoryBLayer = self.compile_layers(
+                        openTerritoryBLayer = self.compile_layers(
                             "open_territory_B", one_hot=True
                         )
                         for i in range(self.height):
@@ -948,9 +945,9 @@ class Game(TurnBase2Player):
                                     color = self.RED
                                 elif territoryBLayer[i][j] == 1:
                                     color = self.BLUE
-                                elif openterritoryALayer[i][j] == 1:
+                                elif openTerritoryALayer[i][j] == 1:
                                     color = self.PINK
-                                elif openterritoryBLayer[i][j] == 1:
+                                elif openTerritoryBLayer[i][j] == 1:
                                     color = self.SKY
                                 else:
                                     placeImage(BLANK_IMG, i, j)

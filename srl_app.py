@@ -83,7 +83,7 @@ def test_env():
             f"input team {env.current_team} actions (need {env.worker_count} input) : "
         )
         env.render_rgb_array()
-        observation, reward_A, reward_B, done, info = env.step(env.get_actions())
+        observation, reward_A, reward_B, done, info = env.step_(env.get_actions())
         print(info)
 
 
