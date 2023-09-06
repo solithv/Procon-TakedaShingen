@@ -13,7 +13,6 @@ import pygame
 from pygame.locals import *
 from srl.base import define, spaces
 from srl.base.env.genre import TurnBase2Player
-from srl.utils import pygame_wrapper as pw
 
 try:
     from .worker import Worker
@@ -65,6 +64,19 @@ class Game(TurnBase2Player):
         "E": np.array([0, 1]),
         "S": np.array([1, 0]),
         "W": np.array([0, -1]),
+    }
+    ICONS = {
+        "blank": "  ",
+        "castle": "C ",
+        "pond": "P ",
+        "territory_A": "Ta",
+        "territory_B": "Tb",
+        "open_territory_A": "ta",
+        "open_territory_B": "tb",
+        "rampart_A": "Ra",
+        "rampart_B": "Rb",
+        "worker_A": "Wa",
+        "worker_B": "Wb",
     }
 
     BLACK = (0, 0, 0)
@@ -205,10 +217,7 @@ class Game(TurnBase2Player):
 
         return name
 
-    def call_reset(self, *args, **kwargs):
-        return self.reset(*args, **kwargs)
-
-    def reset(self):
+    def call_reset(self):
         """
         srlの必須関数
         環境の初期化
@@ -633,10 +642,7 @@ class Game(TurnBase2Player):
         else:
             return False
 
-    def call_step(self, *args, **kwargs):
-        return self.step_(*args, **kwargs)
-
-    def step_(self, actions: Union[list[int], tuple[int]]):
+    def call_step(self, actions: Union[list[int], tuple[int]]):
         """
         srlの必須関数
         1ターン進める処理を実行
@@ -654,8 +660,8 @@ class Game(TurnBase2Player):
             if "break" not in self.ACTIONS[action]
         ]
 
-        if self.ACTIONS.index("stay") in actions:
-            print("stay in actions", actions)
+        # if self.ACTIONS.index("stay") in actions:
+        #     print("stay in actions", actions)
         self.successful = []
         self.stayed_workers = []
         self.action_workers(sorted_workers)
@@ -687,20 +693,23 @@ class Game(TurnBase2Player):
             return self.render_terminal(*args, **kwargs)
 
     def render_terminal(self):
-        view = [
-            [
-                [
-                    self.CELL[i]
-                    for i, item in enumerate(self.board[y, x].astype(bool))
-                    if item
-                ]
-                for x in range(self.width)
-            ]
-            for y in range(self.height)
-        ]
-        rendering = str([row for row in view])
-        print(rendering)
-        return rendering
+        icon_base = len(list(self.ICONS.values())[0])
+        item_num = int(np.max(np.sum(self.board[: self.height, : self.width], axis=2)))
+        cell_num = icon_base * item_num + (item_num - 1)
+        for y in range(self.height):
+            line = []
+            for x in range(self.width):
+                cell = []
+                for i, item in enumerate(self.board[y, x].astype(bool)):
+                    if item:
+                        for key, value in self.ICONS.items():
+                            if key in self.CELL[i]:
+                                cell.append(value)
+                line.append(f"{','.join(cell):^{cell_num}}")
+            print("|".join(line))
+            if y < self.height - 1:
+                print("-" * (self.width * cell_num + self.width - 1))
+        # return rendering
 
     def render_rgb_array(self):
         """

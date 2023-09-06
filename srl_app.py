@@ -72,7 +72,8 @@ def test_srl():
 def test_env():
     fields = glob.glob("./field_data/*.csv")
 
-    env = srlEnv.Game(csv_path=fields, render_mode="human", controller="pygame")
+    # env = srlEnv.Game(csv_path=fields, render_mode="human", controller="pygame")
+    env = srlEnv.Game(csv_path=fields, render_mode="ansi", controller="cli")
 
     observation = env.reset()
     done = False
@@ -82,8 +83,9 @@ def test_env():
         print(
             f"input team {env.current_team} actions (need {env.worker_count} input) : "
         )
-        env.render_rgb_array()
-        observation, reward_A, reward_B, done, info = env.step_(env.get_actions())
+        # env.render_rgb_array()
+        env.render_terminal()
+        observation, reward_A, reward_B, done, info = env.call_step(env.get_actions())
         print(info)
 
 

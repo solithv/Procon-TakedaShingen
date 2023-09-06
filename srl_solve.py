@@ -5,25 +5,22 @@ import tracemalloc
 import numpy as np
 import srl
 from srl.algorithms import ql
+
+# from srl.algorithms import agent57_light
 from srl.utils import common
 
 import srlEnv
 from srl_util import runner
-
 common.logger_print()
 
 
 def main():
-    model_path = "./model/game"
-    os.makedirs(model_path, exist_ok=True)
+    param_path = "./model/game/model_param.pkl"
 
+    runner.load_parameter(param_path)
     runner.model_summary()
 
-    # --- train
-    runner.train(max_episodes=10)
-    # runner.save(os.path.join(model_path, "model.pkl"))
-    runner.save_parameter(os.path.join(model_path, "model_param.pkl"))
-
+    runner.set_players()
     # --- evaluate
     rewards = runner.evaluate(max_episodes=10)
     print("mean", np.mean(rewards))
@@ -35,6 +32,4 @@ def main():
 
 
 if __name__ == "__main__":
-    tracemalloc.start()
     main()
-    tracemalloc.stop()
