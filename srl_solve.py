@@ -1,16 +1,11 @@
-import glob
-import os
-import tracemalloc
-
+import copy
 import numpy as np
 import srl
-from srl.algorithms import ql
-
-# from srl.algorithms import agent57_light
 from srl.utils import common
 
 import srlEnv
 from srl_util import runner
+
 common.logger_print()
 
 
@@ -20,7 +15,8 @@ def main():
     runner.load_parameter(param_path)
     runner.model_summary()
 
-    runner.set_players()
+    # TODO:srl.runner.coreの_play_runを参考にAIとプレイヤーで対戦できるようにする
+
     # --- evaluate
     rewards = runner.evaluate(max_episodes=10)
     print("mean", np.mean(rewards))

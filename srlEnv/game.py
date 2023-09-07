@@ -5,14 +5,18 @@ import pickle
 import random
 import re
 from collections import defaultdict
-from typing import Optional, Union
+from typing import Optional, Tuple, Union, cast
 
 import numpy as np
 import pyautogui
 import pygame
 from pygame.locals import *
 from srl.base import define, spaces
+from srl.base.define import EnvActionType, InfoType
+from srl.base.env.env_run import EnvRun
 from srl.base.env.genre import TurnBase2Player
+from srl.base.rl.algorithms.env_worker import EnvWorker
+from srl.base.rl.worker import WorkerBase
 
 try:
     from .worker import Worker
@@ -1120,20 +1124,22 @@ class Game(TurnBase2Player):
                 drawTurnInfo(actingWorker=actingWorker + 1)
             self.actions = actions
 
+    def get_actions_from_cli(self):
+        [print(f"{i:2}: {action}") for i, action in enumerate(self.ACTIONS)]
+        print(
+            f"input team {self.current_team} actions (need {self.worker_count} input) : "
+        )
+        actions = [int(input()) for _ in range(self.worker_count)]
+        return actions
+
     def get_actions(self):
         if self.controller == "pygame":
-            while self.WORKER_MAX > len(self.actions):
-                self.actions.append(0)
-            return self.actions
+            actions = self.actions
         elif self.controller == "cli":
-            [print(f"{i:2}: {action}") for i, action in enumerate(self.ACTIONS)]
-            print(
-                f"input team {self.current_team} actions (need {self.worker_count} input) : "
-            )
-            actions = [int(input()) for _ in range(self.worker_count)]
-            while self.WORKER_MAX > len(actions):
-                actions.append(0)
-            return actions
+            actions = self.get_actions_from_cli()
+        while self.WORKER_MAX > len(actions):
+            actions.append(0)
+        return actions
 
     def close(self):
         pygame.quit()
@@ -1186,3 +1192,24 @@ class Game(TurnBase2Player):
             self.previous_score_A,
             self.previous_score_B,
         ) = pickle.loads(data)
+
+    def make_worker(self, name: str, **kwargs) -> Union[WorkerBase, None]:
+        if name == "cpu":
+            return Cpu(**kwargs)
+        elif name == "human":
+            return Manual(**kwargs)
+        return None
+
+
+class Cpu(EnvWorker):
+    def call_policy(self, env: EnvRun) -> Tuple[EnvActionType, InfoType]:
+        _env = cast(Game, env.get_original_env())
+        actions = _env.random_act()
+        return actions, {}
+
+
+class Manual(EnvWorker):
+    def call_policy(self, env: EnvRun) -> Tuple[EnvActionType, InfoType]:
+        _env = cast(Game, env.get_original_env())
+        actions = _env.get_actions_from_cli()
+        return actions, {}

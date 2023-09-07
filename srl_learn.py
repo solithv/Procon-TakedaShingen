@@ -1,10 +1,7 @@
-import glob
 import os
 import tracemalloc
 
 import numpy as np
-import srl
-from srl.algorithms import ql
 from srl.utils import common
 
 import srlEnv
@@ -21,7 +18,6 @@ def main():
 
     # --- train
     runner.train(max_episodes=10)
-    # runner.save(os.path.join(model_path, "model.pkl"))
     runner.save_parameter(os.path.join(model_path, "model_param.pkl"))
 
     # --- evaluate
