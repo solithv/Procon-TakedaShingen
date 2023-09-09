@@ -9,15 +9,20 @@ def main():
     env = gym.make(
         "TaniJoh-v0",
         # max_episode_steps=10,
-        csv_path=random.choice(fields),
+        csv_path=fields,
         render_mode="human",
-        controller="pygame",
+        controller="None",
+        first_player=0,
     )
     observation = env.reset()
     terminated, truncated = [False] * 2
     while not terminated and not truncated:
         env.render()
-        observation, reward, terminated, truncated, _ = env.step(env.get_actions())
+        actions = env.unwrapped.get_actions()
+        # actions = env.unwrapped.random_act()
+        actions = env.action_space.sample()
+        print(actions)
+        observation, reward, terminated, truncated, _ = env.step(actions)
         print(f"reward:{reward}")
     env.close()
 
