@@ -171,9 +171,9 @@ class Game(TurnBase2Player):
         内部関数
         blank層を更新
         """
-        self.board[:, :, 0] = np.where(self.board[:, :, 1:].any(axis=2), 0, 1)
-        self.board[self.height :, :, 0] = -1
-        self.board[:, self.width :, 0] = -1
+        self.board[0] = np.where(self.board[1:].any(axis=0), 0, 1)
+        self.board[0, self.height :, :] = -1
+        self.board[0, :, self.width :] = -1
 
     def load_from_csv(self, path: Union[str, list[str]]):
         """
@@ -186,7 +186,7 @@ class Game(TurnBase2Player):
             path = random.choice(path)
         size = int(re.sub(r"[\D]", "", os.path.normpath(path).split(os.path.sep)[-1]))
         name = os.path.normpath(path).split(os.path.sep)[-1].split(".")[0]
-        self.board = np.zeros((size, size, len(self.CELL)), dtype=np.uint8)
+        self.board = np.zeros((len(self.CELL), size, size), dtype=np.uint8)
         self.workers: defaultdict[str, list[Worker]] = defaultdict(list)
         self.width, self.height = [size] * 2
 
@@ -196,22 +196,22 @@ class Game(TurnBase2Player):
             for y, row in enumerate(reader):
                 for x, item in enumerate(row):
                     if item == "0":
-                        self.board[y, x, self.CELL.index("blank")] = 1
+                        self.board[self.CELL.index("blank"), y, x] = 1
                     elif item == "1":
-                        self.board[y, x, self.CELL.index("pond")] = 1
+                        self.board[self.CELL.index("pond"), y, x] = 1
                     elif item == "2":
-                        self.board[y, x, self.CELL.index("castle")] = 1
+                        self.board[self.CELL.index("castle"), y, x] = 1
                     elif item == "a":
-                        self.board[y, x, self.CELL.index(f"worker_A{a_count}")] = 1
+                        self.board[self.CELL.index(f"worker_A{a_count}"), y, x] = 1
                         self.workers["A"].append(Worker(f"worker_A{a_count}", y, x))
                         a_count += 1
                     elif item == "b":
-                        self.board[y, x, self.CELL.index(f"worker_B{b_count}")] = 1
+                        self.board[self.CELL.index(f"worker_B{b_count}"), y, x] = 1
                         self.workers["B"].append(Worker(f"worker_B{b_count}", y, x))
                         b_count += 1
         self.board = np.pad(
             self.board,
-            [(0, self.FIELD_MAX - size), (0, self.FIELD_MAX - size), (0, 0)],
+            [(0, 0), (0, self.FIELD_MAX - size), (0, self.FIELD_MAX - size)],
             "constant",
             constant_values=-1,
         )
@@ -255,7 +255,7 @@ class Game(TurnBase2Player):
         one_hot: bool 返り値の各要素を1,0のみにする (default=True)
         """
         compiled = np.sum(
-            [self.board[:, :, self.CELL.index(layer)] for layer in layers],
+            [self.board[self.CELL.index(layer)] for layer in layers],
             axis=0,
             dtype=np.uint8,
         )
@@ -422,21 +422,21 @@ class Game(TurnBase2Player):
                 ):
                     workers.append((worker, action))
                     continue
-                self.board[worker.y, worker.x, self.CELL.index(worker.name)] = 0
-                self.board[y, x, self.CELL.index(worker.name)] = 1
+                self.board[self.CELL.index(worker.name), worker.y, worker.x] = 0
+                self.board[self.CELL.index(worker.name), y, x] = 1
                 worker.move(y, x)
                 self.successful.append(True)
 
             elif "build" in self.ACTIONS[action] and self.is_buildable(worker, y, x):
-                self.board[y, x, self.CELL.index(f"rampart_{worker.team}")] = 1
+                self.board[self.CELL.index(f"rampart_{worker.team}"), y, x] = 1
                 worker.build(y, x)
                 self.successful.append(True)
 
             elif "break" in self.ACTIONS[action] and self.is_breakable(worker, y, x):
-                if self.board[y, x, self.CELL.index("rampart_A")]:
-                    self.board[y, x, self.CELL.index("rampart_A")] = 0
+                if self.board[self.CELL.index("rampart_A"), y, x]:
+                    self.board[self.CELL.index("rampart_A"), y, x] = 0
                 else:
-                    self.board[y, x, self.CELL.index("rampart_B")] = 0
+                    self.board[self.CELL.index("rampart_B"), y, x] = 0
                 worker.break_(y, x)
                 self.successful.append(True)
 
@@ -501,16 +501,16 @@ class Game(TurnBase2Player):
         陣地を更新
         """
         self.previous_territory_A = copy.deepcopy(
-            self.board[:, :, self.CELL.index("territory_A")]
+            self.board[self.CELL.index("territory_A")]
         )
         self.previous_territory_B = copy.deepcopy(
-            self.board[:, :, self.CELL.index("territory_B")]
+            self.board[self.CELL.index("territory_B")]
         )
-        self.board[:, :, self.CELL.index("territory_A")] = self.fill_area(
-            self.board[:, :, self.CELL.index("rampart_A")]
+        self.board[self.CELL.index("territory_A")] = self.fill_area(
+            self.board[self.CELL.index("rampart_A")]
         )
-        self.board[:, :, self.CELL.index("territory_B")] = self.fill_area(
-            self.board[:, :, self.CELL.index("rampart_B")]
+        self.board[self.CELL.index("territory_B")] = self.fill_area(
+            self.board[self.CELL.index("rampart_B")]
         )
 
     def update_open_territory(self):
@@ -519,37 +519,37 @@ class Game(TurnBase2Player):
         開放陣地を更新
         """
         self.previous_open_territory_A = copy.deepcopy(
-            self.board[:, :, self.CELL.index("open_territory_A")]
+            self.board[self.CELL.index("open_territory_A")]
         )
         self.previous_open_territory_B = copy.deepcopy(
-            self.board[:, :, self.CELL.index("open_territory_B")]
+            self.board[self.CELL.index("open_territory_B")]
         )
 
-        self.board[:, :, self.CELL.index("open_territory_A")] = np.where(
+        self.board[self.CELL.index("open_territory_A")] = np.where(
             (self.previous_territory_A + self.previous_open_territory_A),
             1,
             0,
         ) - self.compile_layers("rampart_A", "rampart_B", "territory_A", "territory_B")
-        self.board[:, :, self.CELL.index("open_territory_A")] = np.where(
-            self.board[:, :, self.CELL.index("open_territory_A")] == np.uint8(-1),
+        self.board[self.CELL.index("open_territory_A")] = np.where(
+            self.board[self.CELL.index("open_territory_A")] == np.uint8(-1),
             0,
-            self.board[:, :, self.CELL.index("open_territory_A")],
+            self.board[self.CELL.index("open_territory_A")],
         )
-        self.board[:, self.width :, self.CELL.index("open_territory_A")] = -1
-        self.board[self.height :, :, self.CELL.index("open_territory_A")] = -1
+        self.board[self.CELL.index("open_territory_A"), :, self.width :] = -1
+        self.board[self.CELL.index("open_territory_A"), self.height :, :] = -1
 
-        self.board[:, :, self.CELL.index("open_territory_B")] = np.where(
+        self.board[self.CELL.index("open_territory_B")] = np.where(
             (self.previous_territory_B + self.previous_open_territory_B),
             1,
             0,
         ) - self.compile_layers("rampart_A", "rampart_B", "territory_A", "territory_B")
-        self.board[:, :, self.CELL.index("open_territory_B")] = np.where(
-            self.board[:, :, self.CELL.index("open_territory_B")] == np.uint8(-1),
+        self.board[self.CELL.index("open_territory_B")] = np.where(
+            self.board[self.CELL.index("open_territory_B")] == np.uint8(-1),
             0,
-            self.board[:, :, self.CELL.index("open_territory_B")],
+            self.board[self.CELL.index("open_territory_B")],
         )
-        self.board[:, self.width :, self.CELL.index("open_territory_B")] = -1
-        self.board[self.height :, :, self.CELL.index("open_territory_B")] = -1
+        self.board[self.CELL.index("open_territory_B"), :, self.width :] = -1
+        self.board[self.CELL.index("open_territory_B"), self.height :, :] = -1
 
     def calculate_score(self):
         """
@@ -560,7 +560,7 @@ class Game(TurnBase2Player):
 
         self.score_A = (
             np.sum(
-                self.board[: self.height, : self.width, self.CELL.index("castle")]
+                self.board[self.CELL.index("castle"), : self.height, : self.width]
                 * self.compile_layers("territory_A", "open_territory_A")[
                     : self.height, : self.width
                 ]
@@ -569,7 +569,7 @@ class Game(TurnBase2Player):
         )
         self.score_A += (
             np.sum(
-                (1 - self.board[: self.height, : self.width, self.CELL.index("castle")])
+                (1 - self.board[self.CELL.index("castle"), : self.height, : self.width])
                 * self.compile_layers("territory_A", "open_territory_A")[
                     : self.height, : self.width
                 ]
@@ -578,14 +578,14 @@ class Game(TurnBase2Player):
         )
         self.score_A += (
             np.sum(
-                self.board[: self.height, : self.width, self.CELL.index("rampart_A")]
+                self.board[self.CELL.index("rampart_A"), : self.height, : self.width]
             )
             * self.SCORE_MULTIPLIER["rampart"]
         )
 
         self.score_B = (
             np.sum(
-                self.board[: self.height, : self.width, self.CELL.index("castle")]
+                self.board[self.CELL.index("castle"), : self.height, : self.width]
                 * self.compile_layers("territory_B", "open_territory_B")[
                     : self.height, : self.width
                 ]
@@ -594,7 +594,7 @@ class Game(TurnBase2Player):
         )
         self.score_B += (
             np.sum(
-                (1 - self.board[: self.height, : self.width, self.CELL.index("castle")])
+                (1 - self.board[self.CELL.index("castle"), : self.height, : self.width])
                 * self.compile_layers("territory_B", "open_territory_B")[
                     : self.height, : self.width
                 ]
@@ -603,7 +603,7 @@ class Game(TurnBase2Player):
         )
         self.score_B += (
             np.sum(
-                self.board[: self.height, : self.width, self.CELL.index("rampart_B")]
+                self.board[self.CELL.index("rampart_B"), : self.height, : self.width]
             )
             * self.SCORE_MULTIPLIER["rampart"]
         )
@@ -698,13 +698,15 @@ class Game(TurnBase2Player):
 
     def render_terminal(self):
         icon_base = len(list(self.ICONS.values())[0])
-        item_num = int(np.max(np.sum(self.board[: self.height, : self.width], axis=2)))
+        item_num = int(
+            np.max(np.sum(self.board[:, : self.height, : self.width], axis=0))
+        )
         cell_num = icon_base * item_num + (item_num - 1)
         for y in range(self.height):
             line = []
             for x in range(self.width):
                 cell = []
-                for i, item in enumerate(self.board[y, x].astype(bool)):
+                for i, item in enumerate(self.board[:, y, x].astype(bool)):
                     if item:
                         for key, value in self.ICONS.items():
                             if key in self.CELL[i]:
@@ -896,7 +898,7 @@ class Game(TurnBase2Player):
             [
                 [
                     self.CELL[i]
-                    for i, item in enumerate(self.board[y, x].astype(bool))
+                    for i, item in enumerate(self.board[:, y, x].astype(bool))
                     if item
                 ]
                 for x in range(self.width)

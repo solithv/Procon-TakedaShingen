@@ -1,7 +1,7 @@
 import glob
 
 import srl
-from srl.algorithms import ql
+from srl.algorithms import ql, dqn, stochastic_muzero
 
 import srlEnv
 
@@ -17,6 +17,14 @@ env_config = srl.EnvConfig(
     },
 )
 
-rl_config = ql.Config()
+# rl_config = ql.Config()
+rl_config = dqn.Config()
+rl_config.batch_size = 1
+rl_config.memory.capacity = 1000
+rl_config.set_config_by_env(env_config.make_env())
+rl_config.image_block.set_dqn_image()
+
+# rl_config = stochastic_muzero.Config()
+# rl_config.input_image_block.set_muzero_atari_block()
 
 runner = srl.Runner(env_config, rl_config)
