@@ -122,8 +122,9 @@ class Game(TurnBase2Player):
     @property
     def observation_space(self):
         """状態の取りうる範囲を返します"""
+        observation = self.get_observation()
         return spaces.BoxSpace(
-            shape=self.board.shape, low=np.min(self.board), high=np.max(self.board)
+            shape=observation.shape, low=np.min(observation), high=np.max(observation)
         )
 
     @property
@@ -153,6 +154,10 @@ class Game(TurnBase2Player):
     def get_invalid_actions(self, player_index: int) -> list:
         """無効なアクションがある場合は配列で返す"""
         return [0]
+
+    def get_observation(self):
+        """状態を整形して観測空間として返す"""
+        return self.board
 
     def change_player(self, no_change: bool = False):
         """
@@ -247,7 +252,7 @@ class Game(TurnBase2Player):
 
         self.update_blank()
         info = {"csv_name": name}
-        return self.board, info
+        return self.get_observation(), info
 
     def compile_layers(self, *layers: tuple[str], one_hot: bool = True):
         """
@@ -688,7 +693,7 @@ class Game(TurnBase2Player):
             "done": done,
         }
         self.turn += 1
-        return self.board, reward_A, reward_B, done, info
+        return self.get_observation(), reward_A, reward_B, done, info
 
     def render(self, *args, **kwargs):
         if self.render_mode == "human":
@@ -715,7 +720,6 @@ class Game(TurnBase2Player):
             print("|".join(line))
             if y < self.height - 1:
                 print("-" * (self.width * cell_num + self.width - 1))
-        # return rendering
 
     def render_rgb_array(self):
         """
