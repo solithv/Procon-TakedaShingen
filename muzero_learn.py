@@ -1,10 +1,14 @@
+import glob
+
 import gymnasium as gym
-from Stochastic_muzero.monte_carlo_tree_search import *
+
+import MyEnv
 from Stochastic_muzero.game import *
+from Stochastic_muzero.monte_carlo_tree_search import *
+from Stochastic_muzero.muzero_model import *
 from Stochastic_muzero.replay_buffer import *
 from Stochastic_muzero.self_play import *
-from Stochastic_muzero.muzero_model import *
-
+from Stochastic_muzero.self_play import generate_config_file, report
 
 # # # unquote to print complet tensor
 torch.set_printoptions(profile="full")
@@ -15,9 +19,6 @@ np.set_printoptions(threshold=np.inf)
 # # # set game environment from gym library
 # # # render_mode should be set to None if you don't want rgb observation
 # env = gym.make("CartPole-v1", render_mode=None)
-import glob
-import MyEnv
-
 fields = glob.glob("./field_data/*.csv")
 env = gym.make(
     "TaniJoh-v0",
@@ -130,8 +131,6 @@ epoch_pr, loss, reward, learning_config = learning_cycle(
     replay_buffer=replay_buffer,
 )
 
-
-from Stochastic_muzero.self_play import report, generate_config_file
 
 report(muzero, replay_buffer, epoch_pr, loss, reward, verbose=True)
 
