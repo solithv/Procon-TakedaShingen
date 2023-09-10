@@ -1,3 +1,9 @@
 .venv/
 __pycache__/
+memo
 test.py
+.Xauthority
+.devcontainer
+model/*
+!model/*.zip.*
+Stochastic_muzero/*/
