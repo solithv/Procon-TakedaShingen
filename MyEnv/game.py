@@ -124,6 +124,7 @@ class Game(gym.Env):
         self.reward_range = [np.NINF, np.inf]
 
         self.window_surface = None
+        self.clock = None
         self.cwd = os.getcwd()
         if use_pyautogui:
             import pyautogui
@@ -230,6 +231,8 @@ class Game(gym.Env):
         self.window_size = max(self.width, self.height) * self.cell_size
         self.window_size_x = self.width * self.cell_size
         self.window_size_y = self.height * self.cell_size
+        if self.render_mode == "human":
+            self.reset_render()
 
         self.update_blank()
         info = {"csv_name": name}
@@ -706,18 +709,10 @@ class Game(gym.Env):
         )
         cell_num = icon_base * item_num + (item_num - 1)
         for y in range(self.height):
-            line = []
-            for x in range(self.width):
-                # cell = []
-                # for i, item in enumerate(self.board[:, y, x]):
-                #     if item:
-                #         for key, value in self.ICONS.items():
-                #             if key in self.CELL[i]:
-                #                 cell.append(value)
-                # line.append(f"{','.join(cell):^{cell_num}}")
-                line.append(
-                    f"{','.join([value for i, item in enumerate(self.board[:,y,x]) if item for key,value in self.ICONS.items() if key in self.CELL[i]]):^{cell_num}}"
-                )
+            line = [
+                f"{','.join([value for i, item in enumerate(self.board[:,y,x]) if item for key,value in self.ICONS.items() if key in self.CELL[i]]):^{cell_num}}"
+                for x in range(self.width)
+            ]
             # print("|".join(line))
             view += "|".join(line) + "\n"
             if y < self.height - 1:
@@ -726,182 +721,189 @@ class Game(gym.Env):
         print(view, end="")
         return view
 
+    def reset_render(self):
+        self.IMG_SCALER = np.array((self.cell_size, self.cell_size))
+        self.BLANK_IMG = pygame.transform.scale(
+            pygame.image.load(self.cwd + "/assets/blank.png"), self.IMG_SCALER
+        )
+        self.POND_IMG = pygame.transform.scale(
+            pygame.image.load(self.cwd + "/assets/pond.png"), self.IMG_SCALER
+        )
+        self.CASTLE_IMG = pygame.transform.scale(
+            pygame.image.load(self.cwd + "/assets/castle.png"), self.IMG_SCALER
+        )
+        self.RAMPART_A_IMG = pygame.transform.scale(
+            pygame.image.load(self.cwd + "/assets/rampart_A.png"), self.IMG_SCALER
+        )
+        self.RAMPART_B_IMG = pygame.transform.scale(
+            pygame.image.load(self.cwd + "/assets/rampart_B.png"), self.IMG_SCALER
+        )
+        self.WORKER_A_IMG = pygame.transform.scale(
+            pygame.image.load(self.cwd + "/assets/worker_A.png"), self.IMG_SCALER
+        )
+        self.WORKER_B_IMG = pygame.transform.scale(
+            pygame.image.load(self.cwd + "/assets/worker_B.png"), self.IMG_SCALER
+        )
+        self.WORKER_A_HOVER_IMG = pygame.transform.scale(
+            pygame.image.load(self.cwd + "/assets/worker_A_hover.png"), self.IMG_SCALER
+        )
+        self.WORKER_B_HOVER_IMG = pygame.transform.scale(
+            pygame.image.load(self.cwd + "/assets/worker_B_hover.png"), self.IMG_SCALER
+        )
+
+    def drawGrids(self):
+        # 縦線描画
+        for i in range(1, self.width):
+            pygame.draw.line(
+                self.window_surface,
+                self.BLACK,
+                (i * self.cell_size, 0),
+                (i * self.cell_size, self.window_size_y),
+                1,
+            )
+        # 横線描画
+        for i in range(1, self.height):
+            pygame.draw.line(
+                self.window_surface,
+                self.BLACK,
+                (0, i * self.cell_size),
+                (self.window_size_x, i * self.cell_size),
+                1,
+            )
+
+    def placeImage(self, img, i, j, workerNumber=None, scale=1.0):
+        """
+        i, j番目に画像描画する関数
+        workerNumber: str 職人番号
+        scale: float 画像の倍率
+        """
+        placement = (
+            (
+                self.cell_size * (j + (1 - scale) / 2),
+                self.cell_size * (i + (1 - scale) / 2),
+            )
+            if scale != 1.0
+            else (j * self.cell_size, i * self.cell_size)
+        )
+        img = pygame.transform.scale(img, self.IMG_SCALER * scale)
+        self.window_surface.blit(img, placement)
+
+        if workerNumber:
+            font = pygame.font.SysFont(None, 30)
+            text = font.render(workerNumber, False, self.BLACK)
+            text_rect = text.get_rect(
+                center=((j + 0.5) * self.cell_size, (i + 0.2) * self.cell_size)
+            )
+            self.window_surface.blit(text, text_rect)
+
+    def drawAll(self, view):
+        for i in range(self.height):
+            for j in range(self.width):
+                self.placeImage(self.BLANK_IMG, i, j)
+                cellInfo = view[i][j]
+                worker_A_exist = any(
+                    f"worker_A{k}" in cellInfo for k in range(self.WORKER_MAX)
+                )
+                worker_B_exist = any(
+                    f"worker_B{k}" in cellInfo for k in range(self.WORKER_MAX)
+                )
+
+                if "castle" in cellInfo and worker_A_exist:
+                    self.placeImage(self.CASTLE_IMG, i, j)
+                    self.placeImage(
+                        self.WORKER_A_IMG,
+                        i,
+                        j,
+                        workerNumber=cellInfo[-1][-1],
+                        scale=0.7,
+                    )
+                elif "castle" in cellInfo and worker_B_exist:
+                    self.placeImage(self.CASTLE_IMG, i, j)
+                    self.placeImage(
+                        self.WORKER_B_IMG,
+                        i,
+                        j,
+                        workerNumber=cellInfo[-1][-1],
+                        scale=0.7,
+                    )
+                elif "rampart_A" in cellInfo and worker_A_exist:
+                    self.placeImage(self.RAMPART_A_IMG, i, j)
+                    self.placeImage(
+                        self.WORKER_A_IMG,
+                        i,
+                        j,
+                        workerNumber=cellInfo[-1][-1],
+                        scale=0.8,
+                    )
+                elif "rampart_B" in cellInfo and worker_B_exist:
+                    self.placeImage(self.RAMPART_B_IMG, i, j)
+                    self.placeImage(
+                        self.WORKER_B_IMG,
+                        i,
+                        j,
+                        workerNumber=cellInfo[-1][-1],
+                        scale=0.8,
+                    )
+                elif "pond" in cellInfo and "rampart_A" in cellInfo:
+                    self.placeImage(self.POND_IMG, i, j)
+                    self.placeImage(self.RAMPART_A_IMG, i, j, scale=0.8)
+                elif "pond" in cellInfo and "rampart_B" in cellInfo:
+                    self.placeImage(self.POND_IMG, i, j)
+                    self.placeImage(self.RAMPART_B_IMG, i, j, scale=0.8)
+                elif "castle" in cellInfo:
+                    self.placeImage(self.CASTLE_IMG, i, j)
+                elif worker_A_exist:
+                    self.placeImage(
+                        self.WORKER_A_IMG, i, j, workerNumber=cellInfo[-1][-1]
+                    )
+                elif worker_B_exist:
+                    self.placeImage(
+                        self.WORKER_B_IMG, i, j, workerNumber=cellInfo[-1][-1]
+                    )
+                elif "pond" in cellInfo:
+                    self.placeImage(self.POND_IMG, i, j)
+                elif "rampart_A" in cellInfo:
+                    self.placeImage(self.RAMPART_A_IMG, i, j)
+                elif "rampart_B" in cellInfo:
+                    self.placeImage(self.RAMPART_B_IMG, i, j)
+                elif "blank" in cellInfo:
+                    self.placeImage(self.BLANK_IMG, i, j)
+        self.drawGrids()
+
+    def drawTurnInfo(self, actingWorker=None):
+        pygame.draw.rect(
+            self.window_surface,
+            self.BLACK,
+            (
+                0,
+                self.cell_size * self.height,
+                self.cell_size * self.width,
+                self.cell_size * 2,
+            ),
+        )
+        font = pygame.font.SysFont(None, 60)
+        if actingWorker:
+            text = font.render(
+                f"{self.current_team}'s turn {actingWorker}/{self.worker_count}",
+                False,
+                self.WHITE,
+            )
+        else:
+            text = font.render(f"{self.current_team}'s turn", False, self.WHITE)
+
+        text_rect = text.get_rect(
+            center=(
+                self.cell_size * self.width / 2,
+                self.cell_size * (self.height + 1),
+            )
+        )
+        self.window_surface.blit(text, text_rect)
+        pygame.display.update()
+
     def render_rgb_array(self):
         """
         描画を行う
         """
-        IMG_SCALER = np.array((self.cell_size, self.cell_size))
-        BLANK_IMG = pygame.transform.scale(
-            pygame.image.load(self.cwd + "/assets/blank.png"), IMG_SCALER
-        )
-        POND_IMG = pygame.transform.scale(
-            pygame.image.load(self.cwd + "/assets/pond.png"), IMG_SCALER
-        )
-        CASTLE_IMG = pygame.transform.scale(
-            pygame.image.load(self.cwd + "/assets/castle.png"), IMG_SCALER
-        )
-        RAMPART_A_IMG = pygame.transform.scale(
-            pygame.image.load(self.cwd + "/assets/rampart_A.png"), IMG_SCALER
-        )
-        RAMPART_B_IMG = pygame.transform.scale(
-            pygame.image.load(self.cwd + "/assets/rampart_B.png"), IMG_SCALER
-        )
-        WORKER_A_IMG = pygame.transform.scale(
-            pygame.image.load(self.cwd + "/assets/worker_A.png"), IMG_SCALER
-        )
-        WORKER_B_IMG = pygame.transform.scale(
-            pygame.image.load(self.cwd + "/assets/worker_B.png"), IMG_SCALER
-        )
-        WORKER_A_HOVER_IMG = pygame.transform.scale(
-            pygame.image.load(self.cwd + "/assets/worker_A_hover.png"), IMG_SCALER
-        )
-        WORKER_B_HOVER_IMG = pygame.transform.scale(
-            pygame.image.load(self.cwd + "/assets/worker_B_hover.png"), IMG_SCALER
-        )
-
-        def drawGrids():
-            # 縦線描画
-            for i in range(1, self.width):
-                pygame.draw.line(
-                    self.window_surface,
-                    self.BLACK,
-                    (i * self.cell_size, 0),
-                    (i * self.cell_size, self.window_size_y),
-                    1,
-                )
-            # 横線描画
-            for i in range(1, self.height):
-                pygame.draw.line(
-                    self.window_surface,
-                    self.BLACK,
-                    (0, i * self.cell_size),
-                    (self.window_size_x, i * self.cell_size),
-                    1,
-                )
-
-        def placeImage(img, i, j, workerNumber=None, scale=1.0):
-            """
-            i, j番目に画像描画する関数
-            workerNumber: str 職人番号
-            scale: float 画像の倍率
-            """
-            placement = (
-                (
-                    self.cell_size * (j + (1 - scale) / 2),
-                    self.cell_size * (i + (1 - scale) / 2),
-                )
-                if scale != 1.0
-                else (j * self.cell_size, i * self.cell_size)
-            )
-            img = pygame.transform.scale(img, IMG_SCALER * scale)
-            self.window_surface.blit(img, placement)
-
-            if workerNumber:
-                font = pygame.font.SysFont(None, 30)
-                text = font.render(workerNumber, False, self.BLACK)
-                text_rect = text.get_rect(
-                    center=((j + 0.5) * self.cell_size, (i + 0.2) * self.cell_size)
-                )
-                self.window_surface.blit(text, text_rect)
-
-        def nonAllowedMovements(x, y, directions):
-            coordinates = np.round(
-                np.array(
-                    [
-                        [
-                            np.cos(2 * n * np.pi / directions) + x,
-                            np.sin(2 * n * np.pi / directions) + y,
-                        ]
-                        for n in range(directions)
-                    ]
-                )
-            )
-
-            return coordinates
-
-        def drawAll():
-            for i in range(self.height):
-                for j in range(self.width):
-                    placeImage(BLANK_IMG, i, j)
-                    cellInfo = view[i][j]
-                    worker_A_exist = any(
-                        f"worker_A{k}" in cellInfo for k in range(self.WORKER_MAX)
-                    )
-                    worker_B_exist = any(
-                        f"worker_B{k}" in cellInfo for k in range(self.WORKER_MAX)
-                    )
-
-                    if "castle" in cellInfo and worker_A_exist:
-                        placeImage(CASTLE_IMG, i, j)
-                        placeImage(
-                            WORKER_A_IMG, i, j, workerNumber=cellInfo[-1][-1], scale=0.7
-                        )
-                    elif "castle" in cellInfo and worker_B_exist:
-                        placeImage(CASTLE_IMG, i, j)
-                        placeImage(
-                            WORKER_B_IMG, i, j, workerNumber=cellInfo[-1][-1], scale=0.7
-                        )
-                    elif "rampart_A" in cellInfo and worker_A_exist:
-                        placeImage(RAMPART_A_IMG, i, j)
-                        placeImage(
-                            WORKER_A_IMG, i, j, workerNumber=cellInfo[-1][-1], scale=0.8
-                        )
-                    elif "rampart_B" in cellInfo and worker_B_exist:
-                        placeImage(RAMPART_B_IMG, i, j)
-                        placeImage(
-                            WORKER_B_IMG, i, j, workerNumber=cellInfo[-1][-1], scale=0.8
-                        )
-                    elif "pond" in cellInfo and "rampart_A" in cellInfo:
-                        placeImage(POND_IMG, i, j)
-                        placeImage(RAMPART_A_IMG, i, j, scale=0.8)
-                    elif "pond" in cellInfo and "rampart_B" in cellInfo:
-                        placeImage(POND_IMG, i, j)
-                        placeImage(RAMPART_B_IMG, i, j, scale=0.8)
-                    elif "castle" in cellInfo:
-                        placeImage(CASTLE_IMG, i, j)
-                    elif worker_A_exist:
-                        placeImage(WORKER_A_IMG, i, j, workerNumber=cellInfo[-1][-1])
-                    elif worker_B_exist:
-                        placeImage(WORKER_B_IMG, i, j, workerNumber=cellInfo[-1][-1])
-                    elif "pond" in cellInfo:
-                        placeImage(POND_IMG, i, j)
-                    elif "rampart_A" in cellInfo:
-                        placeImage(RAMPART_A_IMG, i, j)
-                    elif "rampart_B" in cellInfo:
-                        placeImage(RAMPART_B_IMG, i, j)
-                    elif "blank" in cellInfo:
-                        placeImage(BLANK_IMG, i, j)
-            drawGrids()
-
-        def drawTurnInfo(actingWorker=None):
-            pygame.draw.rect(
-                self.window_surface,
-                self.BLACK,
-                (
-                    0,
-                    self.cell_size * self.height,
-                    self.cell_size * self.width,
-                    self.cell_size * 2,
-                ),
-            )
-            font = pygame.font.SysFont(None, 60)
-            if actingWorker:
-                text = font.render(
-                    f"{self.current_team}'s turn {actingWorker}/{self.worker_count}",
-                    False,
-                    self.WHITE,
-                )
-            else:
-                text = font.render(f"{self.current_team}'s turn", False, self.WHITE)
-
-            text_rect = text.get_rect(
-                center=(
-                    self.cell_size * self.width / 2,
-                    self.cell_size * (self.height + 1),
-                )
-            )
-            self.window_surface.blit(text, text_rect)
-            pygame.display.update()
 
         view = [
             [
@@ -921,12 +923,43 @@ class Game(gym.Env):
                 (self.window_size_x, self.window_size_y + self.cell_size * 2)
             )
             pygame.display.set_caption("game")
+        if self.clock is None:
+            self.clock = pygame.time.Clock()
 
-        drawAll()
+        self.drawAll(view)
+        self.clock.tick(self.metadata["render_fps"])
 
-        if self.controller != "pygame":
-            drawTurnInfo()
-            return
+        self.drawTurnInfo()
+        # if self.controller != "pygame":
+        #     return
+
+    def get_actions_from_pygame(self):
+        def nonAllowedMovements(x, y, directions):
+            coordinates = np.round(
+                np.array(
+                    [
+                        [
+                            np.cos(2 * n * np.pi / directions) + x,
+                            np.sin(2 * n * np.pi / directions) + y,
+                        ]
+                        for n in range(directions)
+                    ]
+                )
+            )
+
+            return coordinates
+
+        view = [
+            [
+                [
+                    self.CELL[i]
+                    for i, item in enumerate(self.board[:, y, x].astype(bool))
+                    if item
+                ]
+                for x in range(self.width)
+            ]
+            for y in range(self.height)
+        ]
         showTerritory = False
         actions = []
         actingWorker = 0
@@ -944,7 +977,7 @@ class Game(gym.Env):
                 if event.type == KEYDOWN:
                     if event.key == pygame.K_RETURN:
                         if showTerritory:
-                            drawAll()
+                            self.drawAll(view)
                         showTerritory = not showTerritory
 
                 if showTerritory:
@@ -967,7 +1000,7 @@ class Game(gym.Env):
                             elif openTerritoryBLayer[i][j] == 1:
                                 color = self.SKY
                             else:
-                                placeImage(BLANK_IMG, i, j)
+                                self.placeImage(self.BLANK_IMG, i, j)
                                 continue
 
                             pygame.draw.rect(
@@ -980,11 +1013,11 @@ class Game(gym.Env):
                                     self.cell_size,
                                 ),
                             )
-                    drawGrids()
+                    self.drawGrids()
                     continue
 
-                placeImage(
-                    eval(f"WORKER_{self.current_team}_HOVER_IMG"),
+                self.placeImage(
+                    eval(f"self.WORKER_{self.current_team}_HOVER_IMG"),
                     workerY,
                     workerX,
                     workerNumber=str(actingWorker),
@@ -1029,14 +1062,14 @@ class Game(gym.Env):
                                     + 1
                                 )
                             )
-                        placeImage(BLANK_IMG, workerY, workerX)
-                        placeImage(
-                            eval(f"WORKER_{self.current_team}_IMG"),
+                        self.placeImage(self.BLANK_IMG, workerY, workerX)
+                        self.placeImage(
+                            eval(f"self.WORKER_{self.current_team}_IMG"),
                             cellY,
                             cellX,
                             workerNumber=str(actingWorker),
                         )
-                        drawGrids()
+                        self.drawGrids()
                         actingWorker += 1
                         pygame.display.update()
                     # build
@@ -1067,17 +1100,17 @@ class Game(gym.Env):
                             )
                         )
                         actingWorker += 1
-                        placeImage(BLANK_IMG, workerY, workerX)
-                        placeImage(
-                            eval(f"WORKER_{self.current_team}_IMG"),
+                        self.placeImage(self.BLANK_IMG, workerY, workerX)
+                        self.placeImage(
+                            eval(f"self.WORKER_{self.current_team}_IMG"),
                             workerY,
                             workerX,
                             workerNumber=str(actingWorker - 1),
                         )
-                        placeImage(
-                            eval(f"RAMPART_{self.current_team}_IMG"), cellY, cellX
+                        self.placeImage(
+                            eval(f"self.RAMPART_{self.current_team}_IMG"), cellY, cellX
                         )
-                        drawGrids()
+                        self.drawGrids()
                         pygame.display.update()
 
                     # break
@@ -1109,18 +1142,18 @@ class Game(gym.Env):
                         )
                         actingWorker += 1
 
-                        placeImage(BLANK_IMG, workerY, workerX)
-                        placeImage(
-                            eval(f"WORKER_{self.current_team}_IMG"),
+                        self.placeImage(self.BLANK_IMG, workerY, workerX)
+                        self.placeImage(
+                            eval(f"self.WORKER_{self.current_team}_IMG"),
                             workerY,
                             workerX,
                             workerNumber=str(actingWorker - 1),
                         )
-                        placeImage(BLANK_IMG, cellY, cellX)
-                        drawGrids()
+                        self.placeImage(self.BLANK_IMG, cellY, cellX)
+                        self.drawGrids()
                         pygame.display.update()
-            drawTurnInfo(actingWorker=actingWorker + 1)
-        self.actions = actions
+            self.drawTurnInfo(actingWorker=actingWorker + 1)
+        return actions
 
     def get_actions_from_cli(self):
         [print(f"{i:2}: {action}") for i, action in enumerate(self.ACTIONS)]
@@ -1132,7 +1165,7 @@ class Game(gym.Env):
 
     def get_actions(self):
         if self.controller == "pygame":
-            actions = self.actions
+            actions = self.get_actions_from_pygame()
         elif self.controller == "cli":
             actions = self.get_actions_from_cli()
         else:
@@ -1142,6 +1175,8 @@ class Game(gym.Env):
         return actions
 
     def close(self):
+        self.window_surface = None
+        self.clock = None
         pygame.display.quit()
         pygame.quit()
 
