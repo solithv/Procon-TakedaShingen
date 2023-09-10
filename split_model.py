@@ -1,5 +1,3 @@
-import os
-import shutil
 from pathlib import Path
 
 
@@ -24,9 +22,17 @@ def split_zip(
 
 
 def main():
-    model_path = "./model/game"
-    shutil.make_archive(model_path, format="zip", root_dir=f"{model_path}/")
+    import shutil
+
+    model_path = Path("./model/game")
+    shutil.make_archive(
+        model_path,
+        format="zip",
+        root_dir=model_path.parent,
+        base_dir=f"{model_path.name}.keras",
+    )
     split_zip(f"{model_path}.zip", model_path)
+
 
 if __name__ == "__main__":
     main()

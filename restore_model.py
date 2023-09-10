@@ -1,5 +1,3 @@
-import os
-import shutil
 from pathlib import Path
 
 
@@ -21,10 +19,14 @@ def combine_split_zip(input_directory, output_zip_file):
 
 
 def main():
+    import os
+    import shutil
+
     model_path = "./model/game"
     os.makedirs(model_path, exist_ok=True)
     combine_split_zip(model_path, f"{model_path}.zip")
     shutil.unpack_archive(f"{model_path}.zip", model_path)
+
 
 if __name__ == "__main__":
     main()

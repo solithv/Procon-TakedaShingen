@@ -1,6 +1,5 @@
 import copy
 import csv
-import glob
 import os
 import random
 import re
@@ -1160,7 +1159,7 @@ class Game(gym.Env):
         actions = [int(input()) for _ in range(self.worker_count)]
         return actions
 
-    def get_actions(self, controller: Optional[str] = None):
+    def get_actions(self, controller: Optional[str] = None, input_actions=None):
         """操作入力 入力方法が指定されていない場合ランダム行動
 
         Args:
@@ -1170,6 +1169,8 @@ class Game(gym.Env):
             actions = self.get_actions_from_pygame()
         elif controller == "cli":
             actions = self.get_actions_from_cli()
+        elif controller == "machine":
+            actions = input_actions
         else:
             actions = self.random_act()
         while self.WORKER_MAX > len(actions):
@@ -1204,7 +1205,7 @@ class Game(gym.Env):
                     ("break" in action and self.is_breakable(worker, *act_pos, waste))
                     or ("move" in action and self.is_movable(worker, *act_pos))
                     or ("build" in action and self.is_buildable(worker, *act_pos))
-                    or (waste and w == 0)
+                    or (waste and action == "stay")
                 ):
                     act_able.append(w)
 
@@ -1212,3 +1213,55 @@ class Game(gym.Env):
         while self.WORKER_MAX > len(act):
             act.append(0)
         return act
+
+    def get_around_worker(self, team: int, side_length: int = 3) -> list[np.ndarray]:
+        """職人の周囲を取得する
+
+        Args:
+            team (int): チームのインデックス
+            side_length (int, optional): 1辺の長さ(奇数で指定). Defaults to 3.
+
+        Returns:
+            list[np.ndarray]: 職人の周囲
+        """
+        if side_length % 2 == 0:
+            raise ValueError("need to input an odd number")
+        length_ = side_length // 2
+        field = np.pad(
+            self.board,
+            [(0, 0), (length_, 0), (length_, 0)],
+            "constant",
+            constant_values=-1,
+        )
+        front = length_ * 2 + 1
+        arounds = []
+        for worker in self.workers[team]:
+            y, x = worker.get_coordinate()
+            arounds.append(field[:, y : y + front, x : x + front])
+        return arounds
+
+    def print_around(self, arounds: list[np.ndarray]):
+        """職人の周囲を表示する(debug用)
+
+        Args:
+            arounds (list[np.ndarray]): 職人の周囲
+        """
+        for around in arounds:
+            view = ""
+            icon_base = len(list(self.ICONS.values())[0])
+            item_num = int(np.max(np.sum(np.where(around == 255, -1, around), axis=0)))
+            cell_num = icon_base * item_num + (item_num - 1)
+            _, height, width = around.shape
+            for y in range(height):
+                view += (
+                    "|".join(
+                        [
+                            f"{','.join([value for i, item in enumerate(around[:,y,x]) if item for key,value in self.ICONS.items() if key in self.CELL[i]]):^{cell_num}}"
+                            for x in range(width)
+                        ]
+                    )
+                    + "\n"
+                )
+                if y < height - 1:
+                    view += "-" * (width * cell_num + width - 1) + "\n"
+            print(view)
