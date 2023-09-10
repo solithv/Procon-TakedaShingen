@@ -9,7 +9,6 @@ from typing import Union, Optional
 
 import gymnasium as gym
 import numpy as np
-import pyautogui
 import pygame
 from pygame.locals import *
 
@@ -94,6 +93,7 @@ class Game(gym.Env):
         max_episode_steps=100,
         first_player: Optional[int] = None,
         controller: str = "cli",
+        use_pyautogui: bool = False,
     ):
         """init
 
@@ -112,7 +112,12 @@ class Game(gym.Env):
         self.controller = controller
 
         self.cwd = os.getcwd()
-        self.display_size_x, self.display_size_y = pyautogui.size()
+        if use_pyautogui:
+            import pyautogui
+
+            self.display_size_x, self.display_size_y = pyautogui.size()
+        else:
+            self.display_size_x, self.display_size_y = 512, 512
 
         self.reset()
 
