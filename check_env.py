@@ -8,7 +8,7 @@ import MyEnv
 fields = glob.glob("./field_data/*.csv")
 env = gym.make(
     "TaniJoh-v0",
-    # max_episode_steps=100,
+    # max_steps=100,
     csv_path=fields,
     render_mode="human",
     controller="pygame",
