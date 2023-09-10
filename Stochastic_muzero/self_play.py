@@ -81,19 +81,25 @@ def play_game(
 
     counter = 0
     observation_reward_done_info = None
-    while not environment.terminal and counter < environment.limit_of_game_play:
-        feedback = (
-            reanalyze_observation if should_reanalyze else observation_reward_done_info
-        )
-        state = environment.observation(iteration=counter, feedback=feedback)
+    with tqdm.tqdm(desc="play",leave=False) as pbar:
+        while not environment.terminal and counter < environment.limit_of_game_play:
+            feedback = (
+                reanalyze_observation
+                if should_reanalyze
+                else observation_reward_done_info
+            )
+            state = environment.observation(iteration=counter, feedback=feedback)
 
-        tree = monte_carlo_tree_search.run(observation=state, model=model, train=True)
-        observation_reward_done_info = environment.policy_step(
-            root=tree, temperature=temperature, feedback=feedback, iteration=counter
-        )
+            tree = monte_carlo_tree_search.run(
+                observation=state, model=model, train=True
+            )
+            observation_reward_done_info = environment.policy_step(
+                root=tree, temperature=temperature, feedback=feedback, iteration=counter
+            )
 
-        environment.store_search_statistics(tree)
-        counter += 1
+            environment.store_search_statistics(tree)
+            counter += 1
+            pbar.update()
 
     monte_carlo_tree_search.cycle.global_reset()
     environment.close()
