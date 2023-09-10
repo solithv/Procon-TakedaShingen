@@ -26,8 +26,7 @@ env = gym.make(
     "TaniJoh-v0",
     max_steps=100,
     csv_path=fields,
-    render_mode="human",
-    controller="pygame",
+    render_mode="ansi",
     first_player=0,
 )
 # # # if you want want rgb observation set render_mode to "rgb_array" , "human" or the render_mode rgb of our env

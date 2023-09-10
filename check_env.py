@@ -11,7 +11,6 @@ env = gym.make(
     # max_steps=100,
     csv_path=fields,
     render_mode="human",
-    controller="pygame",
     # first_player=0,
 )
 env_checker.check_env(env.unwrapped)

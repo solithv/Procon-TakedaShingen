@@ -1,7 +1,8 @@
-import gymnasium as gym
-import random
 import glob
-from MyEnv import Game
+
+import gymnasium as gym
+
+import MyEnv
 
 
 def main():
@@ -11,18 +12,17 @@ def main():
         max_steps=100,
         csv_path=fields,
         render_mode="human",
-        controller="pygame",
-        # first_player=0,
         use_pyautogui=True,
+        # first_player=0,
     )
     observation = env.reset()
     terminated, truncated = [False] * 2
     while not terminated and not truncated:
         env.render()
         if env.unwrapped.current_team == "A":
-            actions = env.unwrapped.random_act()
+            actions = env.unwrapped.random_act(waste=True)
         else:
-            actions = env.unwrapped.get_actions()
+            actions = env.unwrapped.get_actions("pygame")
         # actions = env.action_space.sample()
         print(actions)
         observation, reward, terminated, truncated, info = env.step(actions)

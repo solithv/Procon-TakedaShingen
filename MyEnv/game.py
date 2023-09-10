@@ -92,7 +92,6 @@ class Game(gym.Env):
         render_mode="ansi",
         max_steps=100,
         first_player: Optional[int] = None,
-        controller: str = "cli",
         use_pyautogui: bool = False,
     ):
         """init
@@ -102,7 +101,6 @@ class Game(gym.Env):
             render_mode (str, optional): 描画方法. Defaults to "ansi".
             max_steps (int, optional): 最大ステップ数. Defaults to 100.
             first_player (Optional[int], optional): 先行プレイヤーの番号. Defaults to None.
-            controller (str, optional): 操作入力方法. Defaults to "cli".
             use_pyautogui (bool): PyAutoGUIを使って描画windowサイズを指定するか. Defaults to False.
         """
         super().__init__()
@@ -110,7 +108,6 @@ class Game(gym.Env):
         self.render_mode = render_mode
         self.max_steps = max_steps
         self.first_player = first_player
-        self.controller = controller
 
         self.action_space = gym.spaces.Tuple(
             gym.spaces.Discrete(len(self.ACTIONS)) for _ in range(self.WORKER_MAX)
@@ -665,8 +662,6 @@ class Game(gym.Env):
             if "break" not in self.ACTIONS[action]
         ]
 
-        # if self.ACTIONS.index("stay") in actions:
-        #     print("stay in actions", actions)
         self.successful = []
         self.stayed_workers = []
         self.action_workers(sorted_workers)
@@ -709,14 +704,16 @@ class Game(gym.Env):
         )
         cell_num = icon_base * item_num + (item_num - 1)
         for y in range(self.height):
-            line = [
-                f"{','.join([value for i, item in enumerate(self.board[:,y,x]) if item for key,value in self.ICONS.items() if key in self.CELL[i]]):^{cell_num}}"
-                for x in range(self.width)
-            ]
-            # print("|".join(line))
-            view += "|".join(line) + "\n"
+            view += (
+                "|".join(
+                    [
+                        f"{','.join([value for i, item in enumerate(self.board[:,y,x]) if item for key,value in self.ICONS.items() if key in self.CELL[i]]):^{cell_num}}"
+                        for x in range(self.width)
+                    ]
+                )
+                + "\n"
+            )
             if y < self.height - 1:
-                # print("-" * (self.width * cell_num + self.width - 1))
                 view += "-" * (self.width * cell_num + self.width - 1) + "\n"
         print(view, end="")
         return view
@@ -1163,10 +1160,15 @@ class Game(gym.Env):
         actions = [int(input()) for _ in range(self.worker_count)]
         return actions
 
-    def get_actions(self):
-        if self.controller == "pygame":
+    def get_actions(self, controller: Optional[str] = None):
+        """操作入力 入力方法が指定されていない場合ランダム行動
+
+        Args:
+            controller (str, optional): 操作入力方法("cli", "pygame"). Defaults to None.
+        """
+        if controller == "pygame":
             actions = self.get_actions_from_pygame()
-        elif self.controller == "cli":
+        elif controller == "cli":
             actions = self.get_actions_from_cli()
         else:
             actions = self.random_act()
@@ -1180,9 +1182,11 @@ class Game(gym.Env):
         pygame.display.quit()
         pygame.quit()
 
-    def random_act(self):
-        """
-        行動可能な範囲でランダムな行動を返す
+    def random_act(self, waste: bool = False):
+        """行動可能な範囲でランダムな行動を返す
+
+        Args:
+            waste (bool, optional): 無駄な行動を許容. Defaults to False.
         """
         [worker.turn_init() for worker in self.workers[self.current_team]]
         self.worker_positions = [
@@ -1197,10 +1201,10 @@ class Game(gym.Env):
                 direction = self.get_direction(w)
                 act_pos = (np.array(pos) + np.array(direction)).astype(int)
                 if (
-                    ("break" in action and self.is_breakable(worker, *act_pos, False))
+                    ("break" in action and self.is_breakable(worker, *act_pos, waste))
                     or ("move" in action and self.is_movable(worker, *act_pos))
                     or ("build" in action and self.is_buildable(worker, *act_pos))
-                    # or w == 0
+                    or (waste and w == 0)
                 ):
                     act_able.append(w)
 
@@ -1208,25 +1212,3 @@ class Game(gym.Env):
         while self.WORKER_MAX > len(act):
             act.append(0)
         return act
-
-
-if __name__ == "__main__":
-    fields = glob.glob(os.path.normpath("./field_data/*.csv"))
-
-    env = Game(csv_path=random.choice(fields), render_mode="human", controller="random")
-
-    observation = env.reset()
-    terminated, truncated = [False] * 2
-    print(f"width:{env.width}, height:{env.height}, workers:{env.worker_count}")
-
-    while not terminated and not truncated:
-        print(
-            f"input team {env.current_team} actions (need {env.worker_count} input) : "
-        )
-        env.render()
-        observation, reward, terminated, truncated, _ = env.step(env.random_act())
-        input()
-
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
