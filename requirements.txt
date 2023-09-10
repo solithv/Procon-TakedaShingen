@@ -1,11 +1,16 @@
-gym
+# gym
 gymnasium
-keras-rl2
+# keras-rl2
 matplotlib
 numpy
-opencv-python
-Pillow
+# opencv-python
+# Pillow
 PyAutoGUI
 pygame
-scipy
-tensorflow
+# scipy
+# tensorflow
+# git+https://github.com/pocokhc/simple_distributed_rl
+ray
+torch
+torchvision
+torchaudio
