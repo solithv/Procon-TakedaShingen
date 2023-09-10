@@ -117,19 +117,14 @@ class Game(gym.Env):
 
             self.display_size_x, self.display_size_y = pyautogui.size()
         else:
-            self.display_size_x, self.display_size_y = 512, 512
+            self.display_size_x, self.display_size_y = 960, 960
 
-        self.reset()
-
-        # self.action_space = gym.spaces.MultiDiscrete(
-        #     [len(self.ACTIONS) for _ in range(self.WORKER_MAX)]
-        # )
         self.action_space = gym.spaces.Tuple(
             gym.spaces.Discrete(len(self.ACTIONS)) for _ in range(self.WORKER_MAX)
         )
         self.observation_space = gym.spaces.Box(
-            low=self.get_observation().min(),
-            high=self.get_observation().max(),
+            low=0,
+            high=255,
             shape=(len(self.CELL), self.FIELD_MAX, self.FIELD_MAX),
             dtype=np.uint8,
         )
@@ -212,6 +207,9 @@ class Game(gym.Env):
         環境の初期化
         """
         super().reset(seed=seed, options=options)
+        if seed is not None:
+            random.seed(seed)
+            np.random.seed(seed)
         self.current_player = (
             self.first_player
             if self.first_player is not None
@@ -695,6 +693,7 @@ class Game(gym.Env):
             return self.render_terminal(*args, **kwargs)
 
     def render_terminal(self):
+        view = ""
         icon_base = len(list(self.ICONS.values())[0])
         item_num = int(
             np.max(np.sum(self.board[:, : self.height, : self.width], axis=0))
@@ -703,16 +702,23 @@ class Game(gym.Env):
         for y in range(self.height):
             line = []
             for x in range(self.width):
-                cell = []
-                for i, item in enumerate(self.board[:, y, x].astype(bool)):
-                    if item:
-                        for key, value in self.ICONS.items():
-                            if key in self.CELL[i]:
-                                cell.append(value)
-                line.append(f"{','.join(cell):^{cell_num}}")
-            print("|".join(line))
+                # cell = []
+                # for i, item in enumerate(self.board[:, y, x]):
+                #     if item:
+                #         for key, value in self.ICONS.items():
+                #             if key in self.CELL[i]:
+                #                 cell.append(value)
+                # line.append(f"{','.join(cell):^{cell_num}}")
+                line.append(
+                    f"{','.join([value for i, item in enumerate(self.board[:,y,x]) if item for key,value in self.ICONS.items() if key in self.CELL[i]]):^{cell_num}}"
+                )
+            # print("|".join(line))
+            view += "|".join(line) + "\n"
             if y < self.height - 1:
-                print("-" * (self.width * cell_num + self.width - 1))
+                # print("-" * (self.width * cell_num + self.width - 1))
+                view += "-" * (self.width * cell_num + self.width - 1) + "\n"
+        print(view, end="")
+        return view
 
     def render_rgb_array(self):
         """

@@ -12,7 +12,8 @@ def main():
         csv_path=fields,
         render_mode="human",
         controller="None",
-        first_player=0,
+        # first_player=0,
+        use_pyautogui=True,
     )
     observation = env.reset()
     terminated, truncated = [False] * 2
