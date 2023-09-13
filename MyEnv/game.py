@@ -64,8 +64,8 @@ class Game(gym.Env):
     }
     ICONS = {
         "blank": "  ",
-        "castle": "C ",
-        "pond": "P ",
+        "castle": "Cs",
+        "pond": "Pn",
         "territory_A": "Ta",
         "territory_B": "Tb",
         "open_territory_A": "ta",
@@ -74,6 +74,7 @@ class Game(gym.Env):
         "rampart_B": "Rb",
         "worker_A": "Wa",
         "worker_B": "Wb",
+        "outside": "XX",
     }
 
     BLACK = (0, 0, 0)
@@ -1254,20 +1255,29 @@ class Game(gym.Env):
         """
         for around in around_workers:
             view = ""
-            icon_base = len(list(self.ICONS.values())[0])
-            item_num = int(np.max(np.sum(np.where(around == 255, -1, around), axis=0)))
-            cell_num = icon_base * item_num + (item_num - 1)
+            icon_base = len(self.ICONS["blank"])
+            item_num = int(np.max(np.sum(around, axis=0)))
+            cell_num = icon_base * item_num + item_num - 1
             _, height, width = around.shape
             for y in range(height):
-                view += (
-                    "|".join(
-                        [
-                            f"{','.join([value for i, item in enumerate(around[:,y,x]) if item for key,value in self.ICONS.items() if key in self.CELL[i]]):^{cell_num}}"
-                            for x in range(width)
-                        ]
-                    )
-                    + "\n"
-                )
+                line = []
+                for x in range(width):
+                    cell = []
+                    for i, item in enumerate(around[:, y, x]):
+                        if item < 0:
+                            cell.append(self.ICONS["outside"])
+                            break
+                        elif item:
+                            cell.append(
+                                *[
+                                    value
+                                    for key, value in self.ICONS.items()
+                                    if self.CELL[i].startswith(key)
+                                ]
+                            )
+                    line.append(f"{','.join(cell):^{cell_num}}")
+
+                view += "|".join(line) + "\n"
                 if y < height - 1:
                     view += "-" * (width * cell_num + width - 1) + "\n"
             print(view)
