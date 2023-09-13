@@ -8,9 +8,7 @@ import MyEnv
 fields = glob.glob("./field_data/*.csv")
 env = gym.make(
     "TaniJoh-v0",
-    # max_steps=100,
     csv_path=fields,
     render_mode="human",
-    # first_player=0,
 )
 env_checker.check_env(env.unwrapped)

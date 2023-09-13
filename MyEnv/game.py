@@ -112,10 +112,10 @@ class Game(gym.Env):
             gym.spaces.Discrete(len(self.ACTIONS)) for _ in range(self.WORKER_MAX)
         )
         self.observation_space = gym.spaces.Box(
-            low=0,
-            high=255,
+            low=-1,
+            high=1,
             shape=(len(self.CELL), self.FIELD_MAX, self.FIELD_MAX),
-            dtype=np.uint8,
+            dtype=np.int8,
         )
         self.reward_range = [np.NINF, np.inf]
 
@@ -165,7 +165,7 @@ class Game(gym.Env):
             path = random.choice(path)
         size = int(re.sub(r"[\D]", "", os.path.normpath(path).split(os.path.sep)[-1]))
         name = os.path.normpath(path).split(os.path.sep)[-1].split(".")[0]
-        self.board = np.zeros((len(self.CELL), size, size), dtype=np.uint8)
+        self.board = np.zeros((len(self.CELL), size, size), dtype=np.int8)
         self.workers: defaultdict[str, list[Worker]] = defaultdict(list)
         self.width, self.height = [size] * 2
 
@@ -242,7 +242,7 @@ class Game(gym.Env):
         compiled = np.sum(
             [self.board[self.CELL.index(layer)] for layer in layers],
             axis=0,
-            dtype=np.uint8,
+            dtype=np.int8,
         )
         if one_hot:
             compiled = np.where(compiled, 1, 0)
@@ -520,7 +520,7 @@ class Game(gym.Env):
             0,
         ) - self.compile_layers("rampart_A", "rampart_B", "territory_A", "territory_B")
         self.board[self.CELL.index("open_territory_A")] = np.where(
-            self.board[self.CELL.index("open_territory_A")] == np.uint8(-1),
+            self.board[self.CELL.index("open_territory_A")] == np.int8(-1),
             0,
             self.board[self.CELL.index("open_territory_A")],
         )
@@ -533,7 +533,7 @@ class Game(gym.Env):
             0,
         ) - self.compile_layers("rampart_A", "rampart_B", "territory_A", "territory_B")
         self.board[self.CELL.index("open_territory_B")] = np.where(
-            self.board[self.CELL.index("open_territory_B")] == np.uint8(-1),
+            self.board[self.CELL.index("open_territory_B")] == np.int8(-1),
             0,
             self.board[self.CELL.index("open_territory_B")],
         )
@@ -1214,16 +1214,22 @@ class Game(gym.Env):
             act.append(0)
         return act
 
-    def get_around_worker(self, team: int, side_length: int = 3) -> list[np.ndarray]:
+    def get_around_workers(
+        self, team: str = None, side_length: int = 3
+    ) -> list[np.ndarray]:
         """職人の周囲を取得する
 
         Args:
-            team (int): チームのインデックス
+            team (str, optional): チーム名("A" or "B") 未指定で現在のチーム. Defaults to None.
             side_length (int, optional): 1辺の長さ(奇数で指定). Defaults to 3.
 
         Returns:
             list[np.ndarray]: 職人の周囲
         """
+        if team is None:
+            team = self.current_team
+        elif team == "opponent":
+            team = self.opponent_team
         if side_length % 2 == 0:
             raise ValueError("need to input an odd number")
         length_ = side_length // 2
@@ -1234,19 +1240,19 @@ class Game(gym.Env):
             constant_values=-1,
         )
         front = length_ * 2 + 1
-        arounds = []
+        around_workers = []
         for worker in self.workers[team]:
             y, x = worker.get_coordinate()
-            arounds.append(field[:, y : y + front, x : x + front])
-        return arounds
+            around_workers.append(field[:, y : y + front, x : x + front])
+        return around_workers
 
-    def print_around(self, arounds: list[np.ndarray]):
+    def print_around(self, around_workers: list[np.ndarray]):
         """職人の周囲を表示する(debug用)
 
         Args:
-            arounds (list[np.ndarray]): 職人の周囲
+            around_workers (list[np.ndarray]): 職人の周囲
         """
-        for around in arounds:
+        for around in around_workers:
             view = ""
             icon_base = len(list(self.ICONS.values())[0])
             item_num = int(np.max(np.sum(np.where(around == 255, -1, around), axis=0)))

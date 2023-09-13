@@ -161,6 +161,6 @@ class NNModel:
         Returns:
             list[int]: 行動のリスト
         """
-        out = self.model.predict(np.array(inputs))
-        argmax = np.argmax(out, axis=1)
-        return argmax
+        outs = self.model.predict(np.array(inputs))
+        arg = np.argmax(outs, axis=1)
+        return arg
