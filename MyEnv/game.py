@@ -4,7 +4,7 @@ import os
 import random
 import re
 from collections import defaultdict
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
 import gymnasium as gym
 import numpy as np
@@ -62,6 +62,16 @@ class Game(gym.Env):
         "S": np.array([1, 0]),
         "W": np.array([0, -1]),
     }
+    POST_DIRS = {
+        "NW": 1,
+        "N": 2,
+        "NE": 3,
+        "E": 4,
+        "SE": 5,
+        "S": 6,
+        "SW": 7,
+        "W": 8,
+    }
     ICONS = {
         "blank": " ",
         "castle": "C",
@@ -90,7 +100,7 @@ class Game(gym.Env):
         self,
         csv_path: Union[str, list[str]],
         render_mode="ansi",
-        max_steps=100,
+        max_steps=200,
         first_player: Optional[int] = None,
         use_pyautogui: bool = False,
     ):
@@ -1255,7 +1265,6 @@ class Game(gym.Env):
         """
         for around in around_workers:
             view = ""
-            # icon_base = len(self.ICONS["blank"])
             icon_base = max(len(value) for value in self.ICONS.values())
             item_num = int(np.max(np.sum(around, axis=0)))
             cell_num = icon_base * item_num + item_num - 1
@@ -1282,3 +1291,104 @@ class Game(gym.Env):
                 if y < height - 1:
                     view += "-" * (width * cell_num + width - 1) + "\n"
             print(view)
+
+    def reset_from_api(self, data: dict[str, Any]):
+        """APIから環境を初期化
+
+        Args:
+            data (dict[str, Any]): 試合一覧取得APIから受け取った1試合分のデータ
+        """
+        self.id = data["id"]
+        self.current_player = 0 if data["first"] else 1
+        self.change_player(no_change=True)
+        self.max_steps = data["turns"]
+        # self.turn_seconds=data["turnSeconds"]
+        self.height, self.width = data["board"]["height"], data["board"]["width"]
+        self.worker_count = data["board"]["mason"]
+        self.get_stat_from_api(data)
+
+    def get_stat_from_api(self, data: dict[str, Any]):
+        """APIから環境状態を更新
+
+        Args:
+            data (dict[str, Any]): 試合状態取得APIから受け取ったデータ
+        """
+        assert self.turn == data["turn"]
+        assert self.id == data["id"]
+        assert self.worker_count == data["board"]["mason"]
+        structures = np.pad(
+            np.array(data["board"]["structures"]),
+            [
+                (0, self.FIELD_MAX - self.height),
+                (0, self.FIELD_MAX - self.width),
+            ],
+        )
+        masons = np.pad(
+            np.array(data["board"]["masons"]),
+            [
+                (0, self.FIELD_MAX - self.height),
+                (0, self.FIELD_MAX - self.width),
+            ],
+        )
+        walls = np.pad(
+            np.array(data["board"]["walls"]),
+            [
+                (0, self.FIELD_MAX - self.height),
+                (0, self.FIELD_MAX - self.width),
+            ],
+        )
+        territories = np.pad(
+            np.array(data["board"]["territories"]),
+            [
+                (0, self.FIELD_MAX - self.height),
+                (0, self.FIELD_MAX - self.width),
+            ],
+        )
+        self.board[self.CELL.index("castle")] = np.where(structures == 2, 1, 0)
+        self.board[self.CELL.index("pond")] = np.where(structures == 1, 1, 0)
+        self.board[self.CELL.index("rampart_A")] = np.where(walls == 1, 1, 0)
+        self.board[self.CELL.index("rampart_B")] = np.where(walls == 2, 1, 0)
+        self.board[self.CELL.index("territory_A")] = np.where(
+            (territories == 1) | (territories == 3), 1, 0
+        )
+        self.board[self.CELL.index("territory_B")] = np.where(
+            (territories == 2) | (territories == 3), 1, 0
+        )
+        for i in range(self.worker_count):
+            self.board[self.CELL.index(f"worker_A{i}")] = np.where(masons == i, 1, 0)
+            self.board[self.CELL.index(f"worker_B{i}")] = np.where(masons == -i, 1, 0)
+            assert len(np.argwhere(masons == i)) == 1
+            assert len(np.argwhere(masons == -i)) == 1
+            self.workers["A"][i - 1].update_coordinate(*np.argwhere(masons == i)[0])
+            self.workers["B"][i - 1].update_coordinate(*np.argwhere(masons == -i)[0])
+        self.board[:, self.height :, :] = -1
+        self.board[:, :, self.width :] = -1
+        self.update_open_territory()
+        self.update_blank()
+
+    def make_post_data(self, actions: list[int]):
+        """行動計画APIで送るデータを作成
+
+        Args:
+            actions (list[int]): 行動のリスト
+        """
+
+        def get_type(action: int):
+            if "stay" in self.ACTIONS[action]:
+                return 0
+            elif "move" in self.ACTIONS[action]:
+                return 1
+            elif "build" in self.ACTIONS[action]:
+                return 2
+            elif "break" in self.ACTIONS[action]:
+                return 3
+
+        def get_dir(action: int):
+            return self.POST_DIRS.get(self.ACTIONS[action].split("_")[-1], 0)
+
+        data = {"turn": self.turn}
+        data["actions"] = [
+            {"type": get_type(action), "dir": get_dir(action)}
+            for action in actions[: self.worker_count]
+        ]
+        return data

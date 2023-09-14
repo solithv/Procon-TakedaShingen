@@ -29,6 +29,7 @@ def main():
             actions = env.unwrapped.get_actions("pygame")
         # actions = env.action_space.sample()
         # env.unwrapped.print_around(env.unwrapped.get_around_workers(side_length=5))
+        print(env.unwrapped.make_post_data(actions))
         print(actions)
         observation, reward, terminated, truncated, info = env.step(actions)
         print(f"turn:{info['turn']}, reward:{reward}")

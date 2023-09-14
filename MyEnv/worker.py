@@ -34,3 +34,7 @@ class Worker:
 
     def turn_init(self):
         self.is_action = False
+
+    def update_coordinate(self, y, x):
+        self.y = y
+        self.x = x
