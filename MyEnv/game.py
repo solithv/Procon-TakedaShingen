@@ -63,9 +63,9 @@ class Game(gym.Env):
         "W": np.array([0, -1]),
     }
     ICONS = {
-        "blank": "  ",
-        "castle": "Cs",
-        "pond": "Pn",
+        "blank": " ",
+        "castle": "C",
+        "pond": "P",
         "territory_A": "Ta",
         "territory_B": "Tb",
         "open_territory_A": "ta",
@@ -74,7 +74,7 @@ class Game(gym.Env):
         "rampart_B": "Rb",
         "worker_A": "Wa",
         "worker_B": "Wb",
-        "outside": "XX",
+        "outside": "X",
     }
 
     BLACK = (0, 0, 0)
@@ -1255,7 +1255,8 @@ class Game(gym.Env):
         """
         for around in around_workers:
             view = ""
-            icon_base = len(self.ICONS["blank"])
+            # icon_base = len(self.ICONS["blank"])
+            icon_base = max(len(value) for value in self.ICONS.values())
             item_num = int(np.max(np.sum(around, axis=0)))
             cell_num = icon_base * item_num + item_num - 1
             _, height, width = around.shape
