@@ -33,9 +33,7 @@ def make_configs():
             a_count, b_count = 0, 0
             for y, row in enumerate(reader):
                 for x, item in enumerate(row):
-                    if item == "0":
-                        structures[y, x] = 1
-                    elif item == "1":
+                    if item == "1":
                         structures[y, x] = 1
                     elif item == "2":
                         structures[y, x] = 2
