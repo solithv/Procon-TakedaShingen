@@ -42,6 +42,7 @@ def main():
         print(fa.get_field(id_))
         env.unwrapped.get_stat_from_api(fa.get_field(id_))
         env.render()
+        env.unwrapped.render_terminal()
         if env.unwrapped.current_team == "A":
             actions = env.unwrapped.random_act()
             # actions = nn.predict(env.unwrapped.get_around_workers())
@@ -53,14 +54,15 @@ def main():
         # actions = env.action_space.sample()
         # env.unwrapped.print_around(env.unwrapped.get_around_workers(side_length=5))
         # print(env.unwrapped.make_post_data(actions))
-        print(actions)
+        # print(actions)
         observation, reward, terminated, truncated, info = env.step(actions)
-        print(f"turn:{info['turn']}, reward:{reward}")
+        print(f"turn:{info['turn']}")
         while server_turn == fa.get_field(id_)["turn"]:
             time.sleep(0.5)
         server_turn = fa.get_field(id_)["turn"]
     env.unwrapped.get_stat_from_api(fa.get_field(id_))
     env.render()
+    input()
     env.close()
 
 

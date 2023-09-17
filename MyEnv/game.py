@@ -708,7 +708,7 @@ class Game(gym.Env):
 
     def render_terminal(self):
         view = ""
-        icon_base = len(list(self.ICONS.values())[0])
+        icon_base = max(len(value) for value in self.ICONS.values())
         item_num = int(
             np.max(np.sum(self.board[:, : self.height, : self.width], axis=0))
         )
@@ -1365,7 +1365,6 @@ class Game(gym.Env):
         assert (
             self.turn - 1 == data["turn"]
         ), f"self.turn:{self.turn}, data['turn']:{data['turn']}"
-        print(f"self.turn:{self.turn}, data['turn']:{data['turn']}")
         assert self.id == data["id"], f"self.id:{self.id}, data['id']:{data['id']}"
         assert (
             self.worker_count == data["board"]["mason"]
