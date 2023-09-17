@@ -7,3 +7,4 @@ test.py
 model/*
 !model/*.zip.*
 Stochastic_muzero/*/
+.env

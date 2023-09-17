@@ -1212,28 +1212,3 @@ class Game(gym.Env):
         while self.WORKER_MAX > len(act):
             act.append(0)
         return act
-<<<<<<< HEAD
-
-
-if __name__ == "__main__":
-    fields = glob.glob(os.path.normpath("./field_data/*.csv"))
-
-    env = Game(csv_path=random.choice(fields), render_mode="human", controller="random")
-
-    observation = env.reset()
-    terminated, truncated = [False] * 2
-    print(f"width:{env.width}, height:{env.height}, workers:{env.worker_count}")
-
-    while not terminated and not truncated:
-        print(
-            f"input team {env.current_team} actions (nfeed {env.worker_count} input) : "
-        )
-        env.render()
-        observation, reward, terminated, truncated, _ = env.step(env.random_act())
-        input()
-
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-=======
->>>>>>> origin/3x3
