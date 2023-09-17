@@ -18,10 +18,7 @@ class API:
         r = req.get(self.match_url, headers=self.header)
 
         matches = r.json()
-        id_ = []
-        for match in matches["matches"]:
-            id_.append(match["id"])
-        return id_
+        return matches
     
     def get_field(self,path):
         """

@@ -1,6 +1,6 @@
-import os
+from Field_API import API
 from dotenv import load_dotenv
 
-load_dotenv(".env")
-token = os.getenv("TOKEN")
-print(token)
+fa = API()
+id_ = fa.get_match()
+print(fa.get_field(id_))

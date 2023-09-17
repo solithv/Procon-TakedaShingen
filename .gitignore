@@ -8,3 +8,4 @@ model/*
 !model/*.zip.*
 Stochastic_muzero/*/
 .env
+API_test.py
