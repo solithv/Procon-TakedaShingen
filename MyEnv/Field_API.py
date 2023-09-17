@@ -1,15 +1,17 @@
-import requests as req
 import os
-from dotenv import load_dotenv
-class API:
 
-    #.envはトークンを格納しているファイル
+import requests as req
+from dotenv import load_dotenv
+
+
+class API:
+    # .envはトークンを格納しているファイル
     load_dotenv(".env")
     token = os.getenv("TOKEN")
-    match_url = os.getenv("MATCH_URL")
-    header = {"procon-token":token}
-    query = {"token":token}
-    
+    match_url = os.getenv("MATCH_URL") + "/matches"
+    header = {"procon-token": token}
+    # query = {"token": token}
+
     def get_match(self):
         """
         試合一覧取得API
@@ -18,26 +20,29 @@ class API:
         r = req.get(self.match_url, headers=self.header)
 
         matches = r.json()
-        id_ = []
-        for match in matches["matches"]:
-            id_.append(match["id"])
-        return id_
-    
-    def get_field(self,path):
+        return matches["matches"]
+
+    def get_field(self, path):
         """
         試合状態取得API
         引数(試合id)
         """
-        r = req.get(f"{self.match_url}/{path}",headers=self.header)
+        r = req.get(f"{self.match_url}/{path}", headers=self.header)
         field = r.json()
         return field
 
-    def post_actions(self,act,path):
+    def post_actions(self, act, path, opponent=False):
         """
         行動計画更新API
         引数(jsonファイル , 試合id)
         """
-
-        req.post(f"{self.match_url}/{path}", headers=self.header, json=act)
-
-        
+        if not opponent:
+            r = req.post(f"{self.match_url}/{path}", headers=self.header, json=act)
+        else:
+            r = req.post(
+                f"{self.match_url}/{path}",
+                headers={"procon-token": "dummy-token"},
+                json=act,
+            )
+        # if r.status_code != 200:
+        print(r)

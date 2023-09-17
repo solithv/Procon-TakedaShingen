@@ -9,18 +9,18 @@ from dotenv import load_dotenv
 
 load_dotenv()
 token = os.getenv("TOKEN")
-teams = {
-    "first": {"name": "先攻チーム", "token": token},
-    "second": {"name": "後攻チーム", "token": "後攻チームのトークン"},
-}
+teams = [{"name": "武田進言", "token": token}, {"name": "相手チーム", "token": "dummy-token"}]
 turns = {11: 30, 13: 54, 15: 80, 17: 100, 21: 150, 25: 200}
 seconds = {11: 3, 13: 4, 15: 6, 17: 8, 21: 11, 25: 15}
 bonus = {"wall": 10, "territory": 30, "castle": 100}
-csv_dir = "./field_data"
-config_dir = "./server_configs"
 
 
 def make_configs():
+    csv_dir = "./field_data"
+    config_dir = "./server_configs"
+    os.makedirs(config_dir, exist_ok=True)
+    for filename in Path(config_dir).glob("*.json"):
+        filename.unlink()
     for csv_ in Path(csv_dir).glob("*.csv"):
         data = {}
         size = int(re.sub(r"[\D]", "", os.path.normpath(csv_).split(os.path.sep)[-1]))
@@ -47,10 +47,7 @@ def make_configs():
                         b_count -= 1
                         masons[y, x] = b_count
 
-        if "inv_" not in name:
-            data["teams"] = [teams["first"], teams["second"]]
-        else:
-            data["teams"] = [teams["second"], teams["first"]]
+        data["teams"] = teams
         data["match"] = {
             "id": id_,
             "turns": turns[size],
@@ -65,7 +62,13 @@ def make_configs():
             "masons": masons.tolist(),
         }
         with open(
-            os.path.join(config_dir, f"{csv_.stem}.json"), "w", encoding="utf-8"
+            os.path.join(config_dir, f"{csv_.stem}_f.json"), "w", encoding="utf-8"
+        ) as fo:
+            json.dump(data, fo, indent=4, ensure_ascii=False)
+        data["teams"] = list(reversed(teams))
+        data["match"]["id"] += 1
+        with open(
+            os.path.join(config_dir, f"{csv_.stem}_s.json"), "w", encoding="utf-8"
         ) as fo:
             json.dump(data, fo, indent=4, ensure_ascii=False)
 

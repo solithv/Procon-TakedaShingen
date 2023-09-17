@@ -1302,10 +1302,59 @@ class Game(gym.Env):
         self.current_player = 0 if data["first"] else 1
         self.change_player(no_change=True)
         self.max_steps = data["turns"]
+        self.turn = 1
         # self.turn_seconds=data["turnSeconds"]
         self.height, self.width = data["board"]["height"], data["board"]["width"]
         self.worker_count = data["board"]["mason"]
-        self.get_stat_from_api(data)
+        self.workers: defaultdict[str, list[Worker]] = defaultdict(list)
+        structures = np.pad(
+            np.array(data["board"]["structures"]),
+            [
+                (0, self.FIELD_MAX - self.height),
+                (0, self.FIELD_MAX - self.width),
+            ],
+        )
+        masons = np.pad(
+            np.array(data["board"]["masons"]),
+            [
+                (0, self.FIELD_MAX - self.height),
+                (0, self.FIELD_MAX - self.width),
+            ],
+        )
+        self.board = np.zeros(
+            (len(self.CELL), self.FIELD_MAX, self.FIELD_MAX), dtype=np.int8
+        )
+        self.board[self.CELL.index("castle")] = np.where(structures == 2, 1, 0)
+        self.board[self.CELL.index("pond")] = np.where(structures == 1, 1, 0)
+        for i in range(1, self.worker_count + 1):
+            self.board[self.CELL.index(f"worker_A{i-1}")] = np.where(masons == i, 1, 0)
+            self.board[self.CELL.index(f"worker_B{i-1}")] = np.where(masons == -i, 1, 0)
+            assert (
+                len(np.argwhere(masons == i)) == 1
+                and len(np.argwhere(masons == -i)) == 1
+            )
+            self.workers["A"].append(
+                Worker(f"worker_A{i - 1}", *np.argwhere(masons == i)[0])
+            )
+            self.workers["B"].append(
+                Worker(f"worker_B{i - 1}", *np.argwhere(masons == -i)[0])
+            )
+            # self.workers["A"][i - 1].update_coordinate(*np.argwhere(masons == i)[0])
+            # self.workers["B"][i - 1].update_coordinate(*np.argwhere(masons == -i)[0])
+        self.board[:, self.height :, :] = -1
+        self.board[:, :, self.width :] = -1
+        self.update_blank()
+        self.update_territory()
+
+        self.cell_size = min(
+            self.display_size_x * 0.9 // self.width,
+            self.display_size_y * 0.8 // self.height,
+        )
+        self.window_size = max(self.width, self.height) * self.cell_size
+        self.window_size_x = self.width * self.cell_size
+        self.window_size_y = self.height * self.cell_size
+        if self.render_mode == "human":
+            self.reset_render()
 
     def get_stat_from_api(self, data: dict[str, Any]):
         """APIから環境状態を更新
@@ -1313,9 +1362,14 @@ class Game(gym.Env):
         Args:
             data (dict[str, Any]): 試合状態取得APIから受け取ったデータ
         """
-        assert self.turn == data["turn"]
-        assert self.id == data["id"]
-        assert self.worker_count == data["board"]["mason"]
+        assert (
+            self.turn - 1 == data["turn"]
+        ), f"self.turn:{self.turn}, data['turn']:{data['turn']}"
+        print(f"self.turn:{self.turn}, data['turn']:{data['turn']}")
+        assert self.id == data["id"], f"self.id:{self.id}, data['id']:{data['id']}"
+        assert (
+            self.worker_count == data["board"]["mason"]
+        ), f"self.worker_count:{self.worker_count}, data['board']['mason']:{data['board']['mason']}"
         structures = np.pad(
             np.array(data["board"]["structures"]),
             [
@@ -1354,9 +1408,9 @@ class Game(gym.Env):
         self.board[self.CELL.index("territory_B")] = np.where(
             (territories == 2) | (territories == 3), 1, 0
         )
-        for i in range(self.worker_count):
-            self.board[self.CELL.index(f"worker_A{i}")] = np.where(masons == i, 1, 0)
-            self.board[self.CELL.index(f"worker_B{i}")] = np.where(masons == -i, 1, 0)
+        for i in range(1, self.worker_count + 1):
+            self.board[self.CELL.index(f"worker_A{i-1}")] = np.where(masons == i, 1, 0)
+            self.board[self.CELL.index(f"worker_B{i-1}")] = np.where(masons == -i, 1, 0)
             assert len(np.argwhere(masons == i)) == 1
             assert len(np.argwhere(masons == -i)) == 1
             self.workers["A"][i - 1].update_coordinate(*np.argwhere(masons == i)[0])
