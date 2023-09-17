@@ -24,7 +24,6 @@ def main():
     fa = API()
     match = fa.get_match()[0]
     id_ = match["id"]
-    print(match)
 
     observation = env.reset()
     env.unwrapped.reset_from_api(match)
@@ -39,10 +38,8 @@ def main():
             server_turn = field["turn"]
             break
     while not terminated and not truncated:
-        print(fa.get_field(id_))
         env.unwrapped.get_stat_from_api(fa.get_field(id_))
         env.render()
-        env.unwrapped.render_terminal()
         if env.unwrapped.current_team == "A":
             actions = env.unwrapped.random_act()
             # actions = nn.predict(env.unwrapped.get_around_workers())
@@ -62,7 +59,6 @@ def main():
         server_turn = fa.get_field(id_)["turn"]
     env.unwrapped.get_stat_from_api(fa.get_field(id_))
     env.render()
-    input()
     env.close()
 
 
