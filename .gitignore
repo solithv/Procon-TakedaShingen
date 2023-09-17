@@ -6,3 +6,4 @@ model/*
 !model/*.keras
 !model/*.zip.*
 .env
+server_configs/
