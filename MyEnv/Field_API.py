@@ -1,6 +1,5 @@
 import requests as req
 import os
-import json
 from dotenv import load_dotenv
 class API:
 
@@ -14,7 +13,7 @@ class API:
     def get_match(self):
         """
         試合一覧取得API
-        返り値: 試合idを格納した行列
+        返り値 id_: 試合idを格納した行列
         """
         r = req.get(self.match_url, headers=self.header)
 
