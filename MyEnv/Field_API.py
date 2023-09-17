@@ -20,7 +20,7 @@ class API:
         matches = r.json()
         id_ = []
         for match in matches["matches"]:
-            id_.append(f'/{match["id"]}')
+            id_.append(match["id"])
         return id_
     
     def get_field(self,path):
