@@ -1318,7 +1318,7 @@ class Game(gym.Env):
             act.append(self.ACTIONS.index("stay"))
         return act
 
-    def get_around(self, y: int, x: int, side_length: int = 3):
+    def get_around(self, y: int, x: int, side_length: int = 3, raw=False):
         if side_length % 2 == 0:
             raise ValueError("need to input an odd number")
         length_ = side_length // 2
@@ -1329,7 +1329,29 @@ class Game(gym.Env):
             constant_values=-1,
         )
         front = length_ * 2 + 1
-        return field[:, y : y + front, x : x + front]
+        field = field[:, y : y + front, x : x + front]
+        if raw:
+            return field
+        a = np.sum(
+            [
+                field[self.CELL.index(layer)]
+                for layer in self.CELL
+                if "worker_A" in layer
+            ],
+            axis=0,
+        )[np.newaxis, :, :]
+        a = np.where(a < 0, -1, a)
+        b = np.sum(
+            [
+                field[self.CELL.index(layer)]
+                for layer in self.CELL
+                if "worker_B" in layer
+            ],
+            axis=0,
+        )[np.newaxis, :, :]
+        b = np.where(b < 0, -1, b)
+        field = np.concatenate([field[: self.CELL.index("worker_A0")], a, b], axis=0)
+        return field
 
     def get_around_workers(
         self, team: str = None, side_length: int = 3
@@ -1359,6 +1381,7 @@ class Game(gym.Env):
         Args:
             around_workers (list[np.ndarray]): 職人の周囲
         """
+        layers = self.CELL[: self.CELL.index("worker_A0")] + ("worker_A", "worker_B")
         for around in around_workers:
             view = ""
             icon_base = max(len(value) for value in self.ICONS.values())
@@ -1374,13 +1397,7 @@ class Game(gym.Env):
                             cell.append(self.ICONS["outside"])
                             break
                         elif item:
-                            cell.append(
-                                *[
-                                    value
-                                    for key, value in self.ICONS.items()
-                                    if self.CELL[i].startswith(key)
-                                ]
-                            )
+                            cell.append(self.ICONS[layers[i]])
                     line.append(f"{','.join(cell):^{cell_num}}")
 
                 view += "|".join(line) + "\n"
