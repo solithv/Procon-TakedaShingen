@@ -1,4 +1,3 @@
-from collections import defaultdict
 import copy
 import csv
 import glob
@@ -7,6 +6,7 @@ import os
 import random
 import re
 from typing import Iterable, Union
+
 import numpy as np
 import pygame
 from pygame.locals import *
@@ -38,7 +38,7 @@ class Annotator:
         self.reset_render()
 
     def reset(self):
-        self.load_from_csv(sorted(self.csv_paths)[0])
+        self.load_from_csv(self.csv_paths)
 
     def do_annotate(self):
         features = []
@@ -48,17 +48,15 @@ class Annotator:
                 if self.board[self.layers.index("pond"), y, x]:
                     continue
                 feature = self.get_around(y, x, self.size)
-                target = self.get_action(feature)
+                target = np.identity(len(self.env.ACTIONS), dtype=np.int8)[
+                    self.get_action(feature)
+                ]
                 features.append(feature)
                 targets.append(target)
-                features_annotate, targets_annotate = self.make_annotation(
-                    feature, target
-                )
-                features += features_annotate
-                targets += targets_annotate
-                self.save_dataset(features, targets)
-                features = []
-                targets = []
+
+        self.save_dataset(features, targets)
+        features = []
+        targets = []
 
     def save_dataset(self, features, targets):
         with open(os.path.join(self.output_dir, "data.dat"), "a") as f:
@@ -68,9 +66,7 @@ class Annotator:
                         json.dumps(
                             {
                                 "X": x.tolist(),
-                                "Y": np.identity(len(self.env.ACTIONS), dtype=np.int8)[
-                                    y
-                                ].tolist(),
+                                "Y": y.tolist(),
                             }
                         ),
                         file=f,
@@ -82,9 +78,7 @@ class Annotator:
                     json.dumps(
                         {
                             "X": features.tolist(),
-                            "Y": np.identity(len(self.env.ACTIONS), dtype=np.int8)[
-                                targets
-                            ].tolist(),
+                            "Y": targets.tolist(),
                         }
                     ),
                     file=f,
@@ -93,6 +87,7 @@ class Annotator:
     def make_annotation(self, feature, target):
         def rotate_annotate(feature_, target_, count):
             feature_ = np.rot90(feature_, count, axes=(1, 2))
+            target_ = np.argmax(target_)
             target_name = self.env.ACTIONS[target_]
             for _ in range(count):
                 if target_name == "stay":
@@ -103,20 +98,25 @@ class Annotator:
                     split_name = target_name.split("_")
                     target_name = f"{split_name[0]}_{rotate_trans2[split_name[-1]]}"
             target_ = self.env.ACTIONS.index(target_name)
+            target_ = np.identity(len(self.env.ACTIONS), dtype=np.int8)[target_]
             return feature_, target_
 
         def horizontal_annotate(feature_, target_):
             feature_ = np.flip(copy.deepcopy(feature_), 1).copy()
+            target_ = np.argmax(target_)
             target_ = self.env.ACTIONS.index(
                 self.env.ACTIONS[target_].translate(horizontal_trans)
             )
+            target_ = np.identity(len(self.env.ACTIONS), dtype=np.int8)[target_]
             return feature_, target_
 
         def vertical_annotate(feature_, target_):
             feature_ = np.flip(copy.deepcopy(feature_), 2).copy()
+            target_ = np.argmax(target_)
             target_ = self.env.ACTIONS.index(
                 self.env.ACTIONS[target_].translate(vertical_trans)
             )
+            target_ = np.identity(len(self.env.ACTIONS), dtype=np.int8)[target_]
             return feature_, target_
 
         rotate_trans = str.maketrans({"N": "W", "W": "S", "S": "E", "E": "N"})
@@ -315,62 +315,6 @@ class Annotator:
                     self.placeImage(self.BLANK_IMG, i, j)
         self.drawGrids()
 
-    # def drawTurnInfo(self, actingWorker=None):
-    #     pygame.draw.rect(
-    #         self.window_surface,
-    #         self.env.BLACK,
-    #         (
-    #             0,
-    #             self.cell_size * self.height,
-    #             self.cell_size * self.width,
-    #             self.cell_size * 2,
-    #         ),
-    #     )
-    #     font = pygame.font.SysFont(None, 60)
-    #     if actingWorker:
-    #         text = font.render(
-    #             f"A's turn {actingWorker}/{self.worker_count}",
-    #             False,
-    #             self.env.WHITE,
-    #         )
-    #     else:
-    #         text = font.render(f"A's turn", False, self.env.WHITE)
-
-    #     text_rect = text.get_rect(
-    #         center=(
-    #             self.cell_size * self.width / 2,
-    #             self.cell_size * (self.height + 1),
-    #         )
-    #     )
-    #     self.window_surface.blit(text, text_rect)
-    #     pygame.display.update()
-
-    # def render_rgb_array(self):
-    #     view = [
-    #         [
-    #             [
-    #                 self.layers[i]
-    #                 for i, item in enumerate(self.board[:, y, x].astype(bool))
-    #                 if item
-    #             ]
-    #             for x in range(self.size)
-    #         ]
-    #         for y in range(self.size)
-    #     ]
-    #     if self.window_surface is None:
-    #         pygame.init()
-    #         pygame.display.init()
-    #         self.window_surface = pygame.display.set_mode(
-    #             (self.window_size_x, self.window_size_y + self.cell_size * 2)
-    #         )
-    #         pygame.display.set_caption("game")
-
-    #     self.drawAll(view)
-
-    # self.drawTurnInfo()
-    # if self.controller != "pygame":
-    #     return
-
     def get_action(self, board):
         def nonAllowedMovements(x, y, directions):
             coordinates = np.round(
@@ -407,29 +351,14 @@ class Annotator:
         ]
 
         self.drawAll(view)
-        # showTerritory = False
-        # actions = []
-        # actingWorker = 0
-        # while actingWorker < self.worker_count:
         if "action" in locals():
             del action
         while "action" not in locals():
             for event in pygame.event.get():
-                # if actingWorker >= self.worker_count:
-                #     break
                 mouseX, mouseY = pygame.mouse.get_pos()
                 cellX = int(mouseX // self.cell_size)
                 cellY = int(mouseY // self.cell_size)
-                # workerY, workerX = self.workers[self.current_team][
-                #     actingWorker
-                # ].get_coordinate()
                 workerY, workerX = [self.size // 2] * 2
-
-                # if event.type == KEYDOWN:
-                #     if event.key == pygame.K_RETURN:
-                #         if showTerritory:
-                #             self.drawAll(view)
-                #         showTerritory = not showTerritory
 
                 self.placeImage(
                     self.WORKER_A_HOVER_IMG,

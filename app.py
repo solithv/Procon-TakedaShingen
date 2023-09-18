@@ -18,8 +18,8 @@ def main():
     )
 
     nn = NNModel(model_path)
-    # nn.make_model(5)
     nn.load_model()
+    nn.model.summary()
 
     observation = env.reset()
 
@@ -30,6 +30,7 @@ def main():
         if env.unwrapped.current_team == "A":
             # actions = env.unwrapped.get_random_actions()
             actions = nn.predict(env.unwrapped.get_around_workers(5))
+            print(actions)
         else:
             actions = env.unwrapped.random_act()
             # actions = env.unwrapped.get_actions("pygame")

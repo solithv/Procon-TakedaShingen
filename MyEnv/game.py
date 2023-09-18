@@ -1354,13 +1354,13 @@ class Game(gym.Env):
         return field
 
     def get_around_workers(
-        self, team: str = None, side_length: int = 3
+        self, side_length: int = 3, team: str = None
     ) -> list[np.ndarray]:
         """職人の周囲を取得する
 
         Args:
-            team (str, optional): チーム名("A" or "B") 未指定で現在のチーム. Defaults to None.
             side_length (int, optional): 1辺の長さ(奇数で指定). Defaults to 3.
+            team (str, optional): チーム名("A" or "B") 未指定で現在のチーム. Defaults to None.
 
         Returns:
             list[np.ndarray]: 職人の周囲

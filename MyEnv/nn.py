@@ -38,8 +38,8 @@ class NNModel:
         """
         inputs = keras.Input(input_shape)
         x = layers.Flatten()(inputs)
-        x = layers.Dense(256, activation="relu")(x)
-        x = layers.Dense(256, activation="relu")(x)
+        x = layers.Dense(512, activation="relu")(x)
+        x = layers.Dense(512, activation="relu")(x)
         outputs = layers.Dense(output_size, activation="softmax")(x)
 
         return models.Model(inputs=inputs, outputs=outputs)
@@ -161,6 +161,6 @@ class NNModel:
         Returns:
             list[int]: 行動のリスト
         """
-        outs = self.model.predict(np.array(inputs))
-        arg = np.argmax(outs, axis=1)
-        return arg
+        out = self.model.predict(np.array(inputs))
+        args = np.argmax(out, axis=1)
+        return args
