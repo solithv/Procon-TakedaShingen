@@ -1,10 +1,12 @@
 from collections import defaultdict
+import copy
 import csv
 import glob
+import json
 import os
 import random
 import re
-from typing import Union
+from typing import Iterable, Union
 import numpy as np
 import pygame
 from pygame.locals import *
@@ -13,7 +15,8 @@ from MyEnv import Game
 
 
 class Annotator:
-    def __init__(self, csv_paths, size: int = 3) -> None:
+    def __init__(self, csv_paths, output_dir, size: int = 3) -> None:
+        self.output_dir = output_dir
         self.csv_paths = csv_paths
         self.size = size
         self.env = Game()
@@ -24,7 +27,7 @@ class Annotator:
         )
         self.window_surface = None
         self.cwd = os.getcwd()
-        self.display_size_x, self.display_size_y = 400, 400
+        self.display_size_x, self.display_size_y = 600, 600
         self.cell_size = min(
             self.display_size_x * 0.9 // self.size,
             self.display_size_y * 0.8 // self.size,
@@ -35,15 +38,97 @@ class Annotator:
         self.reset_render()
 
     def reset(self):
-        self.load_from_csv(self.csv_paths)
+        self.load_from_csv(sorted(self.csv_paths)[0])
 
-    def annotate(self):
+    def do_annotate(self):
+        features = []
+        targets = []
         for y in range(self.height):
             for x in range(self.width):
                 if self.board[self.layers.index("pond"), y, x]:
                     continue
-                action = self.get_action(self.get_around(y, x, self.size))
-                print(action)
+                feature = self.get_around(y, x, self.size)
+                target = self.get_action(feature)
+                features.append(feature)
+                targets.append(target)
+                features_annotate, targets_annotate = self.make_annotation(
+                    feature, target
+                )
+                features += features_annotate
+                targets += targets_annotate
+                self.save_dataset(features, targets)
+                features = []
+                targets = []
+
+    def save_dataset(self, features, targets):
+        with open(os.path.join(self.output_dir, "data.dat"), "a") as f:
+            if isinstance(targets, Iterable):
+                [
+                    print(
+                        json.dumps(
+                            {
+                                "X": x.tolist(),
+                                "Y": np.identity(len(self.env.ACTIONS), dtype=np.int8)[
+                                    y
+                                ].tolist(),
+                            }
+                        ),
+                        file=f,
+                    )
+                    for x, y in zip(features, targets)
+                ]
+            else:
+                print(
+                    json.dumps(
+                        {
+                            "X": features.tolist(),
+                            "Y": np.identity(len(self.env.ACTIONS), dtype=np.int8)[
+                                targets
+                            ].tolist(),
+                        }
+                    ),
+                    file=f,
+                )
+
+    def make_annotation(self, feature, target):
+        def rotate_annotate(feature_, target_, count):
+            feature_ = np.rot90(feature_, count, axes=(1, 2))
+            target_name = self.env.ACTIONS[target_]
+            for _ in range(count):
+                if target_name == "stay":
+                    continue
+                elif len(target_name.split("_")[-1]) == 1:
+                    target_name = target_name.translate(str.maketrans(rotate_trans))
+                else:
+                    split_name = target_name.split("_")
+                    target_name = f"{split_name[0]}_{rotate_trans2[split_name[-1]]}"
+            target_ = self.env.ACTIONS.index(target_name)
+            return feature_, target_
+
+        def horizontal_annotate(feature_, target_):
+            feature_ = np.flip(copy.deepcopy(feature_), 1).copy()
+            target_ = self.env.ACTIONS.index(
+                self.env.ACTIONS[target_].translate(horizontal_trans)
+            )
+            return feature_, target_
+
+        def vertical_annotate(feature_, target_):
+            feature_ = np.flip(copy.deepcopy(feature_), 2).copy()
+            target_ = self.env.ACTIONS.index(
+                self.env.ACTIONS[target_].translate(vertical_trans)
+            )
+            return feature_, target_
+
+        rotate_trans = str.maketrans({"N": "W", "W": "S", "S": "E", "E": "N"})
+        rotate_trans2 = {"NW": "SW", "SW": "SE", "SE": "NE", "NE": "NW"}
+        horizontal_trans = str.maketrans({"N": "S", "S": "N"})
+        vertical_trans = str.maketrans({"W": "E", "E": "W"})
+
+        data = [rotate_annotate(feature, target, i + 1) for i in range(3)]
+        data.append(horizontal_annotate(feature, target))
+        data.append(vertical_annotate(feature, target))
+        features, targets = [list(x) for x in zip(*data)]
+        return features, targets
 
     def load_from_csv(self, path: Union[str, list[str]]):
         if isinstance(path, (list, tuple)):
@@ -64,7 +149,6 @@ class Annotator:
                     elif item == "2":
                         self.board[self.layers.index("castle"), y, x] = 1
                     elif item == "a":
-                        # self.board[self.layers.index("worker_A"), y, x] = 1
                         a_count += 1
         self.worker_count = a_count
         self.update_blank()
@@ -88,8 +172,6 @@ class Annotator:
         )
         front = length_ * 2 + 1
         field = field[:, y : y + front, x : x + front]
-        if field.shape != (11, 3, 3):
-            print(field.shape)
         return field
 
     def reset_render(self):
@@ -474,10 +556,12 @@ class Annotator:
 
 
 def main():
+    output_dir = "./dataset"
+    os.makedirs(output_dir, exist_ok=True)
     csv_dir = "./field_data"
-    annotator = Annotator(glob.glob(os.path.join(csv_dir, "[ABC]*.csv")))
+    annotator = Annotator(glob.glob(os.path.join(csv_dir, "[ABC]*.csv")), output_dir, 5)
     annotator.reset()
-    annotator.annotate()
+    annotator.do_annotate()
 
 
 if __name__ == "__main__":

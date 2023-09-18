@@ -25,7 +25,7 @@ class NNModel:
         Args:
             sides (int, optional): 1辺の長さ. Defaults to 3.
         """
-        input_shape = (len(Game.CELL[:Game.CELL.index("worker_A0")])+2, sides, sides)
+        input_shape = (len(Game.CELL[: Game.CELL.index("worker_A0")]) + 2, sides, sides)
         output_size = len(Game.ACTIONS)
         self.model = self._make_model(input_shape, output_size)
 
@@ -103,10 +103,11 @@ class NNModel:
         log_dir: Path = Path(log_dir)
         log_dir.mkdir(exist_ok=True)
 
-        self.make_model()
-
         self.model.compile(
-            optimizer="adam", loss="categorical_crossentropy", metrics=["accuracy"]
+            optimizer="adam",
+            loss="categorical_crossentropy",
+            metrics=["accuracy"],
+            run_eagerly=True,
         )
         self.model.summary()
 
