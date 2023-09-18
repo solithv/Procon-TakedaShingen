@@ -1324,7 +1324,7 @@ class Game(gym.Env):
         length_ = side_length // 2
         field = np.pad(
             self.board,
-            [(0, 0), (length_, 0), (length_, 0)],
+            [(0, 0), (length_, length_), (length_, length_)],
             "constant",
             constant_values=-1,
         )
