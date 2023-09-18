@@ -18,8 +18,11 @@ class Annotator:
         self.size = size
         self.env = Game()
         self.env.reset()
+        self.layers = self.env.CELL[: self.env.CELL.index("worker_A0")] + (
+            "worker_A",
+            "worker_B",
+        )
         self.window_surface = None
-        self.clock = None
         self.cwd = os.getcwd()
         self.display_size_x, self.display_size_y = 400, 400
 
@@ -38,7 +41,7 @@ class Annotator:
         if isinstance(path, (list, tuple)):
             path = random.choice(path)
         size = int(re.sub(r"[\D]", "", os.path.normpath(path).split(os.path.sep)[-1]))
-        self.board = np.zeros((len(self.env.CELL), size, size), dtype=np.int8)
+        self.board = np.zeros((len(self.layers), size, size), dtype=np.int8)
         self.width, self.height = [size] * 2
 
         a_count = 0
@@ -47,25 +50,25 @@ class Annotator:
             for y, row in enumerate(reader):
                 for x, item in enumerate(row):
                     if item == "0":
-                        self.board[self.env.CELL.index("blank"), y, x] = 1
+                        self.board[self.layers.index("blank"), y, x] = 1
                     elif item == "1":
-                        self.board[self.env.CELL.index("pond"), y, x] = 1
+                        self.board[self.layers.index("pond"), y, x] = 1
                     elif item == "2":
-                        self.board[self.env.CELL.index("castle"), y, x] = 1
+                        self.board[self.layers.index("castle"), y, x] = 1
                     elif item == "a":
-                        self.board[self.env.CELL.index(f"worker_A{a_count}"), y, x] = 1
+                        # self.board[self.layers.index("worker_A"), y, x] = 1
                         a_count += 1
         self.worker_count = a_count
         self.update_blank()
 
     def update_blank(self):
-        self.board[self.env.CELL.index("blank")] = np.where(
+        self.board[self.layers.index("blank")] = np.where(
             self.board[1:].any(axis=0), 0, 1
         )
-        self.board[self.env.CELL.index("blank"), self.height :, :] = -1
-        self.board[self.env.CELL.index("blank"), :, self.width :] = -1
+        self.board[self.layers.index("blank"), self.height :, :] = -1
+        self.board[self.layers.index("blank"), :, self.width :] = -1
 
-    def get_around(self, y: int, x: int, side_length: int = 3):
+    def get_around(self, y: int, x: int, side_length: int = 3, raw=False):
         if side_length % 2 == 0:
             raise ValueError("need to input an odd number")
         length_ = side_length // 2
@@ -76,7 +79,29 @@ class Annotator:
             constant_values=-1,
         )
         front = length_ * 2 + 1
-        return field[:, y : y + front, x : x + front]
+        field = field[:, y : y + front, x : x + front]
+        if raw:
+            return field
+        a = np.sum(
+            [
+                field[self.layers.index(layer)]
+                for layer in self.layers
+                if "worker_A" in layer
+            ],
+            axis=0,
+        )[np.newaxis, :, :]
+        a = np.where(a < 0, -1, a)
+        b = np.sum(
+            [
+                field[self.layers.index(layer)]
+                for layer in self.layers
+                if "worker_B" in layer
+            ],
+            axis=0,
+        )[np.newaxis, :, :]
+        b = np.where(b < 0, -1, b)
+        field = np.concatenate([field[: self.layers.index("worker_A0")], a, b], axis=0)
+        return field
 
     def reset_render(self):
         self.IMG_SCALER = np.array((self.cell_size, self.cell_size))
@@ -219,51 +244,47 @@ class Annotator:
                     self.placeImage(self.BLANK_IMG, i, j)
         self.drawGrids()
 
-    def drawTurnInfo(self, actingWorker=None):
-        pygame.draw.rect(
-            self.window_surface,
-            self.env.BLACK,
-            (
-                0,
-                self.cell_size * self.height,
-                self.cell_size * self.width,
-                self.cell_size * 2,
-            ),
-        )
-        font = pygame.font.SysFont(None, 60)
-        if actingWorker:
-            text = font.render(
-                f"{self.current_team}'s turn {actingWorker}/{self.worker_count}",
-                False,
-                self.env.WHITE,
-            )
-        else:
-            text = font.render(f"{self.current_team}'s turn", False, self.env.WHITE)
+    # def drawTurnInfo(self, actingWorker=None):
+    #     pygame.draw.rect(
+    #         self.window_surface,
+    #         self.env.BLACK,
+    #         (
+    #             0,
+    #             self.cell_size * self.height,
+    #             self.cell_size * self.width,
+    #             self.cell_size * 2,
+    #         ),
+    #     )
+    #     font = pygame.font.SysFont(None, 60)
+    #     if actingWorker:
+    #         text = font.render(
+    #             f"{self.current_team}'s turn {actingWorker}/{self.worker_count}",
+    #             False,
+    #             self.env.WHITE,
+    #         )
+    #     else:
+    #         text = font.render(f"{self.current_team}'s turn", False, self.env.WHITE)
 
-        text_rect = text.get_rect(
-            center=(
-                self.cell_size * self.width / 2,
-                self.cell_size * (self.height + 1),
-            )
-        )
-        self.window_surface.blit(text, text_rect)
-        pygame.display.update()
+    #     text_rect = text.get_rect(
+    #         center=(
+    #             self.cell_size * self.width / 2,
+    #             self.cell_size * (self.height + 1),
+    #         )
+    #     )
+    #     self.window_surface.blit(text, text_rect)
+    #     pygame.display.update()
 
     def render_rgb_array(self):
-        """
-        描画を行う
-        """
-
         view = [
             [
                 [
-                    self.CELL[i]
+                    self.layers[i]
                     for i, item in enumerate(self.board[:, y, x].astype(bool))
                     if item
                 ]
-                for x in range(self.width)
+                for x in range(self.size)
             ]
-            for y in range(self.height)
+            for y in range(self.size)
         ]
         if self.window_surface is None:
             pygame.init()
@@ -272,13 +293,10 @@ class Annotator:
                 (self.window_size_x, self.window_size_y + self.cell_size * 2)
             )
             pygame.display.set_caption("game")
-        if self.clock is None:
-            self.clock = pygame.time.Clock()
 
         self.drawAll(view)
-        self.clock.tick(self.metadata["render_fps"])
 
-        self.drawTurnInfo()
+        # self.drawTurnInfo()
         # if self.controller != "pygame":
         #     return
 
@@ -301,177 +319,171 @@ class Annotator:
         view = [
             [
                 [
-                    self.CELL[i]
+                    self.layers[i]
                     for i, item in enumerate(self.board[:, y, x].astype(bool))
                     if item
                 ]
-                for x in range(self.width)
+                for x in range(self.size)
             ]
-            for y in range(self.height)
+            for y in range(self.size)
         ]
-        showTerritory = False
-        actions = []
-        actingWorker = 0
-        while actingWorker < self.worker_count:
-            for event in pygame.event.get():
-                if actingWorker >= self.worker_count:
-                    break
-                mouseX, mouseY = pygame.mouse.get_pos()
-                cellX = int(mouseX // self.cell_size)
-                cellY = int(mouseY // self.cell_size)
-                workerY, workerX = self.workers[self.current_team][
-                    actingWorker
-                ].get_coordinate()
+        # showTerritory = False
+        # actions = []
+        # actingWorker = 0
+        # while actingWorker < self.worker_count:
+        for event in pygame.event.get():
+            # if actingWorker >= self.worker_count:
+            #     break
+            mouseX, mouseY = pygame.mouse.get_pos()
+            cellX = int(mouseX // self.cell_size)
+            cellY = int(mouseY // self.cell_size)
+            # workerY, workerX = self.workers[self.current_team][
+            #     actingWorker
+            # ].get_coordinate()
+            workerY, workerX = [self.size // 2] * 2
 
-                if event.type == KEYDOWN:
-                    if event.key == pygame.K_RETURN:
-                        if showTerritory:
-                            self.drawAll(view)
-                        showTerritory = not showTerritory
+            # if event.type == KEYDOWN:
+            #     if event.key == pygame.K_RETURN:
+            #         if showTerritory:
+            #             self.drawAll(view)
+            #         showTerritory = not showTerritory
 
-                self.placeImage(
-                    eval(f"self.WORKER_{self.current_team}_HOVER_IMG"),
-                    workerY,
-                    workerX,
-                    workerNumber=str(actingWorker),
-                    scale=1.0,
-                )
-                pygame.display.update()
+            self.placeImage(
+                self.WORKER_A_HOVER_IMG,
+                workerY,
+                workerX,
+                scale=1.0,
+            )
+            pygame.display.update()
 
-                if event.type == KEYDOWN:
-                    if event.key == pygame.K_1:
-                        if not np.any(
-                            np.all(
-                                np.append(
-                                    nonAllowedMovements(workerX, workerY, 8),
-                                    [[workerX, workerY]],
-                                    axis=0,
-                                )
-                                == np.array([cellX, cellY]),
-                                axis=1,
+            if event.type == KEYDOWN:
+                if event.key == pygame.K_1:
+                    if not np.any(
+                        np.all(
+                            np.append(
+                                nonAllowedMovements(workerX, workerY, 8),
+                                [[workerX, workerY]],
+                                axis=0,
                             )
-                        ):
-                            continue
-                        directionVector = np.array([cellX - workerX, workerY - cellY])
-                        if directionVector[0] == directionVector[1] == 0:
-                            actions.append(0)
-                        else:
-                            actions.append(
-                                int(
-                                    (
-                                        (
-                                            np.round(
-                                                np.degrees(
-                                                    np.arctan2(
-                                                        directionVector[0],
-                                                        directionVector[1],
-                                                    )
-                                                )
-                                            )
-                                            / 45
-                                        )
-                                        % 8
-                                    )
-                                    + 1
-                                )
-                            )
-                        self.placeImage(self.BLANK_IMG, workerY, workerX)
-                        self.placeImage(
-                            eval(f"self.WORKER_{self.current_team}_IMG"),
-                            cellY,
-                            cellX,
-                            workerNumber=str(actingWorker),
+                            == np.array([cellX, cellY]),
+                            axis=1,
                         )
-                        self.drawGrids()
-                        actingWorker += 1
-                        pygame.display.update()
-                    # build
-                    elif event.key == pygame.K_2:
-                        if not np.any(
-                            np.all(
-                                nonAllowedMovements(workerX, workerY, 4)
-                                == np.array([cellX, cellY]),
-                                axis=1,
-                            )
-                        ):
-                            continue
-                        directionVector = np.array([cellX - workerX, workerY - cellY])
-                        actions.append(
-                            int(
+                    ):
+                        continue
+                    directionVector = np.array([cellX - workerX, workerY - cellY])
+                    if directionVector[0] == directionVector[1] == 0:
+                        action = 0
+                    else:
+                        action = int(
+                            (
                                 (
                                     np.round(
                                         np.degrees(
                                             np.arctan2(
-                                                -directionVector[1],
                                                 directionVector[0],
+                                                directionVector[1],
                                             )
                                         )
                                     )
-                                    / 90
+                                    / 45
                                 )
-                                + 10
+                                % 8
                             )
+                            + 1
                         )
-                        actingWorker += 1
-                        self.placeImage(self.BLANK_IMG, workerY, workerX)
-                        self.placeImage(
-                            eval(f"self.WORKER_{self.current_team}_IMG"),
-                            workerY,
-                            workerX,
-                            workerNumber=str(actingWorker - 1),
+                    self.placeImage(self.BLANK_IMG, workerY, workerX)
+                    self.placeImage(
+                        eval(f"self.WORKER_{self.current_team}_IMG"),
+                        cellY,
+                        cellX,
+                        workerNumber=str(actingWorker),
+                    )
+                    self.drawGrids()
+                    actingWorker += 1
+                    pygame.display.update()
+                # build
+                elif event.key == pygame.K_2:
+                    if not np.any(
+                        np.all(
+                            nonAllowedMovements(workerX, workerY, 4)
+                            == np.array([cellX, cellY]),
+                            axis=1,
                         )
-                        self.placeImage(
-                            eval(f"self.RAMPART_{self.current_team}_IMG"), cellY, cellX
-                        )
-                        self.drawGrids()
-                        pygame.display.update()
-
-                    # break
-                    elif event.key == pygame.K_3:
-                        if not np.any(
-                            np.all(
-                                nonAllowedMovements(workerX, workerY, 4)
-                                == np.array([cellX, cellY]),
-                                axis=1,
-                            )
-                        ):
-                            continue
-                        directionVector = np.array([cellX - workerX, workerY - cellY])
-                        actions.append(
-                            int(
-                                (
-                                    np.round(
-                                        np.degrees(
-                                            np.arctan2(
-                                                -directionVector[1],
-                                                directionVector[0],
-                                            )
-                                        )
+                    ):
+                        continue
+                    directionVector = np.array([cellX - workerX, workerY - cellY])
+                    action = int(
+                        (
+                            np.round(
+                                np.degrees(
+                                    np.arctan2(
+                                        -directionVector[1],
+                                        directionVector[0],
                                     )
-                                    / 90
                                 )
-                                + 14
                             )
+                            / 90
                         )
-                        actingWorker += 1
+                        + 10
+                    )
+                    actingWorker += 1
+                    self.placeImage(self.BLANK_IMG, workerY, workerX)
+                    self.placeImage(
+                        eval(f"self.WORKER_{self.current_team}_IMG"),
+                        workerY,
+                        workerX,
+                        workerNumber=str(actingWorker - 1),
+                    )
+                    self.placeImage(
+                        eval(f"self.RAMPART_{self.current_team}_IMG"), cellY, cellX
+                    )
+                    self.drawGrids()
+                    pygame.display.update()
 
-                        self.placeImage(self.BLANK_IMG, workerY, workerX)
-                        self.placeImage(
-                            eval(f"self.WORKER_{self.current_team}_IMG"),
-                            workerY,
-                            workerX,
-                            workerNumber=str(actingWorker - 1),
+                # break
+                elif event.key == pygame.K_3:
+                    if not np.any(
+                        np.all(
+                            nonAllowedMovements(workerX, workerY, 4)
+                            == np.array([cellX, cellY]),
+                            axis=1,
                         )
-                        self.placeImage(self.BLANK_IMG, cellY, cellX)
-                        self.drawGrids()
-                        pygame.display.update()
+                    ):
+                        continue
+                    directionVector = np.array([cellX - workerX, workerY - cellY])
+                    action = int(
+                        (
+                            np.round(
+                                np.degrees(
+                                    np.arctan2(
+                                        -directionVector[1],
+                                        directionVector[0],
+                                    )
+                                )
+                            )
+                            / 90
+                        )
+                        + 14
+                    )
+                    actingWorker += 1
+
+                    self.placeImage(self.BLANK_IMG, workerY, workerX)
+                    self.placeImage(
+                        eval(f"self.WORKER_{self.current_team}_IMG"),
+                        workerY,
+                        workerX,
+                        workerNumber=str(actingWorker - 1),
+                    )
+                    self.placeImage(self.BLANK_IMG, cellY, cellX)
+                    self.drawGrids()
+                    pygame.display.update()
             self.drawTurnInfo(actingWorker=actingWorker + 1)
-        return actions
+        return action
 
 
 def main():
     csv_dir = "./field_data"
-    annotator = Annotator(glob.glob(csv_dir, "*.csv"))
+    annotator = Annotator(glob.glob(csv_dir, "[ABC]*.csv"))
 
 
 if __name__ == "__main__":
