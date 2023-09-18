@@ -98,7 +98,7 @@ class Game(gym.Env):
 
     def __init__(
         self,
-        csv_path: Union[str, list[str]],
+        csv_path: Union[str, list[str]] = None,
         render_mode="ansi",
         max_steps=200,
         first_player: Optional[int] = None,
@@ -229,7 +229,15 @@ class Game(gym.Env):
         self.score_A, self.score_B = 0, 0
         self.previous_score_A, self.previous_score_B = 0, 0
         self.turn = 1
-        name = self.load_from_csv(self.csv_path)
+        if self.csv_path is not None:
+            name = self.load_from_csv(self.csv_path)
+            info = {"mode": "csv", "csv_name": name}
+        else:
+            self.board = np.zeros(
+                (len(self.CELL), self.FIELD_MAX, self.FIELD_MAX), dtype=np.int8
+            )
+            self.width, self.height = [self.FIELD_MAX] * 2
+            info = {"mode": "api"}
 
         self.cell_size = min(
             self.display_size_x * 0.9 // self.width,
@@ -242,7 +250,6 @@ class Game(gym.Env):
             self.reset_render()
 
         self.update_blank()
-        info = {"csv_name": name}
         return self.get_observation(), info
 
     def compile_layers(self, *layers: tuple[str], one_hot: bool = True):
@@ -306,7 +313,7 @@ class Game(gym.Env):
         else:
             return False
 
-    def is_buildable(self, worker: Worker, y: int, x: int):
+    def is_buildable(self, worker: Worker, y: int, x: int, smart: bool = False):
         """
         内部関数
         建築可能判定
@@ -322,11 +329,22 @@ class Game(gym.Env):
                 *[f"worker_{worker.opponent_team}{i}" for i in range(self.WORKER_MAX)],
             )[y, x]
         ):
-            return True
+            if smart and not self.compile_layers(f"rampart_{worker.team}")[y, x]:
+                territory = copy.deepcopy(
+                    self.board[self.CELL.index(f"rampart_{worker.team}")]
+                )
+                territory[y, x] = 1
+                res = (
+                    self.fill_area(territory).sum()
+                    >= self.board[self.CELL.index(f"territory_{worker.team}")].sum()
+                )
+                return res
+            else:
+                return True
         else:
             return False
 
-    def is_breakable(self, worker: Worker, y: int, x: int, both: bool = True):
+    def is_breakable(self, worker: Worker, y: int, x: int, smart: bool = False):
         """
         内部関数
         破壊可能判定
@@ -335,13 +353,20 @@ class Game(gym.Env):
             not worker.is_action
             and 0 <= y < self.height
             and 0 <= x < self.width
-            and (
-                self.compile_layers("rampart_A", "rampart_B")[y, x]
-                if both
-                else self.compile_layers(f"rampart_{self.opponent_team}")[y, x]
-            )
+            and self.compile_layers("rampart_A", "rampart_B")[y, x]
         ):
-            return True
+            if smart and self.compile_layers(f"rampart_{worker.team}")[y, x]:
+                territory = copy.deepcopy(
+                    self.board[self.CELL.index(f"rampart_{worker.team}")]
+                )
+                territory[y, x] = 0
+                res = (
+                    self.fill_area(territory).sum()
+                    > self.board[self.CELL.index(f"territory_{worker.team}")].sum()
+                )
+                return res
+            else:
+                return True
         else:
             return False
 
@@ -1220,9 +1245,52 @@ class Game(gym.Env):
                 ):
                     act_able.append(w)
 
-            act.append(random.choice(act_able))
+            if len(act_able) > 0:
+                act.append(random.choice(act_able))
+            else:
+                act.append(self.ACTIONS.index("stay"))
+
         while self.WORKER_MAX > len(act):
-            act.append(0)
+            act.append(self.ACTIONS.index("stay"))
+        return act
+
+    def staged_random_act(self, team=None):
+        """行動可能な範囲でランダムな行動を返す
+
+        Args:
+            waste (bool, optional): 無駄な行動を許容. Defaults to False.
+        """
+        team = team if team is not None else self.current_team
+        [worker.turn_init() for worker in self.workers[team]]
+        self.worker_positions = [
+            worker.get_coordinate() for worker in self.workers[team]
+        ]
+        act = []
+        for worker in self.workers[team]:
+            act_able = []
+            pos = worker.get_coordinate()
+            group = "break"
+
+            for action in reversed(self.ACTIONS):
+                if group != action.split("_")[0] and len(act_able):
+                    break
+                group = action.split("_")[0]
+                direction = self.get_direction(self.ACTIONS.index(action))
+                act_pos = (np.array(pos) + np.array(direction)).astype(int)
+                if "break" in action and self.is_breakable(worker, *act_pos, True):
+                    act_able.append(self.ACTIONS.index(action))
+                elif "build" in action and self.is_buildable(worker, *act_pos, True):
+                    act_able.append(self.ACTIONS.index(action))
+                elif "move" in action and self.is_movable(worker, *act_pos):
+                    act_able.append(self.ACTIONS.index(action))
+
+            if len(act_able) > 0:
+                act.append(random.choice(act_able))
+            else:
+                act.append(self.ACTIONS.index("stay"))
+
+        while self.WORKER_MAX > len(act):
+            act.append(self.ACTIONS.index("stay"))
         return act
 
     def get_around_workers(
@@ -1302,6 +1370,9 @@ class Game(gym.Env):
         self.current_player = 0 if data["first"] else 1
         self.change_player(no_change=True)
         self.max_steps = data["turns"]
+        self.SCORE_MULTIPLIER["castle"] = data["bonus"]["castle"]
+        self.SCORE_MULTIPLIER["territory"] = data["bonus"]["territory"]
+        self.SCORE_MULTIPLIER["rampart"] = data["bonus"]["wall"]
         self.turn = 1
         # self.turn_seconds=data["turnSeconds"]
         self.height, self.width = data["board"]["height"], data["board"]["width"]
