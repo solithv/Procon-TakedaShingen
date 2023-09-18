@@ -25,9 +25,9 @@ class NNModel:
         Args:
             sides (int, optional): 1辺の長さ. Defaults to 3.
         """
-        input_shape = (len(Game.CELL), sides, sides)
+        input_shape = (len(Game.CELL[:Game.CELL.index("worker_A0")])+2, sides, sides)
         output_size = len(Game.ACTIONS)
-        self._make_model(input_shape, output_size)
+        self.model = self._make_model(input_shape, output_size)
 
     def _make_model(self, input_shape: tuple[int], output_size: int):
         """モデルを定義
@@ -42,7 +42,7 @@ class NNModel:
         x = layers.Dense(256, activation="relu")(x)
         outputs = layers.Dense(output_size, activation="softmax")(x)
 
-        self.model = models.Model(inputs=inputs, outputs=outputs)
+        return models.Model(inputs=inputs, outputs=outputs)
 
     def save_model(self, model_path: str = None):
         """モデルを保存
