@@ -1,4 +1,4 @@
-from nn import NNModel
+from MyEnv import NNModel
 
 
 def train():

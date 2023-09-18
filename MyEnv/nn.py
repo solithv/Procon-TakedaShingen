@@ -6,9 +6,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from keras import layers, models
 
-from MyEnv import Game
-from restore_model import combine_split_zip
-from split_model import split_zip
+from .game import Game
+from .util import Util
 
 
 class NNModel:
@@ -61,7 +60,7 @@ class NNModel:
                 root_dir=model_path.parent,
                 base_dir=f"{model_path.name}.keras",
             )
-            split_zip(f"{model_path}.zip", model_path)
+            Util.split_zip(f"{model_path}.zip", model_path)
 
     def load_model(self, from_zip: bool = True, model_path: str = None):
         """モデルを読み込み
@@ -72,7 +71,7 @@ class NNModel:
         """
         model_path: Path = self.model_path if model_path is None else Path(model_path)
         if from_zip and list(model_path.parent.glob("*.zip.[0-9][0-9][0-9]")):
-            combine_split_zip(model_path, f"{model_path}.zip")
+            Util.combine_split_zip(model_path, f"{model_path}.zip")
             shutil.unpack_archive(f"{model_path}.zip", model_path.parent)
         self.model = models.load_model(f"{model_path}.keras")
 
