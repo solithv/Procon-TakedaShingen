@@ -26,13 +26,13 @@ def main():
     terminated, truncated = [False] * 2
     while not terminated and not truncated:
         env.render()
+        # env.unwrapped.print_around(env.unwrapped.get_around_workers(side_length=5))
         if env.unwrapped.current_team == "A":
             actions = env.unwrapped.get_random_actions()
             # actions = nn.predict(env.unwrapped.get_around_workers())
         else:
             actions = env.unwrapped.random_act()
             # actions = env.unwrapped.get_actions("pygame")
-        # env.unwrapped.print_around(env.unwrapped.get_around_workers(side_length=5))
         # print(actions)
         observation, reward, terminated, truncated, info = env.step(actions)
         print(
@@ -87,7 +87,6 @@ def server():
         else:
             actions = env.unwrapped.get_random_actions()
             fa.post_actions(env.unwrapped.make_post_data(actions), id_, True)
-            # actions = env.unwrapped.get_actions("pygame")
         # env.unwrapped.print_around(env.unwrapped.get_around_workers(side_length=5))
         print(env.unwrapped.make_post_data(actions))
         # print(actions)

@@ -312,6 +312,19 @@ class Game(gym.Env):
             and (y, x) not in self.get_team_worker_coordinate(worker.team)
             and (y, x) not in self.worker_positions
         ):
+            if smart:
+                field = self.get_around(y, x)
+                compiled: np.ndarray = np.sum(
+                    [
+                        field[self.CELL.index(layer)]
+                        for layer in (
+                            f"rampart_{worker.team}",
+                            f"territory_{worker.team}",
+                        )
+                    ],
+                    axis=0,
+                )
+                return not compiled.all()
             return True
         else:
             return False
@@ -1286,6 +1299,13 @@ class Game(gym.Env):
                     act_able.append(self.ACTIONS.index(action))
                 elif "move" in action and self.is_movable(worker, *act_pos, True):
                     act_able.append(self.ACTIONS.index(action))
+            if len(act_able) == 0:
+                for action in self.ACTIONS:
+                    if "move" in action:
+                        direction = self.get_direction(self.ACTIONS.index(action))
+                        act_pos = (np.array(pos) + np.array(direction)).astype(int)
+                        if self.is_movable(worker, *act_pos):
+                            act_able.append(self.ACTIONS.index(action))
 
             if len(act_able) > 0:
                 act.append(random.choice(act_able))
@@ -1295,6 +1315,19 @@ class Game(gym.Env):
         while self.WORKER_MAX > len(act):
             act.append(self.ACTIONS.index("stay"))
         return act
+
+    def get_around(self, y: int, x: int, side_length: int = 3):
+        if side_length % 2 == 0:
+            raise ValueError("need to input an odd number")
+        length_ = side_length // 2
+        field = np.pad(
+            self.board,
+            [(0, 0), (length_, 0), (length_, 0)],
+            "constant",
+            constant_values=-1,
+        )
+        front = length_ * 2 + 1
+        return field[:, y : y + front, x : x + front]
 
     def get_around_workers(
         self, team: str = None, side_length: int = 3
@@ -1312,20 +1345,10 @@ class Game(gym.Env):
             team = self.current_team
         elif team == "opponent":
             team = self.opponent_team
-        if side_length % 2 == 0:
-            raise ValueError("need to input an odd number")
-        length_ = side_length // 2
-        field = np.pad(
-            self.board,
-            [(0, 0), (length_, 0), (length_, 0)],
-            "constant",
-            constant_values=-1,
-        )
-        front = length_ * 2 + 1
-        around_workers = []
-        for worker in self.workers[team]:
-            y, x = worker.get_coordinate()
-            around_workers.append(field[:, y : y + front, x : x + front])
+        around_workers = [
+            self.get_around(*worker.get_coordinate(), side_length)
+            for worker in self.workers[team]
+        ]
         return around_workers
 
     def print_around(self, around_workers: list[np.ndarray]):
