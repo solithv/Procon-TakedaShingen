@@ -164,9 +164,11 @@ class Game(gym.Env):
         内部関数
         blank層を更新
         """
-        self.board[0] = np.where(self.board[1:].any(axis=0), 0, 1)
-        self.board[0, self.height :, :] = -1
-        self.board[0, :, self.width :] = -1
+        self.board[self.CELL.index("blank")] = np.where(
+            self.board[1:].any(axis=0), 0, 1
+        )
+        self.board[self.CELL.index("blank"), self.height :, :] = -1
+        self.board[self.CELL.index("blank"), :, self.width :] = -1
 
     def load_from_csv(self, path: Union[str, list[str]]):
         """
