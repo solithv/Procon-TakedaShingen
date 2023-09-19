@@ -92,11 +92,8 @@ class Annotator:
             for _ in range(count):
                 if target_name == "stay":
                     continue
-                elif len(target_name.split("_")[-1]) == 1:
-                    target_name = target_name.translate(str.maketrans(rotate_trans))
-                else:
-                    split_name = target_name.split("_")
-                    target_name = f"{split_name[0]}_{rotate_trans2[split_name[-1]]}"
+                split_name = target_name.split("_")
+                target_name = f"{split_name[0]}_{rotate_trans[split_name[-1]]}"
             target_ = self.env.ACTIONS.index(target_name)
             target_ = np.identity(len(self.env.ACTIONS), dtype=np.int8)[target_]
             return feature_, target_
@@ -119,8 +116,16 @@ class Annotator:
             target_ = np.identity(len(self.env.ACTIONS), dtype=np.int8)[target_]
             return feature_, target_
 
-        rotate_trans = str.maketrans({"N": "W", "W": "S", "S": "E", "E": "N"})
-        rotate_trans2 = {"NW": "SW", "SW": "SE", "SE": "NE", "NE": "NW"}
+        rotate_trans = {
+            "N": "W",
+            "W": "S",
+            "S": "E",
+            "E": "N",
+            "NW": "SW",
+            "SW": "SE",
+            "SE": "NE",
+            "NE": "NW",
+        }
         horizontal_trans = str.maketrans({"N": "S", "S": "N"})
         vertical_trans = str.maketrans({"W": "E", "E": "W"})
 
