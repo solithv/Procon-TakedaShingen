@@ -12,7 +12,7 @@ import pygame
 from pygame.locals import *
 from pathlib import Path
 
-from MyEnv import Game, Util
+from MyEnv import Game, Util, Worker
 
 
 class Annotator:
@@ -24,9 +24,9 @@ class Annotator:
         self.basename = self.filename.rsplit(".", 1)[0]
         self.csv_paths = csv_paths
         self.size = size
-        self.env = Game()
-        self.env.reset()
-        self.layers = self.env.CELL[: self.env.CELL.index("worker_A0")] + (
+        self.game = Game()
+        self.game.reset()
+        self.layers = self.game.CELL[: self.game.CELL.index("worker_A0")] + (
             "worker_A",
             "worker_B",
         )
@@ -81,14 +81,14 @@ class Annotator:
                     continue
                 feature = self.get_around(y, x, self.size)
                 # self.env.print_around([self.update_blank_around(feature)])
-                target = np.identity(len(self.env.ACTIONS), dtype=np.int8)[
+                target = np.identity(len(self.game.ACTIONS), dtype=np.int8)[
                     self.get_action(feature)
                 ]
                 features.append(feature)
                 targets.append(target)
                 if not only:
                     feature = self.make_random_feature(feature, 0.1)
-                    target = np.identity(len(self.env.ACTIONS), dtype=np.int8)[
+                    target = np.identity(len(self.game.ACTIONS), dtype=np.int8)[
                         self.get_action(feature)
                     ]
                     features.append(feature)
@@ -188,32 +188,32 @@ class Annotator:
         def rotate_augment(feature_, target_, count):
             feature_ = np.rot90(feature_, count, axes=(1, 2))
             target_ = np.argmax(target_)
-            target_name = self.env.ACTIONS[target_]
+            target_name = self.game.ACTIONS[target_]
             for _ in range(count):
                 if target_name == "stay":
                     continue
                 split_name = target_name.split("_")
                 target_name = f"{split_name[0]}_{rotate_trans[split_name[-1]]}"
-            target_ = self.env.ACTIONS.index(target_name)
-            target_ = np.identity(len(self.env.ACTIONS), dtype=np.int8)[target_]
+            target_ = self.game.ACTIONS.index(target_name)
+            target_ = np.identity(len(self.game.ACTIONS), dtype=np.int8)[target_]
             return feature_, target_
 
         def horizontal_augment(feature_, target_):
             feature_ = np.flip(feature_, 1)
             target_ = np.argmax(target_)
-            target_ = self.env.ACTIONS.index(
-                self.env.ACTIONS[target_].translate(horizontal_trans)
+            target_ = self.game.ACTIONS.index(
+                self.game.ACTIONS[target_].translate(horizontal_trans)
             )
-            target_ = np.identity(len(self.env.ACTIONS), dtype=np.int8)[target_]
+            target_ = np.identity(len(self.game.ACTIONS), dtype=np.int8)[target_]
             return feature_, target_
 
         def vertical_augment(feature_, target_):
             feature_ = np.flip(feature_, 2)
             target_ = np.argmax(target_)
-            target_ = self.env.ACTIONS.index(
-                self.env.ACTIONS[target_].translate(vertical_trans)
+            target_ = self.game.ACTIONS.index(
+                self.game.ACTIONS[target_].translate(vertical_trans)
             )
-            target_ = np.identity(len(self.env.ACTIONS), dtype=np.int8)[target_]
+            target_ = np.identity(len(self.game.ACTIONS), dtype=np.int8)[target_]
             return feature_, target_
 
         rotate_trans = {
@@ -344,7 +344,7 @@ class Annotator:
         for i in range(1, self.size):
             pygame.draw.line(
                 self.window_surface,
-                self.env.BLACK,
+                self.game.BLACK,
                 (i * self.cell_size, 0),
                 (i * self.cell_size, self.window_size_y),
                 1,
@@ -353,7 +353,7 @@ class Annotator:
         for i in range(1, self.size):
             pygame.draw.line(
                 self.window_surface,
-                self.env.BLACK,
+                self.game.BLACK,
                 (0, i * self.cell_size),
                 (self.window_size_x, i * self.cell_size),
                 1,
@@ -512,15 +512,15 @@ class Annotator:
                     for i in range(self.size):
                         for j in range(self.size):
                             if territoryALayer[i][j] == territoryBLayer[i][j] == 1:
-                                color = self.env.PURPLE
+                                color = self.game.PURPLE
                             elif territoryALayer[i][j] == 1:
-                                color = self.env.RED
+                                color = self.game.RED
                             elif territoryBLayer[i][j] == 1:
-                                color = self.env.BLUE
+                                color = self.game.BLUE
                             elif openTerritoryALayer[i][j] == 1:
-                                color = self.env.PINK
+                                color = self.game.PINK
                             elif openTerritoryBLayer[i][j] == 1:
-                                color = self.env.SKY
+                                color = self.game.SKY
                             elif territoryALayer[i][j] < 0:
                                 pygame.draw.rect(
                                     self.window_surface,
@@ -673,16 +673,88 @@ class Annotator:
                         pygame.display.update()
         return action
 
+    def play_game_annotator(self):
+        env = Game(self.csv_paths, render_mode="human", use_pyautogui=True)
+
+        observation = env.reset()
+
+        terminated, truncated = [False] * 2
+        while not terminated and not truncated:
+            env.render()
+            if env.unwrapped.current_team == "A":
+                workers = env.workers["A"]
+                actions = env.get_actions("pygame")
+                features, targets = self.game_dataset_maker(env.board, actions, workers)
+                self.save_dataset(features, targets)
+            else:
+                actions = env.random_act()
+            observation, reward, terminated, truncated, info = env.step(actions)
+            print(
+                f"turn:{info['turn']}, score_A:{info['score_A']}, score_B:{info['score_B']}"
+            )
+        env.close()
+
+    def game_get_around(
+        self, board: np.ndarray, y: int, x: int, side_length: int = 3, raw=False
+    ):
+        if side_length % 2 == 0:
+            raise ValueError("need to input an odd number")
+        length_ = side_length // 2
+        print(board.shape)
+        field = np.pad(
+            board,
+            [(0, 0), (length_, length_), (length_, length_)],
+            "constant",
+            constant_values=-1,
+        )
+        front = length_ * 2 + 1
+        field = field[:, y : y + front, x : x + front]
+        if raw:
+            return field
+        a = np.sum(
+            [
+                field[self.game.CELL.index(layer)]
+                for layer in self.game.CELL
+                if "worker_A" in layer
+            ],
+            axis=0,
+        )[np.newaxis, :, :]
+        a = np.where(a < 0, -1, a)
+        b = np.sum(
+            [
+                field[self.game.CELL.index(layer)]
+                for layer in self.game.CELL
+                if "worker_B" in layer
+            ],
+            axis=0,
+        )[np.newaxis, :, :]
+        b = np.where(b < 0, -1, b)
+        field = np.concatenate(
+            [field[: self.game.CELL.index("worker_A0")], a, b], axis=0
+        )
+        return field
+
+    def game_dataset_maker(
+        self, board: np.ndarray, actions: list[int], workers: list[Worker]
+    ):
+        features = []
+        targets = []
+        for worker, action in zip(workers, actions):
+            feature = self.game_get_around(board, *worker.get_coordinate(), self.size)
+            target = np.identity(len(self.game.ACTIONS), dtype=np.int8)[action]
+            features.append(feature)
+            targets.append(target)
+        return features, targets
+
 
 def main():
     output_dir = "./dataset"
     csv_dir = "./field_data"
-    annotator = Annotator(
-        glob.glob(os.path.join(csv_dir, "[ABC]*.csv")), output_dir, size=5
-    )
+    annotator = Annotator(glob.glob(os.path.join(csv_dir, "*.csv")), output_dir, size=5)
     for _ in range(1):
         annotator.reset()
-        annotator.do_annotate()
+        # annotator.do_annotate()
+        annotator.play_game_annotator()
     annotator.finish()
 
 

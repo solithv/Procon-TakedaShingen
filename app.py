@@ -19,6 +19,7 @@ def main():
 
     nn = NNModel(model_path)
     nn.load_model()
+    nn.make_model(5)
     nn.model.summary()
 
     observation = env.reset()

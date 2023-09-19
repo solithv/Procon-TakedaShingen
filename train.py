@@ -6,7 +6,8 @@ from annotator import Annotator
 
 
 def train():
-    annotator = Annotator(None, None)
+    output_dir = "./dataset"
+    annotator = Annotator(None, output_dir)
     data_path = "./dataset/data.dat"
     model_path = "./model/game"
     nn = NNModel(model_path)
