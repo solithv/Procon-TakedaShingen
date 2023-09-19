@@ -5,12 +5,12 @@ import os
 import random
 import re
 import shutil
+from pathlib import Path
 from typing import Iterable, Union
 
 import numpy as np
 import pygame
 from pygame.locals import *
-from pathlib import Path
 
 from MyEnv import Game, Util, Worker
 
@@ -753,8 +753,10 @@ def main():
     annotator = Annotator(glob.glob(os.path.join(csv_dir, "*.csv")), output_dir, size=5)
     for _ in range(1):
         annotator.reset()
-        # annotator.do_annotate()
         annotator.play_game_annotator()
+    # for _ in range(1):
+    #     annotator.reset()
+    #     annotator.do_annotate()
     annotator.finish()
 
 
