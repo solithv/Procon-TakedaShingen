@@ -95,6 +95,7 @@ class Game(gym.Env):
     YELLOW = (255, 255, 0)
     SKY = (127, 176, 255)
     PINK = (255, 127, 127)
+    PURPLE = (128, 0, 128)
 
     def __init__(
         self,
@@ -1045,7 +1046,9 @@ class Game(gym.Env):
                     )
                     for i in range(self.height):
                         for j in range(self.width):
-                            if territoryALayer[i][j] == 1:
+                            if territoryALayer[i][j] == territoryBLayer[i][j] == 1:
+                                color = self.PURPLE
+                            elif territoryALayer[i][j] == 1:
                                 color = self.RED
                             elif territoryBLayer[i][j] == 1:
                                 color = self.BLUE

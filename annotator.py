@@ -1,22 +1,27 @@
-import copy
 import csv
 import glob
 import json
 import os
 import random
 import re
+import shutil
 from typing import Iterable, Union
 
 import numpy as np
 import pygame
 from pygame.locals import *
+from pathlib import Path
 
-from MyEnv import Game
+from MyEnv import Game, Util
 
 
 class Annotator:
-    def __init__(self, csv_paths, output_dir, size: int = 3) -> None:
-        self.output_dir = output_dir
+    def __init__(
+        self, csv_paths, output_dir, filename="data.dat", size: int = 3
+    ) -> None:
+        self.output_dir = Path(output_dir)
+        self.filename = filename
+        self.basename = self.filename.rsplit(".", 1)[0]
         self.csv_paths = csv_paths
         self.size = size
         self.env = Game()
@@ -36,9 +41,36 @@ class Annotator:
         self.window_size_x = self.size * self.cell_size
         self.window_size_y = self.size * self.cell_size
         self.reset_render()
+        self.GRAY = (125, 125, 125)
+
+        if not self.output_dir.joinpath(self.filename).exists() and list(
+            self.output_dir.glob("*.zip.[0-9][0-9][0-9]")
+        ):
+            Util.combine_split_zip(
+                self.output_dir.joinpath(self.basename),
+                f"{self.output_dir.joinpath(self.basename)}.zip",
+            )
+            shutil.unpack_archive(
+                f"{self.output_dir.joinpath(self.basename)}.zip", self.output_dir
+            )
 
     def reset(self):
         self.load_from_csv(self.csv_paths)
+
+    def finish(self):
+        if self.output_dir.joinpath(self.filename).stat().st_size > 100 * (1024**2):
+            shutil.make_archive(
+                self.output_dir.joinpath(self.basename),
+                format="zip",
+                root_dir=self.output_dir,
+                base_dir=self.filename,
+            )
+            Util.split_zip(
+                f"{self.output_dir.joinpath(self.basename)}.zip",
+                self.output_dir.joinpath(self.basename),
+            )
+            self.output_dir.joinpath(f"{self.basename}.zip").unlink()
+            self.output_dir.joinpath(self.filename).unlink()
 
     def do_annotate(self, only=False):
         features = []
@@ -48,18 +80,23 @@ class Annotator:
                 if self.board[self.layers.index("pond"), y, x]:
                     continue
                 feature = self.get_around(y, x, self.size)
-                if not only:
-                    feature = self.make_random_feature(feature, 0.5)
-                self.env.print_around([self.update_blank_around(feature)])
+                # self.env.print_around([self.update_blank_around(feature)])
                 target = np.identity(len(self.env.ACTIONS), dtype=np.int8)[
                     self.get_action(feature)
                 ]
                 features.append(feature)
                 targets.append(target)
+                if not only:
+                    feature = self.make_random_feature(feature, 0.1)
+                    target = np.identity(len(self.env.ACTIONS), dtype=np.int8)[
+                        self.get_action(feature)
+                    ]
+                    features.append(feature)
+                    targets.append(target)
 
-        self.save_dataset(features, targets)
-        features = []
-        targets = []
+                self.save_dataset(features, targets)
+                features = []
+                targets = []
 
     def make_random_feature(self, origin: np.ndarray, rate: float):
         conflict_list = (
@@ -70,6 +107,17 @@ class Annotator:
             {"worker_A", "worker_B"},
             {"worker_A", "rampart_B"},
             {"worker_B", "rampart_A"},
+            {"rampart_A", "territory_A"},
+            {"rampart_B", "territory_B"},
+            {"rampart_A", "open_territory_A"},
+            {"rampart_B", "open_territory_B"},
+            {"rampart_A", "open_territory_B"},
+            {"rampart_B", "open_territory_A"},
+            {"territory_A", "open_territory_A"},
+            {"territory_B", "open_territory_B"},
+            {"territory_A", "open_territory_B"},
+            {"territory_B", "open_territory_A"},
+            {"open_territory_A", "open_territory_B"},
         )
         noise = np.random.rand(*origin.shape)
         noise = np.where(noise < rate, 1, 0)
@@ -110,7 +158,8 @@ class Annotator:
         return feature
 
     def save_dataset(self, features, targets):
-        with open(os.path.join(self.output_dir, "data.dat"), "a") as f:
+        os.makedirs(self.output_dir, exist_ok=True)
+        with open(os.path.join(self.output_dir, self.filename), "a") as f:
             if isinstance(targets, Iterable):
                 [
                     print(
@@ -335,7 +384,7 @@ class Annotator:
                 if not cellInfo:
                     pygame.draw.rect(
                         self.window_surface,
-                        (125, 125, 125),
+                        self.GRAY,
                         (
                             j * self.cell_size,
                             i * self.cell_size,
@@ -459,10 +508,12 @@ class Annotator:
                     openTerritoryBLayer = self.compile_layers(
                         board, "open_territory_B", one_hot=True
                     )
-                    print(territoryALayer)
+                    pygame.display.update()
                     for i in range(self.size):
                         for j in range(self.size):
-                            if territoryALayer[i][j] == 1:
+                            if territoryALayer[i][j] == territoryBLayer[i][j] == 1:
+                                color = self.env.PURPLE
+                            elif territoryALayer[i][j] == 1:
                                 color = self.env.RED
                             elif territoryBLayer[i][j] == 1:
                                 color = self.env.BLUE
@@ -470,6 +521,18 @@ class Annotator:
                                 color = self.env.PINK
                             elif openTerritoryBLayer[i][j] == 1:
                                 color = self.env.SKY
+                            elif territoryALayer[i][j] < 0:
+                                pygame.draw.rect(
+                                    self.window_surface,
+                                    self.GRAY,
+                                    (
+                                        j * self.cell_size,
+                                        i * self.cell_size,
+                                        self.cell_size,
+                                        self.cell_size,
+                                    ),
+                                )
+                                continue
                             else:
                                 self.placeImage(self.BLANK_IMG, i, j)
                                 continue
@@ -613,11 +676,14 @@ class Annotator:
 
 def main():
     output_dir = "./dataset"
-    os.makedirs(output_dir, exist_ok=True)
     csv_dir = "./field_data"
-    annotator = Annotator(glob.glob(os.path.join(csv_dir, "[ABC]*.csv")), output_dir, 5)
-    annotator.reset()
-    annotator.do_annotate()
+    annotator = Annotator(
+        glob.glob(os.path.join(csv_dir, "[ABC]*.csv")), output_dir, size=5
+    )
+    for _ in range(1):
+        annotator.reset()
+        annotator.do_annotate()
+    annotator.finish()
 
 
 if __name__ == "__main__":
