@@ -12,7 +12,8 @@ import numpy as np
 import pygame
 from pygame.locals import *
 
-from MyEnv import Game, Util, Worker
+from MyEnv import Game, Worker
+from Utils import Util
 
 
 class Annotator:
@@ -700,7 +701,6 @@ class Annotator:
         if side_length % 2 == 0:
             raise ValueError("need to input an odd number")
         length_ = side_length // 2
-        print(board.shape)
         field = np.pad(
             board,
             [(0, 0), (length_, length_), (length_, length_)],

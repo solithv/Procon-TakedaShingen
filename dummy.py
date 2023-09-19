@@ -2,7 +2,8 @@ import time
 
 import gymnasium as gym
 
-from MyEnv import API
+import MyEnv
+from Utils import API
 
 
 def main():

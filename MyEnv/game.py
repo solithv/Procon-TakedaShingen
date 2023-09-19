@@ -1321,7 +1321,7 @@ class Game(gym.Env):
             act.append(self.ACTIONS.index("stay"))
         return act
 
-    def get_around(self, y: int, x: int, side_length: int = 3, raw=False):
+    def get_around(self, y: int, x: int, side_length: int = 5, raw=False):
         if side_length % 2 == 0:
             raise ValueError("need to input an odd number")
         length_ = side_length // 2
@@ -1357,7 +1357,7 @@ class Game(gym.Env):
         return field
 
     def get_around_workers(
-        self, side_length: int = 3, team: str = None
+        self, side_length: int = 5, team: str = None
     ) -> list[np.ndarray]:
         """職人の周囲を取得する
 

@@ -3,7 +3,8 @@ import time
 
 import gymnasium as gym
 
-from MyEnv import API, NNModel
+from NN import NNModel
+from Utils import API
 
 
 def main():
@@ -56,8 +57,8 @@ def server():
     )
 
     nn = NNModel(model_path)
-    nn.make_model()
-    # nn.load_model()
+    # nn.make_model()
+    nn.load_model()
 
     fa = API()
     match = fa.get_match()

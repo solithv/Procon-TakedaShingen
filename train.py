@@ -1,8 +1,9 @@
 import json
 
 import numpy as np
-from MyEnv import NNModel
+
 from annotator import Annotator
+from NN import NNModel
 
 
 def train():

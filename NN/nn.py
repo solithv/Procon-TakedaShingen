@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from keras import layers, models
 
-from .game import Game
-from .util import Util
+from MyEnv import Game
+from Utils import Util
 
 
 class NNModel:
@@ -19,7 +19,7 @@ class NNModel:
         """
         self.model_path = Path(model_path)
 
-    def make_model(self, sides: int = 3):
+    def make_model(self, sides: int = 5):
         """モデルを作成
 
         Args:

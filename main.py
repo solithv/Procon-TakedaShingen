@@ -2,7 +2,9 @@ import time
 
 import gymnasium as gym
 
-from MyEnv import API, NNModel
+import MyEnv
+from NN import NNModel
+from Utils import API
 
 
 def main():
@@ -15,8 +17,7 @@ def main():
     )
 
     nn = NNModel(model_path)
-    nn.make_model()
-    # nn.load_model()
+    nn.load_model()
 
     fa = API()
     match = fa.get_match()
@@ -24,7 +25,6 @@ def main():
         print("match is not one")
     match = match[0]
     id_ = match["id"]
-    my_turn = int(match["first"])
 
     observation = env.reset()
     env.unwrapped.reset_from_api(match)
