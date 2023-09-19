@@ -94,8 +94,8 @@ class Annotator:
                     file=f,
                 )
 
-    def make_annotation(self, feature, target):
-        def rotate_annotate(feature_, target_, count):
+    def make_augmentation(self, feature, target):
+        def rotate_augment(feature_, target_, count):
             feature_ = np.rot90(feature_, count, axes=(1, 2))
             target_ = np.argmax(target_)
             target_name = self.env.ACTIONS[target_]
@@ -108,8 +108,8 @@ class Annotator:
             target_ = np.identity(len(self.env.ACTIONS), dtype=np.int8)[target_]
             return feature_, target_
 
-        def horizontal_annotate(feature_, target_):
-            feature_ = np.flip(copy.deepcopy(feature_), 1).copy()
+        def horizontal_augment(feature_, target_):
+            feature_ = np.flip(feature_, 1)
             target_ = np.argmax(target_)
             target_ = self.env.ACTIONS.index(
                 self.env.ACTIONS[target_].translate(horizontal_trans)
@@ -117,8 +117,8 @@ class Annotator:
             target_ = np.identity(len(self.env.ACTIONS), dtype=np.int8)[target_]
             return feature_, target_
 
-        def vertical_annotate(feature_, target_):
-            feature_ = np.flip(copy.deepcopy(feature_), 2).copy()
+        def vertical_augment(feature_, target_):
+            feature_ = np.flip(feature_, 2)
             target_ = np.argmax(target_)
             target_ = self.env.ACTIONS.index(
                 self.env.ACTIONS[target_].translate(vertical_trans)
@@ -139,9 +139,9 @@ class Annotator:
         horizontal_trans = str.maketrans({"N": "S", "S": "N"})
         vertical_trans = str.maketrans({"W": "E", "E": "W"})
 
-        data = [rotate_annotate(feature, target, i + 1) for i in range(3)]
-        data.append(horizontal_annotate(feature, target))
-        data.append(vertical_annotate(feature, target))
+        data = [rotate_augment(feature, target, i + 1) for i in range(3)]
+        data.append(horizontal_augment(feature, target))
+        data.append(vertical_augment(feature, target))
         features, targets = [list(x) for x in zip(*data)]
         return features, targets
 

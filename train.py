@@ -21,7 +21,7 @@ def train():
             feature, target = json.loads(line).values()
             x.append(np.array(feature, dtype=np.int8))
             y.append(target)
-            features_annotate, targets_annotate = annotator.make_annotation(
+            features_annotate, targets_annotate = annotator.make_augmentation(
                 np.array(feature, dtype=np.int8), np.argmax(target)
             )
             x += features_annotate
