@@ -135,7 +135,7 @@ class Annotator:
             for x in range(self.size):
                 is_ok = False
                 while not is_ok:
-                    for conflict in conflict_list:
+                    for conflict in random.sample(conflict_list, len(conflict_list)):
                         if conflict.issubset(
                             {
                                 self.layers[i]
