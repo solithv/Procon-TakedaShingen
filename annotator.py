@@ -40,7 +40,7 @@ class Annotator:
     def reset(self):
         self.load_from_csv(self.csv_paths)
 
-    def do_annotate(self):
+    def do_annotate(self, only=True):
         features = []
         targets = []
         for y in range(self.height):
@@ -48,6 +48,9 @@ class Annotator:
                 if self.board[self.layers.index("pond"), y, x]:
                     continue
                 feature = self.get_around(y, x, self.size)
+                self.env.print_around([self.update_blank_around(feature)])
+                if only:
+                    self.make_random_feature(feature, 0.1)
                 target = np.identity(len(self.env.ACTIONS), dtype=np.int8)[
                     self.get_action(feature)
                 ]
@@ -57,6 +60,13 @@ class Annotator:
         self.save_dataset(features, targets)
         features = []
         targets = []
+
+    def make_random_feature(self, origin: np.ndarray, rate: float):
+        conflict_list = (("castle", "rampart_A"), ("castle", "rampart_A"))
+        noise = np.random.rand(*origin.shape)
+        noise = np.where(noise < rate, 1, 0)
+        # print(noise)
+        print(noise.shape)
 
     def save_dataset(self, features, targets):
         with open(os.path.join(self.output_dir, "data.dat"), "a") as f:
@@ -165,6 +175,18 @@ class Annotator:
         self.board[self.layers.index("blank"), self.height :, :] = -1
         self.board[self.layers.index("blank"), :, self.width :] = -1
 
+    def update_blank_around(self, field: np.ndarray):
+        assert self.layers.index("blank") != len(self.layers) - 1
+        field[self.layers.index("blank")] = np.where(
+            field[self.layers.index("blank") + 1 :].any(axis=0), 0, 1
+        )
+        field[self.layers.index("blank")] = np.where(
+            np.any(field[self.layers.index("blank") + 1 :] < 0, axis=0),
+            -1,
+            field[self.layers.index("blank")],
+        )
+        return field
+
     def get_around(self, y: int, x: int, side_length: int = 3):
         if side_length % 2 == 0:
             raise ValueError("need to input an odd number")
@@ -177,6 +199,8 @@ class Annotator:
         )
         front = length_ * 2 + 1
         field = field[:, y : y + front, x : x + front]
+        field[self.layers.index("worker_A"), y + length_, x + length_] = 1
+        self.update_blank()
         return field
 
     def reset_render(self):
