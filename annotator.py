@@ -40,7 +40,7 @@ class Annotator:
     def reset(self):
         self.load_from_csv(self.csv_paths)
 
-    def do_annotate(self, only=True):
+    def do_annotate(self, only=False):
         features = []
         targets = []
         for y in range(self.height):
@@ -48,9 +48,9 @@ class Annotator:
                 if self.board[self.layers.index("pond"), y, x]:
                     continue
                 feature = self.get_around(y, x, self.size)
+                if not only:
+                    feature = self.make_random_feature(feature, 0.5)
                 self.env.print_around([self.update_blank_around(feature)])
-                if only:
-                    self.make_random_feature(feature, 0.1)
                 target = np.identity(len(self.env.ACTIONS), dtype=np.int8)[
                     self.get_action(feature)
                 ]
@@ -62,11 +62,52 @@ class Annotator:
         targets = []
 
     def make_random_feature(self, origin: np.ndarray, rate: float):
-        conflict_list = (("castle", "rampart_A"), ("castle", "rampart_A"))
+        conflict_list = (
+            {"castle", "rampart_A"},
+            {"castle", "rampart_A"},
+            {"pond", "worker_A"},
+            {"pond", "worker_B"},
+            {"worker_A", "worker_B"},
+            {"worker_A", "rampart_B"},
+            {"worker_B", "rampart_A"},
+        )
         noise = np.random.rand(*origin.shape)
         noise = np.where(noise < rate, 1, 0)
+        noise[self.layers.index("pond")] = np.where(
+            noise[self.layers.index("pond")] >= 0, 0, noise[self.layers.index("pond")]
+        )
+        noise[self.layers.index("castle")] = np.where(
+            noise[self.layers.index("castle")] >= 0,
+            0,
+            noise[self.layers.index("castle")],
+        )
+        center = (self.size // 2 for _ in range(2))
+        for y in range(self.size):
+            for x in range(self.size):
+                is_ok = False
+                while not is_ok:
+                    for conflict in conflict_list:
+                        if conflict.issubset(
+                            {
+                                self.layers[i]
+                                for i, value in enumerate(
+                                    origin[:, y, x] + noise[:, y, x]
+                                )
+                                if value > 0
+                            }
+                        ):
+                            item = random.choice(list(conflict))
+                            if (y, x) == center and item == "worker_A":
+                                break
+                            noise[self.layers.index(item), y, x] = 0
+                            break
+                    else:
+                        is_ok = True
         # print(noise)
-        print(noise.shape)
+        feature = np.where(origin >= 0, origin + noise, origin)
+        feature = np.where(feature > 0, 1, feature)
+        feature = self.update_blank_around(feature)
+        return feature
 
     def save_dataset(self, features, targets):
         with open(os.path.join(self.output_dir, "data.dat"), "a") as f:
@@ -199,9 +240,25 @@ class Annotator:
         )
         front = length_ * 2 + 1
         field = field[:, y : y + front, x : x + front]
-        field[self.layers.index("worker_A"), y + length_, x + length_] = 1
+        field[self.layers.index("worker_A"), length_, length_] = 1
         self.update_blank()
         return field
+
+    def compile_layers(self, board, *layers: tuple[str], one_hot: bool = True):
+        """
+        入力された層を合成した2次元配列を返す
+        one_hot: bool 返り値の各要素を1,0のみにする (default=True)
+        """
+        compiled = np.sum(
+            [board[self.layers.index(layer)] for layer in layers],
+            axis=0,
+            dtype=np.int8,
+        )
+        if one_hot:
+            compiled = np.where(compiled > 0, 1, compiled)
+        # compiled[self.size :, :] = -1
+        # compiled[:, self.size :] = -1
+        return compiled
 
     def reset_render(self):
         self.IMG_SCALER = np.array((self.cell_size, self.cell_size))
@@ -275,12 +332,19 @@ class Annotator:
             for j in range(self.size):
                 self.placeImage(self.BLANK_IMG, i, j)
                 cellInfo = view[i][j]
-                worker_A_exist = any(
-                    f"worker_A{k}" in cellInfo for k in range(self.env.WORKER_MAX)
-                )
-                worker_B_exist = any(
-                    f"worker_B{k}" in cellInfo for k in range(self.env.WORKER_MAX)
-                )
+                if not cellInfo:
+                    pygame.draw.rect(
+                        self.window_surface,
+                        (125, 125, 125),
+                        (
+                            j * self.cell_size,
+                            i * self.cell_size,
+                            self.cell_size,
+                            self.cell_size,
+                        ),
+                    )
+                worker_A_exist = "worker_A" in cellInfo
+                worker_B_exist = "worker_B" in cellInfo
 
                 if "castle" in cellInfo and worker_A_exist:
                     self.placeImage(self.CASTLE_IMG, i, j)
@@ -288,7 +352,6 @@ class Annotator:
                         self.WORKER_A_IMG,
                         i,
                         j,
-                        workerNumber=cellInfo[-1][-1],
                         scale=0.7,
                     )
                 elif "castle" in cellInfo and worker_B_exist:
@@ -297,7 +360,6 @@ class Annotator:
                         self.WORKER_B_IMG,
                         i,
                         j,
-                        workerNumber=cellInfo[-1][-1],
                         scale=0.7,
                     )
                 elif "rampart_A" in cellInfo and worker_A_exist:
@@ -306,7 +368,6 @@ class Annotator:
                         self.WORKER_A_IMG,
                         i,
                         j,
-                        workerNumber=cellInfo[-1][-1],
                         scale=0.8,
                     )
                 elif "rampart_B" in cellInfo and worker_B_exist:
@@ -315,7 +376,6 @@ class Annotator:
                         self.WORKER_B_IMG,
                         i,
                         j,
-                        workerNumber=cellInfo[-1][-1],
                         scale=0.8,
                     )
                 elif "pond" in cellInfo and "rampart_A" in cellInfo:
@@ -327,13 +387,9 @@ class Annotator:
                 elif "castle" in cellInfo:
                     self.placeImage(self.CASTLE_IMG, i, j)
                 elif worker_A_exist:
-                    self.placeImage(
-                        self.WORKER_A_IMG, i, j, workerNumber=cellInfo[-1][-1]
-                    )
+                    self.placeImage(self.WORKER_A_IMG, i, j)
                 elif worker_B_exist:
-                    self.placeImage(
-                        self.WORKER_B_IMG, i, j, workerNumber=cellInfo[-1][-1]
-                    )
+                    self.placeImage(self.WORKER_B_IMG, i, j)
                 elif "pond" in cellInfo:
                     self.placeImage(self.POND_IMG, i, j)
                 elif "rampart_A" in cellInfo:
@@ -369,25 +425,67 @@ class Annotator:
             pygame.display.set_caption("annotator")
         view = [
             [
-                [
-                    self.layers[i]
-                    for i, item in enumerate(board[:, y, x].astype(bool))
-                    if item
-                ]
+                [self.layers[i] for i, item in enumerate(board[:, y, x]) if item > 0]
                 for x in range(self.size)
             ]
             for y in range(self.size)
         ]
 
         self.drawAll(view)
-        if "action" in locals():
-            del action
-        while "action" not in locals():
+        showTerritory = False
+        action = None
+        while action is None:
             for event in pygame.event.get():
                 mouseX, mouseY = pygame.mouse.get_pos()
                 cellX = int(mouseX // self.cell_size)
                 cellY = int(mouseY // self.cell_size)
                 workerY, workerX = [self.size // 2] * 2
+                if event.type == KEYDOWN:
+                    if event.key == pygame.K_RETURN:
+                        if showTerritory:
+                            self.drawAll(view)
+                        showTerritory = not showTerritory
+
+                if showTerritory:
+                    territoryALayer = self.compile_layers(
+                        board, "territory_A", one_hot=True
+                    )
+                    territoryBLayer = self.compile_layers(
+                        board, "territory_B", one_hot=True
+                    )
+                    openTerritoryALayer = self.compile_layers(
+                        board, "open_territory_A", one_hot=True
+                    )
+                    openTerritoryBLayer = self.compile_layers(
+                        board, "open_territory_B", one_hot=True
+                    )
+                    print(territoryALayer)
+                    for i in range(self.size):
+                        for j in range(self.size):
+                            if territoryALayer[i][j] == 1:
+                                color = self.env.RED
+                            elif territoryBLayer[i][j] == 1:
+                                color = self.env.BLUE
+                            elif openTerritoryALayer[i][j] == 1:
+                                color = self.env.PINK
+                            elif openTerritoryBLayer[i][j] == 1:
+                                color = self.env.SKY
+                            else:
+                                self.placeImage(self.BLANK_IMG, i, j)
+                                continue
+
+                            pygame.draw.rect(
+                                self.window_surface,
+                                color,
+                                (
+                                    j * self.cell_size,
+                                    i * self.cell_size,
+                                    self.cell_size,
+                                    self.cell_size,
+                                ),
+                            )
+                    self.drawGrids()
+                    continue
 
                 self.placeImage(
                     self.WORKER_A_HOVER_IMG,
