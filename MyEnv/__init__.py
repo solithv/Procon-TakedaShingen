@@ -1,4 +1,5 @@
 from gymnasium.envs.registration import register
+
 from .game import *
 from .worker import *
 

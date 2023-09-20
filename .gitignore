@@ -1,9 +1,10 @@
 .venv/
 __pycache__/
-memo
-test.py
-.Xauthority
+test*
 .devcontainer
 model/*
+!model/*.keras
 !model/*.zip.*
-Stochastic_muzero/*/
+.env
+server_configs/
+log/
