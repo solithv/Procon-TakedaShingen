@@ -750,7 +750,8 @@ class Annotator:
 def main():
     output_dir = "./dataset"
     csv_dir = "./field_data"
-    annotator = Annotator(glob.glob(os.path.join(csv_dir, "*.csv")), output_dir, size=5)
+    filename = "data.dat"
+    annotator = Annotator(glob.glob(os.path.join(csv_dir, "*.csv")), output_dir,filename, size=5)
     for _ in range(1):
         annotator.reset()
         annotator.play_game_annotator()
