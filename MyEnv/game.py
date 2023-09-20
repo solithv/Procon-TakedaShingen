@@ -275,9 +275,8 @@ class Game(gym.Env):
             dtype=np.int8,
         )
         if one_hot:
-            compiled = np.where(compiled, 1, 0)
-        compiled[self.height :, :] = -1
-        compiled[:, self.width :] = -1
+            compiled = np.where(compiled > 0, 1, compiled)
+            compiled = np.where(compiled < 0, -1, compiled)
         return compiled
 
     def get_team_worker_coordinate(
@@ -1417,11 +1416,18 @@ class Game(gym.Env):
         )
         front = length_ * 2 + 1
         field = field[:, y : y + front, x : x + front]
-        if raw:
-            return field
+
+        return field if raw else self.compile_worker_layers(field)
+
+    def compile_worker_layers(self, board: np.ndarray):
+        """職人の層を結合
+
+        Args:
+            board (ndarray): 盤面
+        """
         a = np.sum(
             [
-                field[self.CELL.index(layer)]
+                board[self.CELL.index(layer)]
                 for layer in self.CELL
                 if "worker_A" in layer
             ],
@@ -1430,15 +1436,15 @@ class Game(gym.Env):
         a = np.where(a < 0, -1, a)
         b = np.sum(
             [
-                field[self.CELL.index(layer)]
+                board[self.CELL.index(layer)]
                 for layer in self.CELL
                 if "worker_B" in layer
             ],
             axis=0,
         )[np.newaxis, :, :]
         b = np.where(b < 0, -1, b)
-        field = np.concatenate([field[: self.CELL.index("worker_A0")], a, b], axis=0)
-        return field
+        board = np.concatenate([board[: self.CELL.index("worker_A0")], a, b], axis=0)
+        return board
 
     def get_around_workers(
         self, side_length: int = 5, team: str = None
