@@ -34,7 +34,8 @@ def main():
             # actions = nn.predict(env.unwrapped.get_around_workers(5))
             print(actions)
         else:
-            actions = env.unwrapped.random_act()
+            actions = env.unwrapped.get_random_actions()
+            # actions = env.unwrapped.random_act()
             # actions = env.unwrapped.get_actions("pygame")
         # print(actions)
         observation, reward, terminated, truncated, info = env.step(actions)
