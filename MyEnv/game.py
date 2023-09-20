@@ -160,16 +160,17 @@ class Game(gym.Env):
         self.current_team = self.TEAM[self.current_player]
         self.opponent_team = self.TEAM[1 - self.current_player]
 
-    def update_blank(self):
+    def update_blank(self, board: np.ndarray):
         """
         内部関数
         blank層を更新
         """
-        self.board[self.CELL.index("blank")] = np.where(
-            self.board[1:].any(axis=0), 0, 1
+        assert self.CELL.index("blank") != len(self.CELL) - 1
+        board[self.CELL.index("blank")] = np.where(
+            board[self.CELL.index("blank") + 1 :].any(axis=0), 0, 1
         )
-        self.board[self.CELL.index("blank"), self.height :, :] = -1
-        self.board[self.CELL.index("blank"), :, self.width :] = -1
+        board = np.where(np.any(board < 0, axis=0), -1, board)
+        return board
 
     def load_from_csv(self, path: Union[str, list[str]]):
         """
@@ -213,7 +214,7 @@ class Game(gym.Env):
         )
         assert a_count == b_count, "チーム間の職人数が不一致"
         self.worker_count = a_count
-        self.update_blank()
+        self.board = self.update_blank(self.board)
 
         return name
 
@@ -255,16 +256,21 @@ class Game(gym.Env):
         if self.render_mode == "human":
             self.reset_render()
 
-        self.update_blank()
+        self.board = self.update_blank(self.board)
         return self.get_observation(), info
 
-    def compile_layers(self, *layers: tuple[str], one_hot: bool = True):
-        """
-        入力された層を合成した2次元配列を返す
-        one_hot: bool 返り値の各要素を1,0のみにする (default=True)
+    def compile_layers(
+        self, board: np.ndarray, *layers: tuple[str], one_hot: bool = True
+    ):
+        """入力された層を合成した2次元配列を返す
+
+        Args:
+            board (np.ndarray): 盤面
+            layers (tuple[str]): 結合したい層の名称
+            one_hot (bool, optional): 返り値の各要素を1,0のみにする. Defaults to True.
         """
         compiled = np.sum(
-            [self.board[self.CELL.index(layer)] for layer in layers],
+            [board[self.CELL.index(layer)] for layer in layers],
             axis=0,
             dtype=np.int8,
         )
@@ -308,6 +314,7 @@ class Game(gym.Env):
             and 0 <= y < self.height
             and 0 <= x < self.width
             and not self.compile_layers(
+                self.board,
                 f"rampart_{worker.opponent_team}",
                 "pond",
                 *[f"worker_{worker.opponent_team}{i}" for i in range(self.WORKER_MAX)],
@@ -316,7 +323,7 @@ class Game(gym.Env):
             and (y, x) not in self.worker_positions
         ):
             if smart:
-                field = self.get_around(y, x)
+                field = self.get_around(self.board, y, x, side_length=3)
                 compiled: np.ndarray = np.sum(
                     [
                         field[self.CELL.index(layer)]
@@ -342,6 +349,7 @@ class Game(gym.Env):
             and 0 <= y < self.height
             and 0 <= x < self.width
             and not self.compile_layers(
+                self.board,
                 "rampart_A",
                 "rampart_B",
                 "castle",
@@ -374,11 +382,14 @@ class Game(gym.Env):
             not worker.is_action
             and 0 <= y < self.height
             and 0 <= x < self.width
-            and self.compile_layers("rampart_A", "rampart_B")[y, x]
+            and self.compile_layers(self.board, "rampart_A", "rampart_B")[y, x]
         ):
-            if smart and self.compile_layers(f"rampart_{worker.team}")[y, x]:
+            if (
+                smart
+                and self.compile_layers(self.board, f"rampart_{worker.team}")[y, x]
+            ):
                 territory = copy.deepcopy(
-                    self.board[self.CELL.index(f"rampart_{worker.team}")]
+                    self.board[self.CELL.index(self.board, f"rampart_{worker.team}")]
                 )
                 territory[y, x] = 0
                 res = (
@@ -392,6 +403,36 @@ class Game(gym.Env):
                 return True
         else:
             return False
+
+    def is_actionable(
+        self,
+        worker: Worker,
+        action: str,
+        stay=False,
+        smart: bool = False,
+        move_smart: bool = False,
+    ):
+        """行動が有効か判定
+
+        Args:
+            worker (Worker): 職人
+            action (str): 行動名
+            stay (bool, optional): 待機を許容するか. Defaults to False.
+            smart (bool, optional): 建築、破壊が点数向上するか判定する. Defaults to False.
+            move_smart (bool, optional): 移動先が城壁と陣地で埋まっているか判定する. Defaults to False.
+        """
+        position = worker.get_coordinate()
+        direction = self.get_direction(self.ACTIONS.index(action))
+        act_pos = (np.array(position) + np.array(direction)).astype(int)
+        if "break" in action and self.is_breakable(worker, *act_pos, smart):
+            return True
+        elif "build" in action and self.is_buildable(worker, *act_pos, smart):
+            return True
+        elif "move" in action and self.is_movable(worker, *act_pos, move_smart):
+            return True
+        if stay and action == "stay":
+            return True
+        return False
 
     def get_direction(self, action: int):
         """
@@ -577,7 +618,9 @@ class Game(gym.Env):
             (self.previous_territory_A + self.previous_open_territory_A),
             1,
             0,
-        ) - self.compile_layers("rampart_A", "rampart_B", "territory_A", "territory_B")
+        ) - self.compile_layers(
+            self.board, "rampart_A", "rampart_B", "territory_A", "territory_B"
+        )
         self.board[self.CELL.index("open_territory_A")] = np.where(
             self.board[self.CELL.index("open_territory_A")] == np.int8(-1),
             0,
@@ -590,7 +633,9 @@ class Game(gym.Env):
             (self.previous_territory_B + self.previous_open_territory_B),
             1,
             0,
-        ) - self.compile_layers("rampart_A", "rampart_B", "territory_A", "territory_B")
+        ) - self.compile_layers(
+            self.board, "rampart_A", "rampart_B", "territory_A", "territory_B"
+        )
         self.board[self.CELL.index("open_territory_B")] = np.where(
             self.board[self.CELL.index("open_territory_B")] == np.int8(-1),
             0,
@@ -609,7 +654,7 @@ class Game(gym.Env):
         self.score_A = (
             np.sum(
                 self.board[self.CELL.index("castle"), : self.height, : self.width]
-                * self.compile_layers("territory_A", "open_territory_A")[
+                * self.compile_layers(self.board, "territory_A", "open_territory_A")[
                     : self.height, : self.width
                 ]
             )
@@ -618,7 +663,7 @@ class Game(gym.Env):
         self.score_A += (
             np.sum(
                 (1 - self.board[self.CELL.index("castle"), : self.height, : self.width])
-                * self.compile_layers("territory_A", "open_territory_A")[
+                * self.compile_layers(self.board, "territory_A", "open_territory_A")[
                     : self.height, : self.width
                 ]
             )
@@ -634,7 +679,7 @@ class Game(gym.Env):
         self.score_B = (
             np.sum(
                 self.board[self.CELL.index("castle"), : self.height, : self.width]
-                * self.compile_layers("territory_B", "open_territory_B")[
+                * self.compile_layers(self.board, "territory_B", "open_territory_B")[
                     : self.height, : self.width
                 ]
             )
@@ -643,7 +688,7 @@ class Game(gym.Env):
         self.score_B += (
             np.sum(
                 (1 - self.board[self.CELL.index("castle"), : self.height, : self.width])
-                * self.compile_layers("territory_B", "open_territory_B")[
+                * self.compile_layers(self.board, "territory_B", "open_territory_B")[
                     : self.height, : self.width
                 ]
             )
@@ -655,8 +700,6 @@ class Game(gym.Env):
             )
             * self.SCORE_MULTIPLIER["rampart"]
         )
-
-        # print(f"score_A:{self.score_A}, score_B:{self.score_B}")
 
     def get_reward(self):
         if self.current_team == "A":
@@ -699,7 +742,6 @@ class Game(gym.Env):
         terminated, truncated = False, False
         if self.turn >= self.max_steps:
             truncated = True
-        # self.terminated = True
         return terminated, truncated
 
     def step(self, actions: Union[list[int], tuple[int]]):
@@ -725,7 +767,7 @@ class Game(gym.Env):
         self.action_workers(sorted_workers)
         self.update_territory()
         self.update_open_territory()
-        self.update_blank()
+        self.board = self.update_blank(self.board)
         self.calculate_score()
         reward = self.get_reward()
         terminated, truncated = self.is_done()
@@ -755,6 +797,7 @@ class Game(gym.Env):
             return self.render_terminal(*args, **kwargs)
 
     def render_terminal(self):
+        """コンソールに描画"""
         view = ""
         icon_base = max(len(value) for value in self.ICONS.values())
         item_num = int(
@@ -985,8 +1028,6 @@ class Game(gym.Env):
         self.clock.tick(self.metadata["render_fps"])
 
         self.drawTurnInfo()
-        # if self.controller != "pygame":
-        #     return
 
     def get_actions_from_pygame(self):
         def nonAllowedMovements(x, y, directions):
@@ -1036,13 +1077,17 @@ class Game(gym.Env):
                         showTerritory = not showTerritory
 
                 if showTerritory:
-                    territoryALayer = self.compile_layers("territory_A", one_hot=True)
-                    territoryBLayer = self.compile_layers("territory_B", one_hot=True)
+                    territoryALayer = self.compile_layers(
+                        self.board, "territory_A", one_hot=True
+                    )
+                    territoryBLayer = self.compile_layers(
+                        self.board, "territory_B", one_hot=True
+                    )
                     openTerritoryALayer = self.compile_layers(
-                        "open_territory_A", one_hot=True
+                        self.board, "open_territory_A", one_hot=True
                     )
                     openTerritoryBLayer = self.compile_layers(
-                        "open_territory_B", one_hot=True
+                        self.board, "open_territory_B", one_hot=True
                     )
                     for i in range(self.height):
                         for j in range(self.width):
@@ -1213,6 +1258,7 @@ class Game(gym.Env):
         return actions
 
     def get_actions_from_cli(self):
+        """コンソールから行動を入力"""
         [print(f"{i:2}: {action}") for i, action in enumerate(self.ACTIONS)]
         print(
             f"input team {self.current_team} actions (need {self.worker_count} input) : "
@@ -1220,7 +1266,7 @@ class Game(gym.Env):
         actions = [int(input()) for _ in range(self.worker_count)]
         return actions
 
-    def get_actions(self, controller: Optional[str] = None, input_actions=None):
+    def get_actions(self, controller: Optional[str] = None):
         """操作入力 入力方法が指定されていない場合ランダム行動
 
         Args:
@@ -1234,7 +1280,7 @@ class Game(gym.Env):
                     for worker in self.workers[self.current_team]
                 ]
                 if all(
-                    self.is_actionable(worker, self.ACTIONS[action], False, True)
+                    self.is_actionable(worker, self.ACTIONS[action], stay=True)
                     for worker, action in zip(self.workers[self.current_team], actions)
                 ):
                     break
@@ -1242,15 +1288,14 @@ class Game(gym.Env):
 
         elif controller == "cli":
             actions = self.get_actions_from_cli()
-        elif controller == "machine":
-            actions = input_actions
         else:
-            actions = self.random_act()
+            actions = self.get_random_actions()
         while self.WORKER_MAX > len(actions):
-            actions.append(0)
+            actions.append(self.ACTIONS.index("stay"))
         return actions
 
     def close(self):
+        """描画終了処理"""
         self.window_surface = None
         self.clock = None
         pygame.display.quit()
@@ -1287,40 +1332,24 @@ class Game(gym.Env):
             act.append(self.ACTIONS.index("stay"))
         return act
 
-    def is_actionable(
-        self, worker: Worker, action: str, smart: bool = False, stay=False
-    ):
-        position = worker.get_coordinate()
-        direction = self.get_direction(self.ACTIONS.index(action))
-        act_pos = (np.array(position) + np.array(direction)).astype(int)
-        if "break" in action and self.is_breakable(worker, *act_pos, smart):
-            return True
-        elif "build" in action and self.is_buildable(worker, *act_pos, smart):
-            return True
-        elif "move" in action and self.is_movable(worker, *act_pos, smart):
-            return True
-        if stay and action == "stay":
-            return True
-        return False
+    def get_random_action(self, worker: Worker):
+        """職人ごとに有効な行動をランダムに返す
 
-    def get_random_action(self, worker: Worker, team: str = None):
+        Args:
+            worker (Worker): 職人
+        """
         actionable = []
-        pos = worker.get_coordinate()
         group = "break"
-
         for action in reversed(self.ACTIONS):
             if group != action.split("_")[0] and len(actionable):
                 break
             group = action.split("_")[0]
-            if self.is_actionable(worker, action, True):
+            if self.is_actionable(worker, action, smart=True, move_smart=True):
                 actionable.append(self.ACTIONS.index(action))
         if len(actionable) == 0:
             for action in self.ACTIONS:
-                if "move" in action:
-                    direction = self.get_direction(self.ACTIONS.index(action))
-                    act_pos = (np.array(pos) + np.array(direction)).astype(int)
-                    if self.is_movable(worker, *act_pos):
-                        actionable.append(self.ACTIONS.index(action))
+                if self.is_actionable(worker, action, smart=True, move_smart=False):
+                    actionable.append(self.ACTIONS.index(action))
 
         if len(actionable) > 0:
             return random.choice(actionable)
@@ -1340,7 +1369,7 @@ class Game(gym.Env):
         ]
         act = []
         for worker in self.workers[team]:
-            act.append(self.get_random_action(worker, team))
+            act.append(self.get_random_action(worker))
 
         while self.WORKER_MAX > len(act):
             act.append(self.ACTIONS.index("stay"))
@@ -1359,16 +1388,29 @@ class Game(gym.Env):
             worker.get_coordinate() for worker in self.workers[team]
         ]
         for i, (worker, action) in enumerate(zip(self.workers[team], actions)):
-            if not self.is_actionable(worker, self.ACTIONS[action], True, stay):
+            if not self.is_actionable(
+                worker, self.ACTIONS[action], stay=stay, smart=True
+            ):
                 actions[i] = self.get_random_action(worker)
         return actions
 
-    def get_around(self, y: int, x: int, side_length: int = 5, raw=False):
+    def get_around(
+        self, board: np.ndarray, y: int, x: int, side_length: int = 5, raw=False
+    ):
+        """指定マスの周囲を取得
+
+        Args:
+            board (ndarray): 盤面
+            y (int): y座標
+            x (int): x座標
+            side_length (int, optional): 取得領域. Defaults to 5.
+            raw (bool, optional): Trueなら職人の層を結合. Defaults to False.
+        """
         if side_length % 2 == 0:
             raise ValueError("need to input an odd number")
         length_ = side_length // 2
         field = np.pad(
-            self.board,
+            board,
             [(0, 0), (length_, length_), (length_, length_)],
             "constant",
             constant_values=-1,
@@ -1415,7 +1457,7 @@ class Game(gym.Env):
         elif team == "opponent":
             team = self.opponent_team
         around_workers = [
-            self.get_around(*worker.get_coordinate(), side_length)
+            self.get_around(self.board, *worker.get_coordinate(), side_length)
             for worker in self.workers[team]
         ]
         return around_workers
@@ -1502,7 +1544,7 @@ class Game(gym.Env):
             )
         self.board[:, self.height :, :] = -1
         self.board[:, :, self.width :] = -1
-        self.update_blank()
+        self.board = self.update_blank(self.board)
         self.update_territory()
 
         self.cell_size = min(
@@ -1579,7 +1621,7 @@ class Game(gym.Env):
         self.board[:, self.height :, :] = -1
         self.board[:, :, self.width :] = -1
         self.update_open_territory()
-        self.update_blank()
+        self.board = self.update_blank(self.board)
 
     def make_post_data(self, actions: list[int]):
         """行動計画APIで送るデータを作成
