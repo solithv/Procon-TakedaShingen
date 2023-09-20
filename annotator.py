@@ -750,7 +750,7 @@ class Annotator:
 def main():
     output_dir = "./dataset"
     csv_dir = "./field_data"
-    filename = "data.dat"
+    filename = "data-adi-20230920.dat"
     annotator = Annotator(glob.glob(os.path.join(csv_dir, "*.csv")), output_dir,filename, size=5)
     for _ in range(1):
         annotator.reset()
