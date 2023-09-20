@@ -690,7 +690,7 @@ class Annotator:
             else:
                 if enemy == "smart":
                     actions = self.game.get_random_actions()
-                if enemy == "human":
+                elif enemy == "human":
                     actions = self.game.get_actions("pygame")
                 else:
                     actions = self.game.random_act()
@@ -760,7 +760,9 @@ def main():
     # smart: 強強ランダム
     # human: 手動
     enemy = "smart"
-    annotator = Annotator(glob.glob(os.path.join(csv_dir, "*.csv")), output_dir,filename, size=5)
+    annotator = Annotator(
+        glob.glob(os.path.join(csv_dir, "*.csv")), output_dir, filename, size=5
+    )
     for _ in range(1):
         annotator.reset()
         annotator.play_game_annotator(enemy)

@@ -1227,7 +1227,19 @@ class Game(gym.Env):
             controller (str, optional): 操作入力方法("cli", "pygame"). Defaults to None.
         """
         if controller == "pygame":
-            actions = self.get_actions_from_pygame()
+            while True:
+                actions = self.get_actions_from_pygame()
+                self.worker_positions = [
+                    worker.get_coordinate()
+                    for worker in self.workers[self.current_team]
+                ]
+                if all(
+                    self.is_actionable(worker, self.ACTIONS[action], False, True)
+                    for worker, action in zip(self.workers[self.current_team], actions)
+                ):
+                    break
+                self.render_rgb_array()
+
         elif controller == "cli":
             actions = self.get_actions_from_cli()
         elif controller == "machine":
@@ -1275,6 +1287,46 @@ class Game(gym.Env):
             act.append(self.ACTIONS.index("stay"))
         return act
 
+    def is_actionable(
+        self, worker: Worker, action: str, smart: bool = False, stay=False
+    ):
+        position = worker.get_coordinate()
+        direction = self.get_direction(self.ACTIONS.index(action))
+        act_pos = (np.array(position) + np.array(direction)).astype(int)
+        if "break" in action and self.is_breakable(worker, *act_pos, smart):
+            return True
+        elif "build" in action and self.is_buildable(worker, *act_pos, smart):
+            return True
+        elif "move" in action and self.is_movable(worker, *act_pos, smart):
+            return True
+        if stay and action == "stay":
+            return True
+        return False
+
+    def get_random_action(self, worker: Worker, team: str = None):
+        actionable = []
+        pos = worker.get_coordinate()
+        group = "break"
+
+        for action in reversed(self.ACTIONS):
+            if group != action.split("_")[0] and len(actionable):
+                break
+            group = action.split("_")[0]
+            if self.is_actionable(worker, action, True):
+                actionable.append(self.ACTIONS.index(action))
+        if len(actionable) == 0:
+            for action in self.ACTIONS:
+                if "move" in action:
+                    direction = self.get_direction(self.ACTIONS.index(action))
+                    act_pos = (np.array(pos) + np.array(direction)).astype(int)
+                    if self.is_movable(worker, *act_pos):
+                        actionable.append(self.ACTIONS.index(action))
+
+        if len(actionable) > 0:
+            return random.choice(actionable)
+        else:
+            return self.ACTIONS.index("stay")
+
     def get_random_actions(self, team: str = None):
         """有効な行動をランダムで返す
 
@@ -1288,38 +1340,28 @@ class Game(gym.Env):
         ]
         act = []
         for worker in self.workers[team]:
-            act_able = []
-            pos = worker.get_coordinate()
-            group = "break"
-
-            for action in reversed(self.ACTIONS):
-                if group != action.split("_")[0] and len(act_able):
-                    break
-                group = action.split("_")[0]
-                direction = self.get_direction(self.ACTIONS.index(action))
-                act_pos = (np.array(pos) + np.array(direction)).astype(int)
-                if "break" in action and self.is_breakable(worker, *act_pos, True):
-                    act_able.append(self.ACTIONS.index(action))
-                elif "build" in action and self.is_buildable(worker, *act_pos, True):
-                    act_able.append(self.ACTIONS.index(action))
-                elif "move" in action and self.is_movable(worker, *act_pos, True):
-                    act_able.append(self.ACTIONS.index(action))
-            if len(act_able) == 0:
-                for action in self.ACTIONS:
-                    if "move" in action:
-                        direction = self.get_direction(self.ACTIONS.index(action))
-                        act_pos = (np.array(pos) + np.array(direction)).astype(int)
-                        if self.is_movable(worker, *act_pos):
-                            act_able.append(self.ACTIONS.index(action))
-
-            if len(act_able) > 0:
-                act.append(random.choice(act_able))
-            else:
-                act.append(self.ACTIONS.index("stay"))
+            act.append(self.get_random_action(worker, team))
 
         while self.WORKER_MAX > len(act):
             act.append(self.ACTIONS.index("stay"))
         return act
+
+    def check_actions(self, actions: list[int], team: str = None, stay=False):
+        """AIの行動を確認して無効なら上書き
+
+        Args:
+            actions (list[int]): 行動のリスト
+            team (str, optional): チームを指定. Defaults to None.
+            stay (bool, optional): 待機を許容するか. Defaults to False.
+        """
+        team = team if team is not None else self.current_team
+        self.worker_positions = [
+            worker.get_coordinate() for worker in self.workers[team]
+        ]
+        for i, (worker, action) in enumerate(zip(self.workers[team], actions)):
+            if not self.is_actionable(worker, self.ACTIONS[action], True, stay):
+                actions[i] = self.get_random_action(worker)
+        return actions
 
     def get_around(self, y: int, x: int, side_length: int = 5, raw=False):
         if side_length % 2 == 0:
