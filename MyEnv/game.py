@@ -322,6 +322,12 @@ class Game(gym.Env):
             and (y, x) not in self.worker_positions
         ):
             if smart:
+                if (
+                    worker.action_log
+                    and worker.action_log[-1][0] == "move"
+                    and worker.action_log[-1][1] == (y, x)
+                ):
+                    return False
                 field = self.get_around(self.board, y, x, side_length=3)
                 compiled: np.ndarray = np.sum(
                     [
@@ -388,7 +394,7 @@ class Game(gym.Env):
                 and self.compile_layers(self.board, f"rampart_{worker.team}")[y, x]
             ):
                 territory = copy.deepcopy(
-                    self.board[self.CELL.index(self.board, f"rampart_{worker.team}")]
+                    self.board[self.CELL.index(f"rampart_{worker.team}")]
                 )
                 territory[y, x] = 0
                 res = (
