@@ -1,11 +1,16 @@
 .venv/
 __pycache__/
-memo
-test.py
-.Xauthority
+test*
 .devcontainer
 model/*
+!model/*.keras
 !model/*.zip.*
+<<<<<<< HEAD
 Stochastic_muzero/*/
 .env
 API_test.py
+=======
+.env
+server_configs/
+log/
+>>>>>>> 3x3

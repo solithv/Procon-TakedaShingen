@@ -1,11 +1,10 @@
 import copy
 import csv
-import glob
 import os
 import random
 import re
 from collections import defaultdict
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
 import gymnasium as gym
 import numpy as np
@@ -63,10 +62,20 @@ class Game(gym.Env):
         "S": np.array([1, 0]),
         "W": np.array([0, -1]),
     }
+    POST_DIRS = {
+        "NW": 1,
+        "N": 2,
+        "NE": 3,
+        "E": 4,
+        "SE": 5,
+        "S": 6,
+        "SW": 7,
+        "W": 8,
+    }
     ICONS = {
-        "blank": "  ",
-        "castle": "C ",
-        "pond": "P ",
+        "blank": " ",
+        "castle": "C",
+        "pond": "P",
         "territory_A": "Ta",
         "territory_B": "Tb",
         "open_territory_A": "ta",
@@ -75,6 +84,7 @@ class Game(gym.Env):
         "rampart_B": "Rb",
         "worker_A": "Wa",
         "worker_B": "Wb",
+        "outside": "X",
     }
 
     BLACK = (0, 0, 0)
@@ -85,12 +95,13 @@ class Game(gym.Env):
     YELLOW = (255, 255, 0)
     SKY = (127, 176, 255)
     PINK = (255, 127, 127)
+    PURPLE = (128, 0, 128)
 
     def __init__(
         self,
-        csv_path: Union[str, list[str]],
+        csv_path: Union[str, list[str]] = None,
         render_mode="ansi",
-        max_steps=100,
+        max_steps=200,
         first_player: Optional[int] = None,
         use_pyautogui: bool = False,
     ):
@@ -108,15 +119,18 @@ class Game(gym.Env):
         self.render_mode = render_mode
         self.max_steps = max_steps
         self.first_player = first_player
+        self.board = np.zeros(
+            (len(self.CELL), self.FIELD_MAX, self.FIELD_MAX), dtype=np.int8
+        )
 
         self.action_space = gym.spaces.Tuple(
             gym.spaces.Discrete(len(self.ACTIONS)) for _ in range(self.WORKER_MAX)
         )
         self.observation_space = gym.spaces.Box(
-            low=0,
-            high=255,
-            shape=(len(self.CELL), self.FIELD_MAX, self.FIELD_MAX),
-            dtype=np.uint8,
+            low=-1,
+            high=1,
+            shape=self.get_observation().shape,
+            dtype=np.int8,
         )
         self.reward_range = [np.NINF, np.inf]
 
@@ -132,7 +146,7 @@ class Game(gym.Env):
 
     def get_observation(self):
         """状態を整形して観測空間として返す"""
-        return self.board
+        return self.board.flatten()
 
     def change_player(self, no_change: bool = False):
         """
@@ -151,9 +165,11 @@ class Game(gym.Env):
         内部関数
         blank層を更新
         """
-        self.board[0] = np.where(self.board[1:].any(axis=0), 0, 1)
-        self.board[0, self.height :, :] = -1
-        self.board[0, :, self.width :] = -1
+        self.board[self.CELL.index("blank")] = np.where(
+            self.board[1:].any(axis=0), 0, 1
+        )
+        self.board[self.CELL.index("blank"), self.height :, :] = -1
+        self.board[self.CELL.index("blank"), :, self.width :] = -1
 
     def load_from_csv(self, path: Union[str, list[str]]):
         """
@@ -166,7 +182,7 @@ class Game(gym.Env):
             path = random.choice(path)
         size = int(re.sub(r"[\D]", "", os.path.normpath(path).split(os.path.sep)[-1]))
         name = os.path.normpath(path).split(os.path.sep)[-1].split(".")[0]
-        self.board = np.zeros((len(self.CELL), size, size), dtype=np.uint8)
+        self.board = np.zeros((len(self.CELL), size, size), dtype=np.int8)
         self.workers: defaultdict[str, list[Worker]] = defaultdict(list)
         self.width, self.height = [size] * 2
 
@@ -219,7 +235,15 @@ class Game(gym.Env):
         self.score_A, self.score_B = 0, 0
         self.previous_score_A, self.previous_score_B = 0, 0
         self.turn = 1
-        name = self.load_from_csv(self.csv_path)
+        if self.csv_path is not None:
+            name = self.load_from_csv(self.csv_path)
+            info = {"mode": "csv", "csv_name": name}
+        else:
+            self.board = np.zeros(
+                (len(self.CELL), self.FIELD_MAX, self.FIELD_MAX), dtype=np.int8
+            )
+            self.width, self.height = [self.FIELD_MAX] * 2
+            info = {"mode": "api"}
 
         self.cell_size = min(
             self.display_size_x * 0.9 // self.width,
@@ -232,7 +256,6 @@ class Game(gym.Env):
             self.reset_render()
 
         self.update_blank()
-        info = {"csv_name": name}
         return self.get_observation(), info
 
     def compile_layers(self, *layers: tuple[str], one_hot: bool = True):
@@ -243,7 +266,7 @@ class Game(gym.Env):
         compiled = np.sum(
             [self.board[self.CELL.index(layer)] for layer in layers],
             axis=0,
-            dtype=np.uint8,
+            dtype=np.int8,
         )
         if one_hot:
             compiled = np.where(compiled, 1, 0)
@@ -275,7 +298,7 @@ class Game(gym.Env):
             result.remove(worker.get_coordinate())
         return result
 
-    def is_movable(self, worker: Worker, y: int, x: int):
+    def is_movable(self, worker: Worker, y: int, x: int, smart: bool = False):
         """
         内部関数
         行動可能判定
@@ -292,11 +315,24 @@ class Game(gym.Env):
             and (y, x) not in self.get_team_worker_coordinate(worker.team)
             and (y, x) not in self.worker_positions
         ):
+            if smart:
+                field = self.get_around(y, x)
+                compiled: np.ndarray = np.sum(
+                    [
+                        field[self.CELL.index(layer)]
+                        for layer in (
+                            f"rampart_{worker.team}",
+                            f"territory_{worker.team}",
+                        )
+                    ],
+                    axis=0,
+                )
+                return not compiled.all()
             return True
         else:
             return False
 
-    def is_buildable(self, worker: Worker, y: int, x: int):
+    def is_buildable(self, worker: Worker, y: int, x: int, smart: bool = False):
         """
         内部関数
         建築可能判定
@@ -312,11 +348,24 @@ class Game(gym.Env):
                 *[f"worker_{worker.opponent_team}{i}" for i in range(self.WORKER_MAX)],
             )[y, x]
         ):
-            return True
+            if smart:
+                territory = copy.deepcopy(
+                    self.board[self.CELL.index(f"rampart_{worker.team}")]
+                )
+                territory[y, x] = 1
+                res = (
+                    self.fill_area(territory).sum()
+                    >= self.fill_area(
+                        self.board[self.CELL.index(f"rampart_{worker.team}")]
+                    ).sum()
+                )
+                return res
+            else:
+                return True
         else:
             return False
 
-    def is_breakable(self, worker: Worker, y: int, x: int, both: bool = True):
+    def is_breakable(self, worker: Worker, y: int, x: int, smart: bool = False):
         """
         内部関数
         破壊可能判定
@@ -325,13 +374,22 @@ class Game(gym.Env):
             not worker.is_action
             and 0 <= y < self.height
             and 0 <= x < self.width
-            and (
-                self.compile_layers("rampart_A", "rampart_B")[y, x]
-                if both
-                else self.compile_layers(f"rampart_{self.opponent_team}")[y, x]
-            )
+            and self.compile_layers("rampart_A", "rampart_B")[y, x]
         ):
-            return True
+            if smart and self.compile_layers(f"rampart_{worker.team}")[y, x]:
+                territory = copy.deepcopy(
+                    self.board[self.CELL.index(f"rampart_{worker.team}")]
+                )
+                territory[y, x] = 0
+                res = (
+                    self.fill_area(territory).sum()
+                    > self.fill_area(
+                        self.board[self.CELL.index(f"rampart_{worker.team}")]
+                    ).sum()
+                )
+                return res
+            else:
+                return True
         else:
             return False
 
@@ -521,7 +579,7 @@ class Game(gym.Env):
             0,
         ) - self.compile_layers("rampart_A", "rampart_B", "territory_A", "territory_B")
         self.board[self.CELL.index("open_territory_A")] = np.where(
-            self.board[self.CELL.index("open_territory_A")] == np.uint8(-1),
+            self.board[self.CELL.index("open_territory_A")] == np.int8(-1),
             0,
             self.board[self.CELL.index("open_territory_A")],
         )
@@ -534,7 +592,7 @@ class Game(gym.Env):
             0,
         ) - self.compile_layers("rampart_A", "rampart_B", "territory_A", "territory_B")
         self.board[self.CELL.index("open_territory_B")] = np.where(
-            self.board[self.CELL.index("open_territory_B")] == np.uint8(-1),
+            self.board[self.CELL.index("open_territory_B")] == np.int8(-1),
             0,
             self.board[self.CELL.index("open_territory_B")],
         )
@@ -698,7 +756,7 @@ class Game(gym.Env):
 
     def render_terminal(self):
         view = ""
-        icon_base = len(list(self.ICONS.values())[0])
+        icon_base = max(len(value) for value in self.ICONS.values())
         item_num = int(
             np.max(np.sum(self.board[:, : self.height, : self.width], axis=0))
         )
@@ -988,7 +1046,9 @@ class Game(gym.Env):
                     )
                     for i in range(self.height):
                         for j in range(self.width):
-                            if territoryALayer[i][j] == 1:
+                            if territoryALayer[i][j] == territoryBLayer[i][j] == 1:
+                                color = self.PURPLE
+                            elif territoryALayer[i][j] == 1:
                                 color = self.RED
                             elif territoryBLayer[i][j] == 1:
                                 color = self.BLUE
@@ -1160,7 +1220,7 @@ class Game(gym.Env):
         actions = [int(input()) for _ in range(self.worker_count)]
         return actions
 
-    def get_actions(self, controller: Optional[str] = None):
+    def get_actions(self, controller: Optional[str] = None, input_actions=None):
         """操作入力 入力方法が指定されていない場合ランダム行動
 
         Args:
@@ -1170,6 +1230,8 @@ class Game(gym.Env):
             actions = self.get_actions_from_pygame()
         elif controller == "cli":
             actions = self.get_actions_from_cli()
+        elif controller == "machine":
+            actions = input_actions
         else:
             actions = self.random_act()
         while self.WORKER_MAX > len(actions):
@@ -1182,12 +1244,8 @@ class Game(gym.Env):
         pygame.display.quit()
         pygame.quit()
 
-    def random_act(self, waste: bool = False):
-        """行動可能な範囲でランダムな行動を返す
-
-        Args:
-            waste (bool, optional): 無駄な行動を許容. Defaults to False.
-        """
+    def random_act(self):
+        """行動可能な範囲でランダムな行動を返す"""
         [worker.turn_init() for worker in self.workers[self.current_team]]
         self.worker_positions = [
             worker.get_coordinate() for worker in self.workers[self.current_team]
@@ -1201,14 +1259,309 @@ class Game(gym.Env):
                 direction = self.get_direction(w)
                 act_pos = (np.array(pos) + np.array(direction)).astype(int)
                 if (
-                    ("break" in action and self.is_breakable(worker, *act_pos, waste))
+                    ("break" in action and self.is_breakable(worker, *act_pos))
                     or ("move" in action and self.is_movable(worker, *act_pos))
                     or ("build" in action and self.is_buildable(worker, *act_pos))
-                    or (waste and w == 0)
+                    or action == "stay"
                 ):
                     act_able.append(w)
 
-            act.append(random.choice(act_able))
+            if len(act_able) > 0:
+                act.append(random.choice(act_able))
+            else:
+                act.append(self.ACTIONS.index("stay"))
+
         while self.WORKER_MAX > len(act):
-            act.append(0)
+            act.append(self.ACTIONS.index("stay"))
         return act
+
+    def get_random_actions(self, team: str = None):
+        """有効な行動をランダムで返す
+
+        Args:
+            team (str, optional): チームを指定. Defaults to None.
+        """
+        team = team if team is not None else self.current_team
+        [worker.turn_init() for worker in self.workers[team]]
+        self.worker_positions = [
+            worker.get_coordinate() for worker in self.workers[team]
+        ]
+        act = []
+        for worker in self.workers[team]:
+            act_able = []
+            pos = worker.get_coordinate()
+            group = "break"
+
+            for action in reversed(self.ACTIONS):
+                if group != action.split("_")[0] and len(act_able):
+                    break
+                group = action.split("_")[0]
+                direction = self.get_direction(self.ACTIONS.index(action))
+                act_pos = (np.array(pos) + np.array(direction)).astype(int)
+                if "break" in action and self.is_breakable(worker, *act_pos, True):
+                    act_able.append(self.ACTIONS.index(action))
+                elif "build" in action and self.is_buildable(worker, *act_pos, True):
+                    act_able.append(self.ACTIONS.index(action))
+                elif "move" in action and self.is_movable(worker, *act_pos, True):
+                    act_able.append(self.ACTIONS.index(action))
+            if len(act_able) == 0:
+                for action in self.ACTIONS:
+                    if "move" in action:
+                        direction = self.get_direction(self.ACTIONS.index(action))
+                        act_pos = (np.array(pos) + np.array(direction)).astype(int)
+                        if self.is_movable(worker, *act_pos):
+                            act_able.append(self.ACTIONS.index(action))
+
+            if len(act_able) > 0:
+                act.append(random.choice(act_able))
+            else:
+                act.append(self.ACTIONS.index("stay"))
+
+        while self.WORKER_MAX > len(act):
+            act.append(self.ACTIONS.index("stay"))
+        return act
+
+    def get_around(self, y: int, x: int, side_length: int = 5, raw=False):
+        if side_length % 2 == 0:
+            raise ValueError("need to input an odd number")
+        length_ = side_length // 2
+        field = np.pad(
+            self.board,
+            [(0, 0), (length_, length_), (length_, length_)],
+            "constant",
+            constant_values=-1,
+        )
+        front = length_ * 2 + 1
+        field = field[:, y : y + front, x : x + front]
+        if raw:
+            return field
+        a = np.sum(
+            [
+                field[self.CELL.index(layer)]
+                for layer in self.CELL
+                if "worker_A" in layer
+            ],
+            axis=0,
+        )[np.newaxis, :, :]
+        a = np.where(a < 0, -1, a)
+        b = np.sum(
+            [
+                field[self.CELL.index(layer)]
+                for layer in self.CELL
+                if "worker_B" in layer
+            ],
+            axis=0,
+        )[np.newaxis, :, :]
+        b = np.where(b < 0, -1, b)
+        field = np.concatenate([field[: self.CELL.index("worker_A0")], a, b], axis=0)
+        return field
+
+    def get_around_workers(
+        self, side_length: int = 5, team: str = None
+    ) -> list[np.ndarray]:
+        """職人の周囲を取得する
+
+        Args:
+            side_length (int, optional): 1辺の長さ(奇数で指定). Defaults to 3.
+            team (str, optional): チーム名("A" or "B") 未指定で現在のチーム. Defaults to None.
+
+        Returns:
+            list[np.ndarray]: 職人の周囲
+        """
+        if team is None:
+            team = self.current_team
+        elif team == "opponent":
+            team = self.opponent_team
+        around_workers = [
+            self.get_around(*worker.get_coordinate(), side_length)
+            for worker in self.workers[team]
+        ]
+        return around_workers
+
+    def print_around(self, around_workers: list[np.ndarray]):
+        """職人の周囲を表示する(debug用)
+
+        Args:
+            around_workers (list[np.ndarray]): 職人の周囲
+        """
+        layers = self.CELL[: self.CELL.index("worker_A0")] + ("worker_A", "worker_B")
+        for around in around_workers:
+            view = ""
+            icon_base = max(len(value) for value in self.ICONS.values())
+            item_num = int(np.max(np.sum(around, axis=0)))
+            cell_num = icon_base * item_num + item_num - 1
+            _, height, width = around.shape
+            for y in range(height):
+                line = []
+                for x in range(width):
+                    cell = []
+                    for i, item in enumerate(around[:, y, x]):
+                        if item < 0:
+                            cell.append(self.ICONS["outside"])
+                            break
+                        elif item:
+                            cell.append(self.ICONS[layers[i]])
+                    line.append(f"{','.join(cell):^{cell_num}}")
+
+                view += "|".join(line) + "\n"
+                if y < height - 1:
+                    view += "-" * (width * cell_num + width - 1) + "\n"
+            print(view)
+
+    def reset_from_api(self, data: dict[str, Any]):
+        """APIから環境を初期化
+
+        Args:
+            data (dict[str, Any]): 試合一覧取得APIから受け取った1試合分のデータ
+        """
+        self.id = data["id"]
+        self.current_player = 0 if data["first"] else 1
+        self.change_player(no_change=True)
+        self.max_steps = data["turns"]
+        self.SCORE_MULTIPLIER["castle"] = data["bonus"]["castle"]
+        self.SCORE_MULTIPLIER["territory"] = data["bonus"]["territory"]
+        self.SCORE_MULTIPLIER["rampart"] = data["bonus"]["wall"]
+        self.turn = 1
+        # self.turn_seconds=data["turnSeconds"]
+        self.height, self.width = data["board"]["height"], data["board"]["width"]
+        self.worker_count = data["board"]["mason"]
+        self.workers: defaultdict[str, list[Worker]] = defaultdict(list)
+        structures = np.pad(
+            np.array(data["board"]["structures"]),
+            [
+                (0, self.FIELD_MAX - self.height),
+                (0, self.FIELD_MAX - self.width),
+            ],
+        )
+        masons = np.pad(
+            np.array(data["board"]["masons"]),
+            [
+                (0, self.FIELD_MAX - self.height),
+                (0, self.FIELD_MAX - self.width),
+            ],
+        )
+        self.board = np.zeros(
+            (len(self.CELL), self.FIELD_MAX, self.FIELD_MAX), dtype=np.int8
+        )
+        self.board[self.CELL.index("castle")] = np.where(structures == 2, 1, 0)
+        self.board[self.CELL.index("pond")] = np.where(structures == 1, 1, 0)
+        for i in range(self.worker_count):
+            self.board[self.CELL.index(f"worker_A{i}")] = np.where(
+                masons == i + 1, 1, 0
+            )
+            self.board[self.CELL.index(f"worker_B{i}")] = np.where(
+                masons == -(i + 1), 1, 0
+            )
+            self.workers["A"].append(
+                Worker(f"worker_A{i}", *np.argwhere(masons == i + 1)[0])
+            )
+            self.workers["B"].append(
+                Worker(f"worker_B{i}", *np.argwhere(masons == -(i + 1))[0])
+            )
+        self.board[:, self.height :, :] = -1
+        self.board[:, :, self.width :] = -1
+        self.update_blank()
+        self.update_territory()
+
+        self.cell_size = min(
+            self.display_size_x * 0.9 // self.width,
+            self.display_size_y * 0.8 // self.height,
+        )
+        self.window_size = max(self.width, self.height) * self.cell_size
+        self.window_size_x = self.width * self.cell_size
+        self.window_size_y = self.height * self.cell_size
+        if self.render_mode == "human":
+            self.reset_render()
+
+    def get_stat_from_api(self, data: dict[str, Any]):
+        """APIから環境状態を更新
+
+        Args:
+            data (dict[str, Any]): 試合状態取得APIから受け取ったデータ
+        """
+        assert self.id == data["id"], f"self.id:{self.id}, data['id']:{data['id']}"
+        assert (
+            self.worker_count == data["board"]["mason"]
+        ), f"self.worker_count:{self.worker_count}, data['board']['mason']:{data['board']['mason']}"
+        assert (
+            self.turn - 1 == data["turn"]
+        ), f"self.turn:{self.turn}, data['turn']:{data['turn']}"
+        # self.turn = data["turn"] + 1
+        structures = np.pad(
+            np.array(data["board"]["structures"]),
+            [
+                (0, self.FIELD_MAX - self.height),
+                (0, self.FIELD_MAX - self.width),
+            ],
+        )
+        masons = np.pad(
+            np.array(data["board"]["masons"]),
+            [
+                (0, self.FIELD_MAX - self.height),
+                (0, self.FIELD_MAX - self.width),
+            ],
+        )
+        walls = np.pad(
+            np.array(data["board"]["walls"]),
+            [
+                (0, self.FIELD_MAX - self.height),
+                (0, self.FIELD_MAX - self.width),
+            ],
+        )
+        territories = np.pad(
+            np.array(data["board"]["territories"]),
+            [
+                (0, self.FIELD_MAX - self.height),
+                (0, self.FIELD_MAX - self.width),
+            ],
+        )
+        self.board[self.CELL.index("castle")] = np.where(structures == 2, 1, 0)
+        self.board[self.CELL.index("pond")] = np.where(structures == 1, 1, 0)
+        self.board[self.CELL.index("rampart_A")] = np.where(walls == 1, 1, 0)
+        self.board[self.CELL.index("rampart_B")] = np.where(walls == 2, 1, 0)
+        self.board[self.CELL.index("territory_A")] = np.where(
+            (territories == 1) | (territories == 3), 1, 0
+        )
+        self.board[self.CELL.index("territory_B")] = np.where(
+            (territories == 2) | (territories == 3), 1, 0
+        )
+        for i in range(self.worker_count):
+            self.board[self.CELL.index(f"worker_A{i}")] = np.where(
+                masons == i + 1, 1, 0
+            )
+            self.board[self.CELL.index(f"worker_B{i}")] = np.where(
+                masons == -(i + 1), 1, 0
+            )
+            self.workers["A"][i].update_coordinate(*np.argwhere(masons == i + 1)[0])
+            self.workers["B"][i].update_coordinate(*np.argwhere(masons == -(i + 1))[0])
+        self.board[:, self.height :, :] = -1
+        self.board[:, :, self.width :] = -1
+        self.update_open_territory()
+        self.update_blank()
+
+    def make_post_data(self, actions: list[int]):
+        """行動計画APIで送るデータを作成
+
+        Args:
+            actions (list[int]): 行動のリスト
+        """
+
+        def get_type(action: int):
+            if "stay" in self.ACTIONS[action]:
+                return 0
+            elif "move" in self.ACTIONS[action]:
+                return 1
+            elif "build" in self.ACTIONS[action]:
+                return 2
+            elif "break" in self.ACTIONS[action]:
+                return 3
+
+        def get_dir(action: int):
+            return self.POST_DIRS.get(self.ACTIONS[action].split("_")[-1], 0)
+
+        data = {"turn": self.turn}
+        data["actions"] = [
+            {"type": get_type(action), "dir": get_dir(action)}
+            for action in actions[: self.worker_count]
+        ]
+        return data
