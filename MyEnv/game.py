@@ -6,18 +6,14 @@ import re
 from collections import defaultdict
 from typing import Any, Optional, Union
 
-import gymnasium as gym
 import numpy as np
 import pygame
 from pygame.locals import *
 
-try:
-    from .worker import Worker
-except:
-    from worker import Worker
+from .worker import Worker
 
 
-class Game(gym.Env):
+class Game:
     metadata = {"render_modes": ["human", "ansi"], "render_fps": 5}
     SCORE_MULTIPLIER = {"castle": 100, "territory": 30, "rampart": 10}
     TEAM = ("A", "B")
@@ -114,7 +110,6 @@ class Game(gym.Env):
             first_player (Optional[int], optional): 先行プレイヤーの番号. Defaults to None.
             use_pyautogui (bool): PyAutoGUIを使って描画windowサイズを指定するか. Defaults to False.
         """
-        super().__init__()
         self.csv_path = csv_path
         self.render_mode = render_mode
         self.max_steps = max_steps
@@ -122,17 +117,6 @@ class Game(gym.Env):
         self.board = np.zeros(
             (len(self.CELL), self.FIELD_MAX, self.FIELD_MAX), dtype=np.int8
         )
-
-        self.action_space = gym.spaces.Tuple(
-            gym.spaces.Discrete(len(self.ACTIONS)) for _ in range(self.WORKER_MAX)
-        )
-        self.observation_space = gym.spaces.Box(
-            low=-1,
-            high=1,
-            shape=self.get_observation().shape,
-            dtype=np.int8,
-        )
-        self.reward_range = [np.NINF, np.inf]
 
         self.window_surface = None
         self.clock = None
@@ -218,12 +202,11 @@ class Game(gym.Env):
 
         return name
 
-    def reset(self, seed=None, options=None):
+    def reset(self, seed=None):
         """
         gymの必須関数
         環境の初期化
         """
-        super().reset(seed=seed, options=options)
         if seed is not None:
             random.seed(seed)
             np.random.seed(seed)

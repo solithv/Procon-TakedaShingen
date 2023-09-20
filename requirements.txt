@@ -1,7 +1,7 @@
-gymnasium
 matplotlib
 numpy
 PyAutoGUI
 pygame
 python-dotenv
+requests
 tensorflow
