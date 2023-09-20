@@ -1,11 +1,10 @@
-import os
-
+import time
 import requests as req
+import os
 from dotenv import load_dotenv
-
-
 class API:
-    # .envはトークンを格納しているファイル
+
+    #.envはトークンを格納しているファイル
     load_dotenv(".env")
     token = os.getenv("TOKEN")
     match_url = os.getenv("MATCH_URL") + "/matches"
@@ -17,8 +16,14 @@ class API:
         試合一覧取得API
         返り値 id_: 試合idを格納した行列
         """
-        r = req.get(self.match_url, headers=self.header)
-
+        while(True):
+            #返答が200(正常)でなければ0.1
+            r = req.get(self.match_url, headers=self.header)
+            if(r.status_code == 200):
+                break
+            print(r.status_code)
+            time.sleep(0.1)
+            
         matches = r.json()
         return matches["matches"]
 
@@ -27,7 +32,13 @@ class API:
         試合状態取得API
         引数(試合id)
         """
-        r = req.get(f"{self.match_url}/{path}", headers=self.header)
+        while(True):
+            r = req.get(f"{self.match_url}/{path}",headers=self.header)
+            if(r.status_code == 200):
+                break
+            print(r.status_code)
+            time.sleep(0.1)
+
         field = r.json()
         return field
 
@@ -37,12 +48,12 @@ class API:
         引数(jsonファイル , 試合id)
         """
         if not opponent:
-            r = req.post(f"{self.match_url}/{path}", headers=self.header, json=act)
+            header=self.header
         else:
-            r = req.post(
-                f"{self.match_url}/{path}",
-                headers={"procon-token": "dummy-token"},
-                json=act,
-            )
-        # if r.status_code != 200:
-        print(r)
+            header={"procon-token": "dummy-token"}
+        while(True):
+            r = req.post(f"{self.match_url}/{path}", headers=header, json=act)
+            if(r.status_code == 200):
+                break
+            print(r.status_code)
+            time.sleep(0.1)
