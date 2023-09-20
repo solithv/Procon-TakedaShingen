@@ -674,7 +674,7 @@ class Annotator:
                         pygame.display.update()
         return action
 
-    def play_game_annotator(self):
+    def play_game_annotator(self, enemy=""):
         observation = self.game.reset()
 
         terminated, truncated = [False] * 2
@@ -688,7 +688,12 @@ class Annotator:
                 )
                 self.save_dataset(features, targets)
             else:
-                actions = self.game.random_act()
+                if enemy == "smart":
+                    actions = self.game.get_random_actions()
+                if enemy == "human":
+                    actions = self.game.get_actions("pygame")
+                else:
+                    actions = self.game.random_act()
             observation, reward, terminated, truncated, info = self.game.step(actions)
             print(
                 f"turn:{info['turn']}, score_A:{info['score_A']}, score_B:{info['score_B']}"
@@ -751,10 +756,14 @@ def main():
     output_dir = "./dataset"
     csv_dir = "./field_data"
     filename = "data.dat"
+    # random: ランダム
+    # smart: 強強ランダム
+    # human: 手動
+    enemy = "smart"
     annotator = Annotator(glob.glob(os.path.join(csv_dir, "*.csv")), output_dir,filename, size=5)
     for _ in range(1):
         annotator.reset()
-        annotator.play_game_annotator()
+        annotator.play_game_annotator(enemy)
     # for _ in range(1):
     #     annotator.reset()
     #     annotator.do_annotate()
