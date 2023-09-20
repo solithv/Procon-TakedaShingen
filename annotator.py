@@ -25,7 +25,7 @@ class Annotator:
         self.basename = self.filename.rsplit(".", 1)[0]
         self.csv_paths = csv_paths
         self.size = size
-        self.game = Game()
+        self.game = Game(self.csv_paths, render_mode="human", use_pyautogui=True)
         self.game.reset()
         self.layers = self.game.CELL[: self.game.CELL.index("worker_A0")] + (
             "worker_A",
@@ -675,25 +675,25 @@ class Annotator:
         return action
 
     def play_game_annotator(self):
-        env = Game(self.csv_paths, render_mode="human", use_pyautogui=True)
-
-        observation = env.reset()
+        observation = self.game.reset()
 
         terminated, truncated = [False] * 2
         while not terminated and not truncated:
-            env.render()
-            if env.unwrapped.current_team == "A":
-                workers = env.workers["A"]
-                actions = env.get_actions("pygame")
-                features, targets = self.game_dataset_maker(env.board, actions, workers)
+            self.game.render()
+            if self.game.current_team == "A":
+                workers = self.game.workers["A"]
+                actions = self.game.get_actions("pygame")
+                features, targets = self.game_dataset_maker(
+                    self.game.board, actions, workers
+                )
                 self.save_dataset(features, targets)
             else:
-                actions = env.random_act()
-            observation, reward, terminated, truncated, info = env.step(actions)
+                actions = self.game.random_act()
+            observation, reward, terminated, truncated, info = self.game.step(actions)
             print(
                 f"turn:{info['turn']}, score_A:{info['score_A']}, score_B:{info['score_B']}"
             )
-        env.close()
+        self.game.close()
 
     def game_get_around(
         self, board: np.ndarray, y: int, x: int, side_length: int = 3, raw=False
