@@ -82,6 +82,7 @@ class Game:
         "worker_B": "Wb",
         "outside": "X",
     }
+    turns = {11: 30, 13: 54, 15: 80, 17: 100, 21: 150, 25: 200}
 
     BLACK = (0, 0, 0)
     WHITE = (255, 255, 255)
@@ -97,7 +98,7 @@ class Game:
         self,
         csv_path: Union[str, list[str]] = None,
         render_mode="ansi",
-        max_steps=200,
+        max_steps: int = None,
         first_player: Optional[int] = None,
         use_pyautogui: bool = False,
     ):
@@ -106,7 +107,7 @@ class Game:
         Args:
             csv_path (Union[str, list[str]]): フィールドデータのパス
             render_mode (str, optional): 描画方法. Defaults to "ansi".
-            max_steps (int, optional): 最大ステップ数. Defaults to 100.
+            max_steps (int, optional): 最大ステップ数 未指定でマップサイズに応じて変動. Defaults to None.
             first_player (Optional[int], optional): 先行プレイヤーの番号. Defaults to None.
             use_pyautogui (bool): PyAutoGUIを使って描画windowサイズを指定するか. Defaults to False.
         """
@@ -130,7 +131,7 @@ class Game:
 
     def get_observation(self):
         """状態を整形して観測空間として返す"""
-        return self.board.flatten()
+        return self.board
 
     def change_player(self, no_change: bool = False):
         """
@@ -727,8 +728,11 @@ class Game:
         """ゲーム終了判定実装予定"""
         # terminated : エピソード終了フラグ
         # truncated  : ステップ数上限での終了フラグ
+        max_steps = (
+            self.max_steps if self.max_steps is not None else self.turns[self.width]
+        )
         terminated, truncated = False, False
-        if self.turn >= self.max_steps:
+        if self.turn >= max_steps:
             truncated = True
         return terminated, truncated
 

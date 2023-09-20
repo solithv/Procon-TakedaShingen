@@ -9,8 +9,7 @@ from Utils import API
 def main():
     fields = glob.glob("./field_data/*.csv")
     model_path = "./model/game"
-    env =MyEnv.Game(
-        max_steps=200,
+    env = MyEnv.Game(
         csv_path=fields,
         render_mode="human",
         use_pyautogui=True,

@@ -18,14 +18,16 @@ from Utils import Util
 
 class Annotator:
     def __init__(
-        self, csv_paths, output_dir, filename="data.dat", size: int = 3
+        self, csv_paths, output_dir, filename="data.dat", size: int = 3, max_steps=None
     ) -> None:
         self.output_dir = Path(output_dir)
         self.filename = filename
         self.basename = self.filename.rsplit(".", 1)[0]
         self.csv_paths = csv_paths
         self.size = size
-        self.game = Game(self.csv_paths, render_mode="human", use_pyautogui=True)
+        self.game = Game(
+            self.csv_paths, render_mode="human", use_pyautogui=True, max_steps=max_steps
+        )
         self.game.reset()
         self.layers = self.game.CELL[: self.game.CELL.index("worker_A0")] + (
             "worker_A",
@@ -706,8 +708,16 @@ def main():
     # smart: 強強ランダム
     # human: 手動
     enemy = "smart"
+    # 最大ターン数を指定
+    # 数値入力で指定可能
+    # Noneでマップサイズに応じて可変
+    max_steps = None
     annotator = Annotator(
-        glob.glob(os.path.join(csv_dir, "*.csv")), output_dir, filename, size=5
+        glob.glob(os.path.join(csv_dir, "*.csv")),
+        output_dir,
+        filename,
+        size=5,
+        max_steps=max_steps,
     )
     for _ in range(1):
         annotator.reset()
