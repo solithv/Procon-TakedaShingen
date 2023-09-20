@@ -30,8 +30,8 @@ def main():
         env.render()
         # env.unwrapped.print_around(env.unwrapped.get_around_workers(side_length=5))
         if env.unwrapped.current_team == "A":
-            # actions = env.unwrapped.get_random_actions()
-            actions = nn.predict(env.unwrapped.get_around_workers(5))
+            actions = env.unwrapped.get_random_actions()
+            # actions = nn.predict(env.unwrapped.get_around_workers(5))
             print(actions)
         else:
             actions = env.unwrapped.random_act()
