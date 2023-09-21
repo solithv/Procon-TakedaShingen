@@ -690,7 +690,7 @@ class Annotator:
             else:
                 if enemy == "smart":
                     actions = self.game.get_random_actions()
-                if enemy == "human":
+                elif enemy == "human":
                     actions = self.game.get_actions("pygame")
                 else:
                     actions = self.game.random_act()
@@ -755,7 +755,7 @@ class Annotator:
 def main():
     output_dir = "./dataset"
     csv_dir = "./field_data"
-    filename = "data.dat"
+    filename = "datami.dat"
     # random: ランダム
     # smart: 強強ランダム
     # human: 手動
