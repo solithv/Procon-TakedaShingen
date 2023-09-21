@@ -685,6 +685,7 @@ class Annotator:
             print(
                 f"turn:{info['turn']}, score_A:{info['score_A']}, score_B:{info['score_B']}"
             )
+        self.game.end_game_render()
         self.game.close()
 
     def game_dataset_maker(

@@ -399,7 +399,7 @@ class Game:
         action: str,
         stay=False,
         smart: bool = False,
-        move_smart: bool = False,
+        smart_move: bool = False,
     ):
         """行動が有効か判定
 
@@ -417,7 +417,7 @@ class Game:
             return True
         elif "build" in action and self.is_buildable(worker, *act_pos, smart):
             return True
-        elif "move" in action and self.is_movable(worker, *act_pos, move_smart):
+        elif "move" in action and self.is_movable(worker, *act_pos, smart_move):
             return True
         if stay and action == "stay":
             return True
@@ -1249,6 +1249,114 @@ class Game:
             self.drawTurnInfo(actingWorker=actingWorker + 1)
         return actions
 
+    def end_game_render(self):
+        """終了状態描画"""
+        if self.window_surface is None:
+            self.reset_render()
+            pygame.init()
+            pygame.display.init()
+            self.window_surface = pygame.display.set_mode(
+                (self.window_size_x, self.window_size_y + self.cell_size * 2)
+            )
+            pygame.display.set_caption("game")
+
+        view = [
+            [
+                [
+                    self.CELL[i]
+                    for i, item in enumerate(self.board[:, y, x].astype(bool))
+                    if item
+                ]
+                for x in range(self.width)
+            ]
+            for y in range(self.height)
+        ]
+        showTerritory = False
+        self.drawAll(view)
+        pygame.draw.rect(
+            self.window_surface,
+            self.BLACK,
+            (
+                0,
+                self.cell_size * self.height,
+                self.cell_size * self.width,
+                self.cell_size * 2,
+            ),
+        )
+        font = pygame.font.SysFont(None, 60)
+        self.calculate_score()
+        text = font.render(
+            f"A team:{self.score_A}, B team:{self.score_B}",
+            False,
+            self.WHITE,
+        )
+        text_rect = text.get_rect(
+            center=(
+                self.cell_size * self.width / 2,
+                self.cell_size * (self.height + 1),
+            )
+        )
+        self.window_surface.blit(text, text_rect)
+        pygame.display.update()
+        while True:
+            for event in pygame.event.get():
+                if event.type == KEYDOWN:
+                    if event.key == pygame.K_RETURN:
+                        showTerritory = not showTerritory
+                        self.drawAll(view)
+                    elif event.key in (pygame.K_ESCAPE, pygame.K_q):
+                        return
+
+                    if showTerritory:
+                        territoryALayer = self.compile_layers(
+                            self.board, "territory_A", one_hot=True
+                        )
+                        territoryBLayer = self.compile_layers(
+                            self.board, "territory_B", one_hot=True
+                        )
+                        openTerritoryALayer = self.compile_layers(
+                            self.board, "open_territory_A", one_hot=True
+                        )
+                        openTerritoryBLayer = self.compile_layers(
+                            self.board, "open_territory_B", one_hot=True
+                        )
+                        for i in range(self.height):
+                            for j in range(self.width):
+                                if territoryALayer[i][j] == territoryBLayer[i][j] == 1:
+                                    color = self.PURPLE
+                                elif territoryALayer[i][j] == 1:
+                                    color = self.RED
+                                elif territoryBLayer[i][j] == 1:
+                                    color = self.BLUE
+                                elif openTerritoryALayer[i][j] == 1:
+                                    color = self.PINK
+                                elif openTerritoryBLayer[i][j] == 1:
+                                    color = self.SKY
+                                else:
+                                    self.placeImage(self.BLANK_IMG, i, j)
+                                    continue
+
+                                pygame.draw.rect(
+                                    self.window_surface,
+                                    color,
+                                    (
+                                        j * self.cell_size,
+                                        i * self.cell_size,
+                                        self.cell_size,
+                                        self.cell_size,
+                                    ),
+                                )
+                        self.drawGrids()
+                        continue
+                pygame.display.update()
+
+    def close(self):
+        """描画終了処理"""
+        self.window_surface = None
+        self.clock = None
+        pygame.display.quit()
+        pygame.quit()
+
     def get_actions_from_cli(self):
         """コンソールから行動を入力"""
         [print(f"{i:2}: {action}") for i, action in enumerate(self.ACTIONS)]
@@ -1285,13 +1393,6 @@ class Game:
         while self.WORKER_MAX > len(actions):
             actions.append(self.ACTIONS.index("stay"))
         return actions
-
-    def close(self):
-        """描画終了処理"""
-        self.window_surface = None
-        self.clock = None
-        pygame.display.quit()
-        pygame.quit()
 
     def random_act(self):
         """行動可能な範囲でランダムな行動を返す"""
@@ -1336,11 +1437,11 @@ class Game:
             if group != action.split("_")[0] and len(actionable):
                 break
             group = action.split("_")[0]
-            if self.is_actionable(worker, action, smart=True, move_smart=True):
+            if self.is_actionable(worker, action, smart=True, smart_move=True):
                 actionable.append(self.ACTIONS.index(action))
         if len(actionable) == 0:
             for action in self.ACTIONS:
-                if self.is_actionable(worker, action, smart=True, move_smart=False):
+                if self.is_actionable(worker, action, smart=True, smart_move=False):
                     actionable.append(self.ACTIONS.index(action))
 
         if len(actionable) > 0:
@@ -1621,6 +1722,7 @@ class Game:
         self.board[:, :, self.width :] = -1
         self.update_open_territory()
         self.board = self.update_blank(self.board)
+        self.calculate_score()
 
     def make_post_data(self, actions: list[int]):
         """行動計画APIで送るデータを作成
