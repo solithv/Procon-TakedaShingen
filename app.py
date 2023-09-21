@@ -1,9 +1,7 @@
 import glob
-import time
 
 import MyEnv
 from NN import NNModel
-from Utils import API
 
 
 def main():
@@ -14,11 +12,10 @@ def main():
         render_mode="human",
         use_pyautogui=True,
     )
-    env.metadata["render_fps"] = 30
 
     nn = NNModel(model_path)
     nn.load_model()
-    nn.make_model(5)
+    # nn.make_model(5)
     nn.model.summary()
 
     observation = env.reset()
@@ -28,8 +25,9 @@ def main():
         env.render()
         # env.print_around(env.get_around_workers(side_length=5))
         if env.current_team == "A":
-            actions = env.get_random_actions()
-            # actions = nn.predict(env.get_around_workers(5))
+            # actions = env.get_random_actions()
+            actions = nn.predict(env.get_around_workers(5))
+            actions = env.check_actions(actions)
             print(actions)
         else:
             actions = env.get_random_actions()
@@ -40,7 +38,6 @@ def main():
         print(
             f"turn:{info['turn']}, score_A:{info['score_A']}, score_B:{info['score_B']}"
         )
-    env.render()
     print("game end")
     env.end_game_render()
     env.close()

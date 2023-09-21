@@ -419,7 +419,7 @@ class Game:
             return True
         elif "move" in action and self.is_movable(worker, *act_pos, smart_move):
             return True
-        if stay and action == "stay":
+        elif stay and action == "stay":
             return True
         return False
 
@@ -768,6 +768,36 @@ class Game:
             "turn": self.turn,
             "current_team": self.current_team,
             "actions": actions,
+            "stayed_workers": self.stayed_workers,
+            "score_A": self.score_A,
+            "score_B": self.score_B,
+            "reward": reward,
+            "terminated": terminated,
+            "truncated": truncated,
+        }
+        self.turn += 1
+        return self.get_observation(), reward, terminated, truncated, info
+
+    def dummy_step(self):
+        [worker.turn_init() for worker in self.workers[self.current_team]]
+        workers = [
+            (worker, self.ACTIONS.index("stay"))
+            for worker in self.workers[self.current_team]
+        ]
+        self.successful = []
+        self.stayed_workers = []
+        self.action_workers(workers)
+        self.update_territory()
+        self.update_open_territory()
+        self.board = self.update_blank(self.board)
+        self.calculate_score()
+        reward = self.get_reward()
+        terminated, truncated = self.is_done()
+        self.change_player()
+        info = {
+            "turn": self.turn,
+            "current_team": self.current_team,
+            "actions": "dummy",
             "stayed_workers": self.stayed_workers,
             "score_A": self.score_A,
             "score_B": self.score_B,
@@ -1284,6 +1314,9 @@ class Game:
             ),
         )
         font = pygame.font.SysFont(None, 60)
+        self.update_territory()
+        self.update_open_territory()
+        self.board = self.update_blank(self.board)
         self.calculate_score()
         text = font.render(
             f"A team:{self.score_A}, B team:{self.score_B}",
@@ -1477,6 +1510,7 @@ class Game:
             stay (bool, optional): 待機を許容するか. Defaults to False.
         """
         team = team if team is not None else self.current_team
+        [worker.turn_init() for worker in self.workers[team]]
         self.worker_positions = [
             worker.get_coordinate() for worker in self.workers[team]
         ]
