@@ -1408,6 +1408,7 @@ class Game:
         if controller == "pygame":
             while True:
                 actions = self.get_actions_from_pygame()
+                [worker.turn_init() for worker in self.workers[self.current_team]]
                 self.worker_positions = [
                     worker.get_coordinate()
                     for worker in self.workers[self.current_team]
