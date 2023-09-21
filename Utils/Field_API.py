@@ -9,11 +9,8 @@ class API:
     # .envはトークンを格納しているファイル
     load_dotenv(".env")
     token = os.getenv("TOKEN")
+    match_url = f"{os.getenv('MATCH_URL')}/matches"
     header = {"procon-token": token}
-
-    # query = {"token": token}
-    def __init__(self, match_url) -> None:
-        self.match_url = f"{match_url}/matches"
 
     def get_match(self):
         """

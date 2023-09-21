@@ -8,3 +8,4 @@ model/*
 .env
 server_configs/
 log/
+資料/
