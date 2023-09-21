@@ -1,3 +1,11 @@
 .venv/
 __pycache__/
-test.py
+test*
+.devcontainer
+model/*
+!model/*.keras
+!model/*.zip.*
+.env
+server_configs/
+log/
+資料/

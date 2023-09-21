@@ -1,11 +1,7 @@
-gym
-gymnasium
-keras-rl2
 matplotlib
 numpy
-opencv-python
-Pillow
 PyAutoGUI
 pygame
-scipy
+python-dotenv
+requests
 tensorflow
