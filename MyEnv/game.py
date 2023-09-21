@@ -1465,6 +1465,7 @@ class Game:
         Args:
             worker (Worker): 職人
         """
+        worker.turn_init()
         actionable = []
         group = "break"
         for action in reversed(self.ACTIONS):
