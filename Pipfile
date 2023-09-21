@@ -4,10 +4,15 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
+gymnasium = "*"
+matplotlib = "*"
+numpy = "*"
+pyautogui = "*"
+pygame = "*"
+python-dotenv = "*"
+tensorflow = "*"
 
 [dev-packages]
-ipykernel = "*"
 
 [requires]
-python_version = "3.9"
-python_full_version = "3.9.16"
+python_version = "3.11"
