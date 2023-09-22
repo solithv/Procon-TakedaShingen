@@ -54,9 +54,10 @@ class Annotator:
                     self.output_dir.joinpath(self.basename),
                     f"{self.output_dir.joinpath(self.basename)}.zip",
                 )
-            shutil.unpack_archive(
-                f"{self.output_dir.joinpath(self.basename)}.zip", self.output_dir
-            )
+            if self.output_dir.joinpath(f"{self.basename}.zip").exists():
+                shutil.unpack_archive(
+                    self.output_dir.joinpath(f"{self.basename}.zip"), self.output_dir
+                )
 
     def reset(self):
         self.load_from_csv(self.csv_paths)
