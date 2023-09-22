@@ -135,7 +135,6 @@ class NNModel:
         if plot:
             fig, axes = plt.subplots(2, 1)
             fig.subplots_adjust(hspace=0.6)
-            fig.tight_layout()
             axes[0].plot(history.history["accuracy"])
             axes[0].plot(history.history["val_accuracy"])
             axes[0].set_title("Model accuracy")

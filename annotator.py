@@ -679,6 +679,11 @@ class Annotator:
                     actions = self.game.get_random_actions()
                 elif enemy == "human":
                     actions = self.game.get_actions("pygame")
+                    workers = self.game.workers["B"]
+                    features, targets = self.game_dataset_maker(
+                        self.game.board, actions, workers
+                    )
+                    self.save_dataset(features, targets)
                 else:
                     actions = self.game.random_act()
             observation, reward, terminated, truncated, info = self.game.step(actions)
@@ -695,6 +700,8 @@ class Annotator:
         targets = []
         for worker, action in zip(workers, actions):
             feature = self.game.get_around(board, *worker.get_coordinate(), self.size)
+            if worker.team == "B":
+                feature = feature[[0, 2, 1, 4, 3, 6, 5, 8, 7, 10, 9]]
             target = np.identity(len(self.game.ACTIONS), dtype=np.int8)[action]
             features.append(feature)
             targets.append(target)
