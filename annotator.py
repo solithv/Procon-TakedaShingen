@@ -18,14 +18,16 @@ from Utils import Util
 
 class Annotator:
     def __init__(
-        self, csv_paths, output_dir, filename="data.dat", size: int = 3
+        self, csv_paths, output_dir, filename="data.dat", size: int = 3, max_steps=None
     ) -> None:
         self.output_dir = Path(output_dir)
         self.filename = filename
         self.basename = self.filename.rsplit(".", 1)[0]
         self.csv_paths = csv_paths
         self.size = size
-        self.game = Game(self.csv_paths, render_mode="human", use_pyautogui=True)
+        self.game = Game(
+            self.csv_paths, render_mode="human", use_pyautogui=True, max_steps=max_steps
+        )
         self.game.reset()
         self.layers = self.game.CELL[: self.game.CELL.index("worker_A0")] + (
             "worker_A",
@@ -294,22 +296,6 @@ class Annotator:
         self.update_blank()
         return field
 
-    def compile_layers(self, board, *layers: tuple[str], one_hot: bool = True):
-        """
-        入力された層を合成した2次元配列を返す
-        one_hot: bool 返り値の各要素を1,0のみにする (default=True)
-        """
-        compiled = np.sum(
-            [board[self.layers.index(layer)] for layer in layers],
-            axis=0,
-            dtype=np.int8,
-        )
-        if one_hot:
-            compiled = np.where(compiled > 0, 1, compiled)
-        # compiled[self.size :, :] = -1
-        # compiled[:, self.size :] = -1
-        return compiled
-
     def reset_render(self):
         self.IMG_SCALER = np.array((self.cell_size, self.cell_size))
         self.BLANK_IMG = pygame.transform.scale(
@@ -497,16 +483,16 @@ class Annotator:
                         showTerritory = not showTerritory
 
                 if showTerritory:
-                    territoryALayer = self.compile_layers(
+                    territoryALayer = self.game.compile_layers(
                         board, "territory_A", one_hot=True
                     )
-                    territoryBLayer = self.compile_layers(
+                    territoryBLayer = self.game.compile_layers(
                         board, "territory_B", one_hot=True
                     )
-                    openTerritoryALayer = self.compile_layers(
+                    openTerritoryALayer = self.game.compile_layers(
                         board, "open_territory_A", one_hot=True
                     )
-                    openTerritoryBLayer = self.compile_layers(
+                    openTerritoryBLayer = self.game.compile_layers(
                         board, "open_territory_B", one_hot=True
                     )
                     pygame.display.update()
@@ -674,7 +660,8 @@ class Annotator:
                         pygame.display.update()
         return action
 
-    def play_game_annotator(self):
+    def play_game_annotator(self, enemy=""):
+        self.game = Game(self.csv_paths, render_mode="human", use_pyautogui=True)
         observation = self.game.reset()
 
         terminated, truncated = [False] * 2
@@ -688,51 +675,18 @@ class Annotator:
                 )
                 self.save_dataset(features, targets)
             else:
-                actions = self.game.random_act()
+                if enemy == "smart":
+                    actions = self.game.get_random_actions()
+                elif enemy == "human":
+                    actions = self.game.get_actions("pygame")
+                else:
+                    actions = self.game.random_act()
             observation, reward, terminated, truncated, info = self.game.step(actions)
             print(
                 f"turn:{info['turn']}, score_A:{info['score_A']}, score_B:{info['score_B']}"
             )
+        self.game.end_game_render()
         self.game.close()
-
-    def game_get_around(
-        self, board: np.ndarray, y: int, x: int, side_length: int = 3, raw=False
-    ):
-        if side_length % 2 == 0:
-            raise ValueError("need to input an odd number")
-        length_ = side_length // 2
-        field = np.pad(
-            board,
-            [(0, 0), (length_, length_), (length_, length_)],
-            "constant",
-            constant_values=-1,
-        )
-        front = length_ * 2 + 1
-        field = field[:, y : y + front, x : x + front]
-        if raw:
-            return field
-        a = np.sum(
-            [
-                field[self.game.CELL.index(layer)]
-                for layer in self.game.CELL
-                if "worker_A" in layer
-            ],
-            axis=0,
-        )[np.newaxis, :, :]
-        a = np.where(a < 0, -1, a)
-        b = np.sum(
-            [
-                field[self.game.CELL.index(layer)]
-                for layer in self.game.CELL
-                if "worker_B" in layer
-            ],
-            axis=0,
-        )[np.newaxis, :, :]
-        b = np.where(b < 0, -1, b)
-        field = np.concatenate(
-            [field[: self.game.CELL.index("worker_A0")], a, b], axis=0
-        )
-        return field
 
     def game_dataset_maker(
         self, board: np.ndarray, actions: list[int], workers: list[Worker]
@@ -740,7 +694,7 @@ class Annotator:
         features = []
         targets = []
         for worker, action in zip(workers, actions):
-            feature = self.game_get_around(board, *worker.get_coordinate(), self.size)
+            feature = self.game.get_around(board, *worker.get_coordinate(), self.size)
             target = np.identity(len(self.game.ACTIONS), dtype=np.int8)[action]
             features.append(feature)
             targets.append(target)
@@ -751,13 +705,25 @@ def main():
     output_dir = "./dataset"
     csv_dir = "./field_data"
     filename = "data.dat"
-    annotator = Annotator(glob.glob(os.path.join(csv_dir, "*.csv")), output_dir,filename, size=5)
+    # random: ランダム
+    # smart: 強強ランダム
+    # human: 手動
+    enemy = "smart"
+    # 最大ターン数を指定
+    # 数値入力で指定可能
+    # Noneでマップサイズに応じて可変
+    max_steps = None
+    annotator = Annotator(
+        glob.glob(os.path.join(csv_dir, "*.csv")),
+        output_dir,
+        filename,
+        size=5,
+        max_steps=max_steps,
+    )
     for _ in range(1):
         annotator.reset()
-        annotator.play_game_annotator()
-    # for _ in range(1):
-    #     annotator.reset()
-    #     annotator.do_annotate()
+        annotator.play_game_annotator(enemy)
+        # annotator.do_annotate()
     annotator.finish()
 
 

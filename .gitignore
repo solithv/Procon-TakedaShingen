@@ -6,6 +6,7 @@ model/*
 !model/*.keras
 !model/*.zip.*
 <<<<<<< HEAD
+<<<<<<< HEAD
 Stochastic_muzero/*/
 .env
 API_test.py
@@ -14,3 +15,9 @@ API_test.py
 server_configs/
 log/
 >>>>>>> 3x3
+=======
+.env
+server_configs/
+log/
+資料/
+>>>>>>> origin/3x3

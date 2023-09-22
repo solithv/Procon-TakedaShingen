@@ -1,18 +1,28 @@
 import glob
+<<<<<<< HEAD
 import time
 
 import gymnasium as gym
 
 from NN import NNModel
 from Utils import API
+=======
+
+import MyEnv
+from NN import NNModel
+>>>>>>> origin/3x3
 
 
 def main():
     fields = glob.glob("./field_data/*.csv")
     model_path = "./model/game"
+<<<<<<< HEAD
     env = gym.make(
         "TaniJoh-v0",
         max_steps=200,
+=======
+    env = MyEnv.Game(
+>>>>>>> origin/3x3
         csv_path=fields,
         render_mode="human",
         use_pyautogui=True,
@@ -20,7 +30,11 @@ def main():
 
     nn = NNModel(model_path)
     nn.load_model()
+<<<<<<< HEAD
     nn.make_model(5)
+=======
+    # nn.make_model(5)
+>>>>>>> origin/3x3
     nn.model.summary()
 
     observation = env.reset()
@@ -28,6 +42,7 @@ def main():
     terminated, truncated = [False] * 2
     while not terminated and not truncated:
         env.render()
+<<<<<<< HEAD
         # env.unwrapped.print_around(env.unwrapped.get_around_workers(side_length=5))
         if env.unwrapped.current_team == "A":
             actions = env.unwrapped.get_random_actions()
@@ -36,11 +51,24 @@ def main():
         else:
             actions = env.unwrapped.random_act()
             # actions = env.unwrapped.get_actions("pygame")
+=======
+        # env.print_around(env.get_around_workers(side_length=5))
+        if env.current_team == "A":
+            # actions = env.get_random_actions()
+            actions = nn.predict(env.get_around_workers(5))
+            actions = env.check_actions(actions)
+            print(actions)
+        else:
+            actions = env.get_random_actions()
+            actions = env.random_act()
+            # actions = env.get_actions("pygame")
+>>>>>>> origin/3x3
         # print(actions)
         observation, reward, terminated, truncated, info = env.step(actions)
         print(
             f"turn:{info['turn']}, score_A:{info['score_A']}, score_B:{info['score_B']}"
         )
+<<<<<<< HEAD
     env.render()
     print("game end")
     input()
@@ -104,9 +132,16 @@ def server():
     env.render()
     print("game end")
     input()
+=======
+    print("game end")
+    env.end_game_render()
+>>>>>>> origin/3x3
     env.close()
 
 
 if __name__ == "__main__":
     main()
+<<<<<<< HEAD
     # server()
+=======
+>>>>>>> origin/3x3

@@ -1,7 +1,14 @@
+<<<<<<< HEAD
 gymnasium
+=======
+>>>>>>> origin/3x3
 matplotlib
 numpy
 PyAutoGUI
 pygame
 python-dotenv
+<<<<<<< HEAD
+=======
+requests
+>>>>>>> origin/3x3
 tensorflow
