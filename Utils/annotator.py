@@ -671,8 +671,7 @@ class Annotator:
             self.game.render()
             if self.game.current_team == "A":
                 workers = self.game.workers["A"]
-                # actions = self.game.get_actions("pygame")
-                actions = self.game.get_random_actions()
+                actions = self.game.get_actions("pygame")
                 features, targets = self.game_dataset_maker(
                     self.game.board, actions, workers
                 )
