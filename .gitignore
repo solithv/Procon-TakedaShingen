@@ -2,6 +2,7 @@
 __pycache__/
 test*
 .devcontainer
+<<<<<<< HEAD
 model/*
 !model/*.keras
 !model/*.zip.*
@@ -11,6 +12,9 @@ Stochastic_muzero/*/
 .env
 API_test.py
 =======
+=======
+dataset/*.dat
+>>>>>>> origin/3x3
 .env
 server_configs/
 log/

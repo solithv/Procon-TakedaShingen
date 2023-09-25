@@ -1533,7 +1533,7 @@ class Game:
             y (int): y座標
             x (int): x座標
             side_length (int, optional): 取得領域. Defaults to 5.
-            raw (bool, optional): Trueなら職人の層を結合. Defaults to False.
+            raw (bool, optional): Falseなら職人の層を結合. Defaults to False.
         """
         if side_length % 2 == 0:
             raise ValueError("need to input an odd number")
