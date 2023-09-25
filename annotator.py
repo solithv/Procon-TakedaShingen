@@ -704,7 +704,7 @@ class Annotator:
 def main():
     output_dir = "./dataset"
     csv_dir = "./field_data"
-    filename = "data.dat"
+    filename = "data_mori.dat"
     # random: ランダム
     # smart: 強強ランダム
     # human: 手動

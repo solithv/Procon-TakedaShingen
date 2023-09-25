@@ -6,28 +6,14 @@ import re
 from collections import defaultdict
 from typing import Any, Optional, Union
 
-<<<<<<< HEAD
-import gymnasium as gym
-=======
->>>>>>> origin/3x3
 import numpy as np
 import pygame
 from pygame.locals import *
 
-<<<<<<< HEAD
-try:
-    from .worker import Worker
-except:
-    from worker import Worker
-
-
-class Game(gym.Env):
-=======
 from .worker import Worker
 
 
 class Game:
->>>>>>> origin/3x3
     metadata = {"render_modes": ["human", "ansi"], "render_fps": 5}
     SCORE_MULTIPLIER = {"castle": 100, "territory": 30, "rampart": 10}
     TEAM = ("A", "B")
@@ -96,10 +82,7 @@ class Game:
         "worker_B": "Wb",
         "outside": "X",
     }
-<<<<<<< HEAD
-=======
     turns = {11: 30, 13: 54, 15: 80, 17: 100, 21: 150, 25: 200}
->>>>>>> origin/3x3
 
     BLACK = (0, 0, 0)
     WHITE = (255, 255, 255)
@@ -115,11 +98,7 @@ class Game:
         self,
         csv_path: Union[str, list[str]] = None,
         render_mode="ansi",
-<<<<<<< HEAD
-        max_steps=200,
-=======
         max_steps: int = None,
->>>>>>> origin/3x3
         first_player: Optional[int] = None,
         use_pyautogui: bool = False,
     ):
@@ -128,18 +107,10 @@ class Game:
         Args:
             csv_path (Union[str, list[str]]): フィールドデータのパス
             render_mode (str, optional): 描画方法. Defaults to "ansi".
-<<<<<<< HEAD
-            max_steps (int, optional): 最大ステップ数. Defaults to 100.
-            first_player (Optional[int], optional): 先行プレイヤーの番号. Defaults to None.
-            use_pyautogui (bool): PyAutoGUIを使って描画windowサイズを指定するか. Defaults to False.
-        """
-        super().__init__()
-=======
             max_steps (int, optional): 最大ステップ数 未指定でマップサイズに応じて変動. Defaults to None.
             first_player (Optional[int], optional): 先行プレイヤーの番号. Defaults to None.
             use_pyautogui (bool): PyAutoGUIを使って描画windowサイズを指定するか. Defaults to False.
         """
->>>>>>> origin/3x3
         self.csv_path = csv_path
         self.render_mode = render_mode
         self.max_steps = max_steps
@@ -148,20 +119,6 @@ class Game:
             (len(self.CELL), self.FIELD_MAX, self.FIELD_MAX), dtype=np.int8
         )
 
-<<<<<<< HEAD
-        self.action_space = gym.spaces.Tuple(
-            gym.spaces.Discrete(len(self.ACTIONS)) for _ in range(self.WORKER_MAX)
-        )
-        self.observation_space = gym.spaces.Box(
-            low=-1,
-            high=1,
-            shape=self.get_observation().shape,
-            dtype=np.int8,
-        )
-        self.reward_range = [np.NINF, np.inf]
-
-=======
->>>>>>> origin/3x3
         self.window_surface = None
         self.clock = None
         self.cwd = os.getcwd()
@@ -174,11 +131,7 @@ class Game:
 
     def get_observation(self):
         """状態を整形して観測空間として返す"""
-<<<<<<< HEAD
-        return self.board.flatten()
-=======
         return self.board
->>>>>>> origin/3x3
 
     def change_player(self, no_change: bool = False):
         """
@@ -192,29 +145,17 @@ class Game:
         self.current_team = self.TEAM[self.current_player]
         self.opponent_team = self.TEAM[1 - self.current_player]
 
-<<<<<<< HEAD
-    def update_blank(self):
-=======
     def update_blank(self, board: np.ndarray):
->>>>>>> origin/3x3
         """
         内部関数
         blank層を更新
         """
-<<<<<<< HEAD
-        self.board[self.CELL.index("blank")] = np.where(
-            self.board[1:].any(axis=0), 0, 1
-        )
-        self.board[self.CELL.index("blank"), self.height :, :] = -1
-        self.board[self.CELL.index("blank"), :, self.width :] = -1
-=======
         assert self.CELL.index("blank") != len(self.CELL) - 1
         board[self.CELL.index("blank")] = np.where(
             board[self.CELL.index("blank") + 1 :].any(axis=0), 0, 1
         )
         board = np.where(np.any(board < 0, axis=0), -1, board)
         return board
->>>>>>> origin/3x3
 
     def load_from_csv(self, path: Union[str, list[str]]):
         """
@@ -258,27 +199,15 @@ class Game:
         )
         assert a_count == b_count, "チーム間の職人数が不一致"
         self.worker_count = a_count
-<<<<<<< HEAD
-        self.update_blank()
-
-        return name
-
-    def reset(self, seed=None, options=None):
-=======
         self.board = self.update_blank(self.board)
 
         return name
 
     def reset(self, seed=None):
->>>>>>> origin/3x3
         """
         gymの必須関数
         環境の初期化
         """
-<<<<<<< HEAD
-        super().reset(seed=seed, options=options)
-=======
->>>>>>> origin/3x3
         if seed is not None:
             random.seed(seed)
             np.random.seed(seed)
@@ -311,18 +240,6 @@ class Game:
         if self.render_mode == "human":
             self.reset_render()
 
-<<<<<<< HEAD
-        self.update_blank()
-        return self.get_observation(), info
-
-    def compile_layers(self, *layers: tuple[str], one_hot: bool = True):
-        """
-        入力された層を合成した2次元配列を返す
-        one_hot: bool 返り値の各要素を1,0のみにする (default=True)
-        """
-        compiled = np.sum(
-            [self.board[self.CELL.index(layer)] for layer in layers],
-=======
         self.board = self.update_blank(self.board)
         return self.get_observation(), info
 
@@ -338,19 +255,12 @@ class Game:
         """
         compiled = np.sum(
             [board[self.CELL.index(layer)] for layer in layers],
->>>>>>> origin/3x3
             axis=0,
             dtype=np.int8,
         )
         if one_hot:
-<<<<<<< HEAD
-            compiled = np.where(compiled, 1, 0)
-        compiled[self.height :, :] = -1
-        compiled[:, self.width :] = -1
-=======
             compiled = np.where(compiled > 0, 1, compiled)
             compiled = np.where(compiled < 0, -1, compiled)
->>>>>>> origin/3x3
         return compiled
 
     def get_team_worker_coordinate(
@@ -387,10 +297,7 @@ class Game:
             and 0 <= y < self.height
             and 0 <= x < self.width
             and not self.compile_layers(
-<<<<<<< HEAD
-=======
                 self.board,
->>>>>>> origin/3x3
                 f"rampart_{worker.opponent_team}",
                 "pond",
                 *[f"worker_{worker.opponent_team}{i}" for i in range(self.WORKER_MAX)],
@@ -399,9 +306,6 @@ class Game:
             and (y, x) not in self.worker_positions
         ):
             if smart:
-<<<<<<< HEAD
-                field = self.get_around(y, x)
-=======
                 if (
                     worker.action_log
                     and worker.action_log[-1][0] == "move"
@@ -409,7 +313,6 @@ class Game:
                 ):
                     return False
                 field = self.get_around(self.board, y, x, side_length=3)
->>>>>>> origin/3x3
                 compiled: np.ndarray = np.sum(
                     [
                         field[self.CELL.index(layer)]
@@ -435,10 +338,7 @@ class Game:
             and 0 <= y < self.height
             and 0 <= x < self.width
             and not self.compile_layers(
-<<<<<<< HEAD
-=======
                 self.board,
->>>>>>> origin/3x3
                 "rampart_A",
                 "rampart_B",
                 "castle",
@@ -471,18 +371,12 @@ class Game:
             not worker.is_action
             and 0 <= y < self.height
             and 0 <= x < self.width
-<<<<<<< HEAD
-            and self.compile_layers("rampart_A", "rampart_B")[y, x]
-        ):
-            if smart and self.compile_layers(f"rampart_{worker.team}")[y, x]:
-=======
             and self.compile_layers(self.board, "rampart_A", "rampart_B")[y, x]
         ):
             if (
                 smart
                 and self.compile_layers(self.board, f"rampart_{worker.team}")[y, x]
             ):
->>>>>>> origin/3x3
                 territory = copy.deepcopy(
                     self.board[self.CELL.index(f"rampart_{worker.team}")]
                 )
@@ -499,8 +393,6 @@ class Game:
         else:
             return False
 
-<<<<<<< HEAD
-=======
     def is_actionable(
         self,
         worker: Worker,
@@ -531,7 +423,6 @@ class Game:
             return True
         return False
 
->>>>>>> origin/3x3
     def get_direction(self, action: int):
         """
         内部関数
@@ -716,13 +607,9 @@ class Game:
             (self.previous_territory_A + self.previous_open_territory_A),
             1,
             0,
-<<<<<<< HEAD
-        ) - self.compile_layers("rampart_A", "rampart_B", "territory_A", "territory_B")
-=======
         ) - self.compile_layers(
             self.board, "rampart_A", "rampart_B", "territory_A", "territory_B"
         )
->>>>>>> origin/3x3
         self.board[self.CELL.index("open_territory_A")] = np.where(
             self.board[self.CELL.index("open_territory_A")] == np.int8(-1),
             0,
@@ -735,13 +622,9 @@ class Game:
             (self.previous_territory_B + self.previous_open_territory_B),
             1,
             0,
-<<<<<<< HEAD
-        ) - self.compile_layers("rampart_A", "rampart_B", "territory_A", "territory_B")
-=======
         ) - self.compile_layers(
             self.board, "rampart_A", "rampart_B", "territory_A", "territory_B"
         )
->>>>>>> origin/3x3
         self.board[self.CELL.index("open_territory_B")] = np.where(
             self.board[self.CELL.index("open_territory_B")] == np.int8(-1),
             0,
@@ -760,11 +643,7 @@ class Game:
         self.score_A = (
             np.sum(
                 self.board[self.CELL.index("castle"), : self.height, : self.width]
-<<<<<<< HEAD
-                * self.compile_layers("territory_A", "open_territory_A")[
-=======
                 * self.compile_layers(self.board, "territory_A", "open_territory_A")[
->>>>>>> origin/3x3
                     : self.height, : self.width
                 ]
             )
@@ -773,11 +652,7 @@ class Game:
         self.score_A += (
             np.sum(
                 (1 - self.board[self.CELL.index("castle"), : self.height, : self.width])
-<<<<<<< HEAD
-                * self.compile_layers("territory_A", "open_territory_A")[
-=======
                 * self.compile_layers(self.board, "territory_A", "open_territory_A")[
->>>>>>> origin/3x3
                     : self.height, : self.width
                 ]
             )
@@ -793,11 +668,7 @@ class Game:
         self.score_B = (
             np.sum(
                 self.board[self.CELL.index("castle"), : self.height, : self.width]
-<<<<<<< HEAD
-                * self.compile_layers("territory_B", "open_territory_B")[
-=======
                 * self.compile_layers(self.board, "territory_B", "open_territory_B")[
->>>>>>> origin/3x3
                     : self.height, : self.width
                 ]
             )
@@ -806,11 +677,7 @@ class Game:
         self.score_B += (
             np.sum(
                 (1 - self.board[self.CELL.index("castle"), : self.height, : self.width])
-<<<<<<< HEAD
-                * self.compile_layers("territory_B", "open_territory_B")[
-=======
                 * self.compile_layers(self.board, "territory_B", "open_territory_B")[
->>>>>>> origin/3x3
                     : self.height, : self.width
                 ]
             )
@@ -823,11 +690,6 @@ class Game:
             * self.SCORE_MULTIPLIER["rampart"]
         )
 
-<<<<<<< HEAD
-        # print(f"score_A:{self.score_A}, score_B:{self.score_B}")
-
-=======
->>>>>>> origin/3x3
     def get_reward(self):
         if self.current_team == "A":
             return self.get_reward_A()
@@ -866,19 +728,12 @@ class Game:
         """ゲーム終了判定実装予定"""
         # terminated : エピソード終了フラグ
         # truncated  : ステップ数上限での終了フラグ
-<<<<<<< HEAD
-        terminated, truncated = False, False
-        if self.turn >= self.max_steps:
-            truncated = True
-        # self.terminated = True
-=======
         max_steps = (
             self.max_steps if self.max_steps is not None else self.turns[self.width]
         )
         terminated, truncated = False, False
         if self.turn >= max_steps:
             truncated = True
->>>>>>> origin/3x3
         return terminated, truncated
 
     def step(self, actions: Union[list[int], tuple[int]]):
@@ -904,11 +759,7 @@ class Game:
         self.action_workers(sorted_workers)
         self.update_territory()
         self.update_open_territory()
-<<<<<<< HEAD
-        self.update_blank()
-=======
         self.board = self.update_blank(self.board)
->>>>>>> origin/3x3
         self.calculate_score()
         reward = self.get_reward()
         terminated, truncated = self.is_done()
@@ -927,8 +778,6 @@ class Game:
         self.turn += 1
         return self.get_observation(), reward, terminated, truncated, info
 
-<<<<<<< HEAD
-=======
     def dummy_step(self):
         [worker.turn_init() for worker in self.workers[self.current_team]]
         workers = [
@@ -959,7 +808,6 @@ class Game:
         self.turn += 1
         return self.get_observation(), reward, terminated, truncated, info
 
->>>>>>> origin/3x3
     def render(self, *args, **kwargs):
         """
         gymの必須関数
@@ -971,10 +819,7 @@ class Game:
             return self.render_terminal(*args, **kwargs)
 
     def render_terminal(self):
-<<<<<<< HEAD
-=======
         """コンソールに描画"""
->>>>>>> origin/3x3
         view = ""
         icon_base = max(len(value) for value in self.ICONS.values())
         item_num = int(
@@ -1205,11 +1050,6 @@ class Game:
         self.clock.tick(self.metadata["render_fps"])
 
         self.drawTurnInfo()
-<<<<<<< HEAD
-        # if self.controller != "pygame":
-        #     return
-=======
->>>>>>> origin/3x3
 
     def get_actions_from_pygame(self):
         def nonAllowedMovements(x, y, directions):
@@ -1259,15 +1099,6 @@ class Game:
                         showTerritory = not showTerritory
 
                 if showTerritory:
-<<<<<<< HEAD
-                    territoryALayer = self.compile_layers("territory_A", one_hot=True)
-                    territoryBLayer = self.compile_layers("territory_B", one_hot=True)
-                    openTerritoryALayer = self.compile_layers(
-                        "open_territory_A", one_hot=True
-                    )
-                    openTerritoryBLayer = self.compile_layers(
-                        "open_territory_B", one_hot=True
-=======
                     territoryALayer = self.compile_layers(
                         self.board, "territory_A", one_hot=True
                     )
@@ -1279,7 +1110,6 @@ class Game:
                     )
                     openTerritoryBLayer = self.compile_layers(
                         self.board, "open_territory_B", one_hot=True
->>>>>>> origin/3x3
                     )
                     for i in range(self.height):
                         for j in range(self.width):
@@ -1449,9 +1279,6 @@ class Game:
             self.drawTurnInfo(actingWorker=actingWorker + 1)
         return actions
 
-<<<<<<< HEAD
-    def get_actions_from_cli(self):
-=======
     def end_game_render(self):
         """終了状態描画"""
         if self.window_surface is None:
@@ -1565,7 +1392,6 @@ class Game:
 
     def get_actions_from_cli(self):
         """コンソールから行動を入力"""
->>>>>>> origin/3x3
         [print(f"{i:2}: {action}") for i, action in enumerate(self.ACTIONS)]
         print(
             f"input team {self.current_team} actions (need {self.worker_count} input) : "
@@ -1573,36 +1399,13 @@ class Game:
         actions = [int(input()) for _ in range(self.worker_count)]
         return actions
 
-<<<<<<< HEAD
-    def get_actions(self, controller: Optional[str] = None, input_actions=None):
-=======
     def get_actions(self, controller: Optional[str] = None):
->>>>>>> origin/3x3
         """操作入力 入力方法が指定されていない場合ランダム行動
 
         Args:
             controller (str, optional): 操作入力方法("cli", "pygame"). Defaults to None.
         """
         if controller == "pygame":
-<<<<<<< HEAD
-            actions = self.get_actions_from_pygame()
-        elif controller == "cli":
-            actions = self.get_actions_from_cli()
-        elif controller == "machine":
-            actions = input_actions
-        else:
-            actions = self.random_act()
-        while self.WORKER_MAX > len(actions):
-            actions.append(0)
-        return actions
-
-    def close(self):
-        self.window_surface = None
-        self.clock = None
-        pygame.display.quit()
-        pygame.quit()
-
-=======
             while True:
                 actions = self.get_actions_from_pygame()
                 [worker.turn_init() for worker in self.workers[self.current_team]]
@@ -1625,7 +1428,6 @@ class Game:
             actions.append(self.ACTIONS.index("stay"))
         return actions
 
->>>>>>> origin/3x3
     def random_act(self):
         """行動可能な範囲でランダムな行動を返す"""
         [worker.turn_init() for worker in self.workers[self.current_team]]
@@ -1657,8 +1459,6 @@ class Game:
             act.append(self.ACTIONS.index("stay"))
         return act
 
-<<<<<<< HEAD
-=======
     def get_random_action(self, worker: Worker):
         """職人ごとに有効な行動をランダムに返す
 
@@ -1684,7 +1484,6 @@ class Game:
         else:
             return self.ACTIONS.index("stay")
 
->>>>>>> origin/3x3
     def get_random_actions(self, team: str = None):
         """有効な行動をランダムで返す
 
@@ -1698,46 +1497,12 @@ class Game:
         ]
         act = []
         for worker in self.workers[team]:
-<<<<<<< HEAD
-            act_able = []
-            pos = worker.get_coordinate()
-            group = "break"
-
-            for action in reversed(self.ACTIONS):
-                if group != action.split("_")[0] and len(act_able):
-                    break
-                group = action.split("_")[0]
-                direction = self.get_direction(self.ACTIONS.index(action))
-                act_pos = (np.array(pos) + np.array(direction)).astype(int)
-                if "break" in action and self.is_breakable(worker, *act_pos, True):
-                    act_able.append(self.ACTIONS.index(action))
-                elif "build" in action and self.is_buildable(worker, *act_pos, True):
-                    act_able.append(self.ACTIONS.index(action))
-                elif "move" in action and self.is_movable(worker, *act_pos, True):
-                    act_able.append(self.ACTIONS.index(action))
-            if len(act_able) == 0:
-                for action in self.ACTIONS:
-                    if "move" in action:
-                        direction = self.get_direction(self.ACTIONS.index(action))
-                        act_pos = (np.array(pos) + np.array(direction)).astype(int)
-                        if self.is_movable(worker, *act_pos):
-                            act_able.append(self.ACTIONS.index(action))
-
-            if len(act_able) > 0:
-                act.append(random.choice(act_able))
-            else:
-                act.append(self.ACTIONS.index("stay"))
-=======
             act.append(self.get_random_action(worker))
->>>>>>> origin/3x3
 
         while self.WORKER_MAX > len(act):
             act.append(self.ACTIONS.index("stay"))
         return act
 
-<<<<<<< HEAD
-    def get_around(self, y: int, x: int, side_length: int = 5, raw=False):
-=======
     def check_actions(self, actions: list[int], team: str = None, stay=False):
         """AIの行動を確認して無効なら上書き
 
@@ -1770,29 +1535,17 @@ class Game:
             side_length (int, optional): 取得領域. Defaults to 5.
             raw (bool, optional): Trueなら職人の層を結合. Defaults to False.
         """
->>>>>>> origin/3x3
         if side_length % 2 == 0:
             raise ValueError("need to input an odd number")
         length_ = side_length // 2
         field = np.pad(
-<<<<<<< HEAD
-            self.board,
-=======
             board,
->>>>>>> origin/3x3
             [(0, 0), (length_, length_), (length_, length_)],
             "constant",
             constant_values=-1,
         )
         front = length_ * 2 + 1
         field = field[:, y : y + front, x : x + front]
-<<<<<<< HEAD
-        if raw:
-            return field
-        a = np.sum(
-            [
-                field[self.CELL.index(layer)]
-=======
 
         return field if raw else self.compile_worker_layers(field)
 
@@ -1805,7 +1558,6 @@ class Game:
         a = np.sum(
             [
                 board[self.CELL.index(layer)]
->>>>>>> origin/3x3
                 for layer in self.CELL
                 if "worker_A" in layer
             ],
@@ -1814,24 +1566,15 @@ class Game:
         a = np.where(a < 0, -1, a)
         b = np.sum(
             [
-<<<<<<< HEAD
-                field[self.CELL.index(layer)]
-=======
                 board[self.CELL.index(layer)]
->>>>>>> origin/3x3
                 for layer in self.CELL
                 if "worker_B" in layer
             ],
             axis=0,
         )[np.newaxis, :, :]
         b = np.where(b < 0, -1, b)
-<<<<<<< HEAD
-        field = np.concatenate([field[: self.CELL.index("worker_A0")], a, b], axis=0)
-        return field
-=======
         board = np.concatenate([board[: self.CELL.index("worker_A0")], a, b], axis=0)
         return board
->>>>>>> origin/3x3
 
     def get_around_workers(
         self, side_length: int = 5, team: str = None
@@ -1850,11 +1593,7 @@ class Game:
         elif team == "opponent":
             team = self.opponent_team
         around_workers = [
-<<<<<<< HEAD
-            self.get_around(*worker.get_coordinate(), side_length)
-=======
             self.get_around(self.board, *worker.get_coordinate(), side_length)
->>>>>>> origin/3x3
             for worker in self.workers[team]
         ]
         return around_workers
@@ -1941,11 +1680,7 @@ class Game:
             )
         self.board[:, self.height :, :] = -1
         self.board[:, :, self.width :] = -1
-<<<<<<< HEAD
-        self.update_blank()
-=======
         self.board = self.update_blank(self.board)
->>>>>>> origin/3x3
         self.update_territory()
 
         self.cell_size = min(
@@ -2022,12 +1757,8 @@ class Game:
         self.board[:, self.height :, :] = -1
         self.board[:, :, self.width :] = -1
         self.update_open_territory()
-<<<<<<< HEAD
-        self.update_blank()
-=======
         self.board = self.update_blank(self.board)
         self.calculate_score()
->>>>>>> origin/3x3
 
     def make_post_data(self, actions: list[int]):
         """行動計画APIで送るデータを作成
