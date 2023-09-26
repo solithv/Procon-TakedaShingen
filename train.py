@@ -58,6 +58,8 @@ def train():
     nn.train(x, y, batch_size, epochs, validation_split)
     nn.save_model(model_path, model_name)
 
+    nn.test_model(x, y)
+
 
 if __name__ == "__main__":
     train()

@@ -145,6 +145,12 @@ class NNModel:
 
             plt.show()
 
+    def test_model(self, x, y):
+        test_loss, test_acc = self.model.evaluate(x, y)
+
+        print(test_loss)
+        print(test_acc)
+
     def predict(self, inputs: list[np.ndarray]):
         """予測
 
@@ -154,6 +160,6 @@ class NNModel:
         Returns:
             list[int]: 行動のリスト
         """
-        out = self.model.predict(np.array(inputs))
+        out = self.model.predict(np.array(inputs, dtype=np.int8))
         args = np.argmax(out, axis=1)
         return args
