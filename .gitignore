@@ -2,9 +2,8 @@
 __pycache__/
 test*
 .devcontainer
-model/*
-!model/*.keras
-!model/*.zip.*
+dataset/*.dat
 .env
 server_configs/
 log/
+資料/
