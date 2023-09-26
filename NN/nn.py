@@ -1,4 +1,3 @@
-import shutil
 from pathlib import Path
 
 import keras
@@ -11,14 +10,6 @@ from Utils import Util
 
 
 class NNModel:
-    def __init__(self, model_path: str) -> None:
-        """init
-
-        Args:
-            model_path (str): モデルの保存パス(拡張子なし)
-        """
-        self.model_path = Path(model_path)
-
     def make_model(self, sides: int = 5):
         """モデルを作成
 
@@ -27,9 +18,9 @@ class NNModel:
         """
         input_shape = (len(Game.CELL[: Game.CELL.index("worker_A0")]) + 2, sides, sides)
         output_size = len(Game.ACTIONS)
-        self.model = self._make_model(input_shape, output_size)
+        self.model = self.define_model(input_shape, output_size)
 
-    def _make_model(self, input_shape: tuple[int], output_size: int):
+    def define_model(self, input_shape: tuple[int], output_size: int):
         """モデルを定義
 
         Args:
@@ -38,42 +29,46 @@ class NNModel:
         """
         inputs = keras.Input(input_shape)
         x = layers.Flatten()(inputs)
-        x = layers.Dense(512, activation="relu")(x)
-        x = layers.Dense(512, activation="relu")(x)
+        x = layers.Dense(128, activation="relu")(x)
+        x = layers.Dense(128, activation="relu")(x)
+        x = layers.Dropout(0.5)(x)
+        x = layers.Dense(128, activation="relu")(x)
+        x = layers.Dense(128, activation="relu")(x)
+        x = layers.Dropout(0.5)(x)
+        x = layers.Dense(32, activation="relu")(x)
         outputs = layers.Dense(output_size, activation="softmax")(x)
 
         return models.Model(inputs=inputs, outputs=outputs)
 
-    def save_model(self, model_path: str = None):
+    def save_model(self, model_dir: str, model_name: str):
         """モデルを保存
 
         Args:
-            model_path (str, optional): モデルの保存先. Defaults to None.
+            model_dir (str): モデルの保存先
+            model_name (str): モデルの保存名
         """
-        model_path: Path = self.model_path if model_path is None else Path(model_path)
-        model_path.parent.mkdir(exist_ok=True)
-        self.model.save(f"{model_path}.keras")
-        if Path(f"{model_path}.keras").stat().st_size > 100 * (1024**2):
-            shutil.make_archive(
-                model_path,
-                format="zip",
-                root_dir=model_path.parent,
-                base_dir=f"{model_path.name}.keras",
-            )
-            Util.split_zip(f"{model_path}.zip", model_path)
+        model_dir: Path = Path(model_dir)
+        model_name: Path = Path(model_name)
+        model_dir.mkdir(exist_ok=True)
+        model_file = model_dir / f"{model_name}.keras"
+        self.model.save(model_file)
+        if model_file.stat().st_size > 100 * (1024**2):
+            Util.compress_and_split(model_file, model_name, model_dir)
 
-    def load_model(self, from_zip: bool = True, model_path: str = None):
+    def load_model(self, model_dir: str, model_name: str, from_zip: bool = True):
         """モデルを読み込み
 
         Args:
+            model_dir (str): モデルの保存先
+            model_name (str): モデルの保存名
             from_zip (bool, optional): 分割zipファイルから読み込もうとするか. Defaults to True.
-            model_path (str, optional): モデルの保存先. Defaults to None.
         """
-        model_path: Path = self.model_path if model_path is None else Path(model_path)
-        if from_zip and list(model_path.parent.glob("*.zip.[0-9][0-9][0-9]")):
-            Util.combine_split_zip(model_path, f"{model_path}.zip")
-            shutil.unpack_archive(f"{model_path}.zip", model_path.parent)
-        self.model = models.load_model(f"{model_path}.keras")
+        model_dir: Path = Path(model_dir)
+        model_name: Path = Path(model_name)
+        model_file = model_dir / f"{model_name}.keras"
+        if from_zip and list(model_dir.glob(f"{model_name}.zip.[0-9][0-9][0-9]")):
+            Util.combine_and_unpack(model_dir, model_name)
+        self.model = models.load_model(model_file)
 
     def train(
         self,
@@ -111,10 +106,11 @@ class NNModel:
         )
         self.model.summary()
 
+        callbacks = []
         early_stopping = keras.callbacks.EarlyStopping(
             monitor="val_loss", patience=20, verbose=1, restore_best_weights=True
         )
-        callbacks = [early_stopping]
+        callbacks.append(early_stopping)
         if tensorboard_log:
             tensorboard = keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
             callbacks.append(tensorboard)
@@ -129,8 +125,6 @@ class NNModel:
             *args,
             **kwargs,
         )
-
-        self.save_model()
 
         if plot:
             fig, axes = plt.subplots(2, 1)

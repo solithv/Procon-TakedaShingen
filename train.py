@@ -10,26 +10,26 @@ from Utils import Annotator, Util
 
 def unpack_dataset(dir):
     dir = Path(dir)
+    is_combine = {}
     for file in dir.glob("*.zip.[0-9][0-9][0-9]"):
-        basename = file.name.split(".")[0]
-        if dir.joinpath(f"{basename}.dat").exists():
+        basename = file.name.rsplit(2)[0]
+        if any("zip" not in item for item in dir.glob(f"{basename}.*")):
             continue
-        Util.combine_split_zip(
-            dir.joinpath(basename),
-            f"{dir.joinpath(basename)}.zip",
-        )
+        Util.combine_split_zip(dir, basename, dir)
+        is_combine[basename] = True
     for file in dir.glob("*.zip"):
-        basename = file.name.split(".")[0]
-        if dir.joinpath(f"{basename}.dat").exists():
-            continue
-        shutil.unpack_archive(f"{dir.joinpath(basename)}.zip", dir)
+        basename = file.stem
+        shutil.unpack_archive(file, dir)
+        if is_combine.get(basename):
+            file.unlink()
 
 
 def train():
     dataset_dir = "./dataset"
-    model_path = "./model/game"
+    model_path = "./model"
+    model_name = "game"
     annotator = Annotator(None, dataset_dir)
-    nn = NNModel(model_path)
+    nn = NNModel()
     nn.make_model(5)
 
     unpack_dataset(dataset_dir)
@@ -40,6 +40,7 @@ def train():
     y = []
 
     for dataset in Path(dataset_dir).glob("*.dat"):
+        print(dataset)
         with open(dataset) as f:
             for line in f:
                 feature, target = json.loads(line).values()
@@ -55,6 +56,7 @@ def train():
     print(x.shape, y.shape)
 
     nn.train(x, y, batch_size, epochs, validation_split)
+    nn.save_model(model_path, model_name)
 
 
 if __name__ == "__main__":

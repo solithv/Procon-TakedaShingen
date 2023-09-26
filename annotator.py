@@ -7,9 +7,9 @@ from Utils import Annotator
 def main():
     output_dir = "./dataset"
     csv_dir = "./field_data"
-    filename = "data.dat"
+    filename = "data1.dat"
     # random: ランダム
-    # smart: 強強ランダム
+    # smart: 強ランダム
     # human: 手動
     enemy = "smart"
     # 最大ターン数を指定

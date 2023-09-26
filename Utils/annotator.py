@@ -3,7 +3,6 @@ import json
 import os
 import random
 import re
-import shutil
 from pathlib import Path
 from typing import Iterable, Union
 
@@ -21,8 +20,8 @@ class Annotator:
         self, csv_paths, output_dir, filename="data.dat", size: int = 3, max_steps=None
     ) -> None:
         self.output_dir = Path(output_dir)
-        self.filename = filename
-        self.basename = self.filename.rsplit(".", 1)[0]
+        self.filename = Path(filename)
+        self.basename = self.filename.stem
         self.csv_paths = csv_paths
         self.size = size
         self.game = Game(
@@ -48,36 +47,16 @@ class Annotator:
         self.unpack()
 
     def unpack(self):
-        if not self.output_dir.joinpath(self.filename).exists():
-            if list(self.output_dir.glob("*.zip.[0-9][0-9][0-9]")):
-                Util.combine_split_zip(
-                    self.output_dir.joinpath(self.basename),
-                    f"{self.output_dir.joinpath(self.basename)}.zip",
-                )
-            if self.output_dir.joinpath(f"{self.basename}.zip").exists():
-                shutil.unpack_archive(
-                    self.output_dir.joinpath(f"{self.basename}.zip"), self.output_dir
-                )
+        if not (self.output_dir / self.filename).exists():
+            Util.combine_and_unpack(self.output_dir, self.basename)
 
     def reset(self):
         self.load_from_csv(self.csv_paths)
 
     def finish(self):
-        shutil.make_archive(
-            self.output_dir.joinpath(self.basename),
-            format="zip",
-            root_dir=self.output_dir,
-            base_dir=self.filename,
+        Util.compress_and_split(
+            self.output_dir / self.filename, output_dir=self.output_dir
         )
-        self.output_dir.joinpath(self.filename).unlink()
-        if self.output_dir.joinpath(f"{self.basename}.zip").stat().st_size > 100 * (
-            1024**2
-        ):
-            Util.split_zip(
-                f"{self.output_dir.joinpath(self.basename)}.zip",
-                self.output_dir.joinpath(self.basename),
-            )
-            self.output_dir.joinpath(f"{self.basename}.zip").unlink()
 
     def do_annotate(self, only=False):
         features = []
