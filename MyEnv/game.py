@@ -229,10 +229,13 @@ class Game:
             )
             self.width, self.height = [self.FIELD_MAX] * 2
             info = {"mode": "api"}
+        self.max_turn = (
+            self.max_steps if self.max_steps is not None else self.turns[self.width]
+        )
 
         self.cell_size = min(
             self.display_size_x * 0.9 // self.width,
-            self.display_size_y * 0.8 // self.height,
+            self.display_size_y * 0.7 // self.height,
         )
         self.window_size = max(self.width, self.height) * self.cell_size
         self.window_size_x = self.width * self.cell_size
@@ -728,11 +731,8 @@ class Game:
         """ゲーム終了判定実装予定"""
         # terminated : エピソード終了フラグ
         # truncated  : ステップ数上限での終了フラグ
-        max_steps = (
-            self.max_steps if self.max_steps is not None else self.turns[self.width]
-        )
         terminated, truncated = False, False
-        if self.turn >= max_steps:
+        if self.turn >= self.max_turn:
             truncated = True
         return terminated, truncated
 
@@ -998,7 +998,7 @@ class Game:
                 0,
                 self.cell_size * self.height,
                 self.cell_size * self.width,
-                self.cell_size * 2,
+                self.cell_size * 4,
             ),
         )
         font = pygame.font.SysFont(None, 60)
@@ -1010,11 +1010,19 @@ class Game:
             )
         else:
             text = font.render(f"{self.current_team}'s turn", False, self.WHITE)
+        turn_text = font.render(f"{self.turn}/{self.max_turn} turn", False, self.WHITE)
 
-        text_rect = text.get_rect(
+        text_rect = turn_text.get_rect(
             center=(
                 self.cell_size * self.width / 2,
                 self.cell_size * (self.height + 1),
+            )
+        )
+        self.window_surface.blit(turn_text, text_rect)
+        text_rect = text.get_rect(
+            center=(
+                self.cell_size * self.width / 2,
+                self.cell_size * (self.height + 3),
             )
         )
         self.window_surface.blit(text, text_rect)
@@ -1040,7 +1048,7 @@ class Game:
             pygame.init()
             pygame.display.init()
             self.window_surface = pygame.display.set_mode(
-                (self.window_size_x, self.window_size_y + self.cell_size * 2)
+                (self.window_size_x, self.window_size_y + self.cell_size * 4)
             )
             pygame.display.set_caption("game")
         if self.clock is None:
@@ -1067,6 +1075,10 @@ class Game:
 
             return coordinates
 
+        [worker.turn_init() for worker in self.workers[self.current_team]]
+        self.worker_positions = [
+            worker.get_coordinate() for worker in self.workers[self.current_team]
+        ]
         view = [
             [
                 [
@@ -1167,25 +1179,30 @@ class Game:
                         if directionVector[0] == directionVector[1] == 0:
                             actions.append(0)
                         else:
-                            actions.append(
-                                int(
+                            action = int(
+                                (
                                     (
-                                        (
-                                            np.round(
-                                                np.degrees(
-                                                    np.arctan2(
-                                                        directionVector[0],
-                                                        directionVector[1],
-                                                    )
+                                        np.round(
+                                            np.degrees(
+                                                np.arctan2(
+                                                    directionVector[0],
+                                                    directionVector[1],
                                                 )
                                             )
-                                            / 45
                                         )
-                                        % 8
+                                        / 45
                                     )
-                                    + 1
+                                    % 8
                                 )
+                                + 1
                             )
+                            if not self.is_actionable(
+                                self.workers[self.current_team][actingWorker],
+                                self.ACTIONS[action],
+                                stay=True,
+                            ):
+                                continue
+                            actions.append(action)
                         self.placeImage(self.BLANK_IMG, workerY, workerX)
                         self.placeImage(
                             eval(f"self.WORKER_{self.current_team}_IMG"),
@@ -1207,22 +1224,27 @@ class Game:
                         ):
                             continue
                         directionVector = np.array([cellX - workerX, workerY - cellY])
-                        actions.append(
-                            int(
-                                (
-                                    np.round(
-                                        np.degrees(
-                                            np.arctan2(
-                                                -directionVector[1],
-                                                directionVector[0],
-                                            )
+                        action = int(
+                            (
+                                np.round(
+                                    np.degrees(
+                                        np.arctan2(
+                                            -directionVector[1],
+                                            directionVector[0],
                                         )
                                     )
-                                    / 90
                                 )
-                                + 10
+                                / 90
                             )
+                            + 10
                         )
+                        if not self.is_actionable(
+                            self.workers[self.current_team][actingWorker],
+                            self.ACTIONS[action],
+                            stay=True,
+                        ):
+                            continue
+                        actions.append(action)
                         actingWorker += 1
                         self.placeImage(self.BLANK_IMG, workerY, workerX)
                         self.placeImage(
@@ -1248,22 +1270,27 @@ class Game:
                         ):
                             continue
                         directionVector = np.array([cellX - workerX, workerY - cellY])
-                        actions.append(
-                            int(
-                                (
-                                    np.round(
-                                        np.degrees(
-                                            np.arctan2(
-                                                -directionVector[1],
-                                                directionVector[0],
-                                            )
+                        action = int(
+                            (
+                                np.round(
+                                    np.degrees(
+                                        np.arctan2(
+                                            -directionVector[1],
+                                            directionVector[0],
                                         )
                                     )
-                                    / 90
                                 )
-                                + 14
+                                / 90
                             )
+                            + 14
                         )
+                        if not self.is_actionable(
+                            self.workers[self.current_team][actingWorker],
+                            self.ACTIONS[action],
+                            stay=True,
+                        ):
+                            continue
+                        actions.append(action)
                         actingWorker += 1
 
                         self.placeImage(self.BLANK_IMG, workerY, workerX)
@@ -1683,6 +1710,9 @@ class Game:
         self.board = self.update_blank(self.board)
         self.update_territory()
 
+        self.max_turn = (
+            self.max_steps if self.max_steps is not None else self.turns[self.width]
+        )
         self.cell_size = min(
             self.display_size_x * 0.9 // self.width,
             self.display_size_y * 0.8 // self.height,
