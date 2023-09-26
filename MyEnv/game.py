@@ -235,7 +235,7 @@ class Game:
 
         self.cell_size = min(
             self.display_size_x * 0.9 // self.width,
-            self.display_size_y * 0.7 // self.height,
+            self.display_size_y * 0.8 // self.height,
         )
         self.window_size = max(self.width, self.height) * self.cell_size
         self.window_size_x = self.width * self.cell_size
@@ -998,31 +998,20 @@ class Game:
                 0,
                 self.cell_size * self.height,
                 self.cell_size * self.width,
-                self.cell_size * 4,
+                self.cell_size * 2,
             ),
         )
         font = pygame.font.SysFont(None, 60)
-        if actingWorker:
-            text = font.render(
-                f"{self.current_team}'s turn {actingWorker}/{self.worker_count}",
-                False,
-                self.WHITE,
-            )
-        else:
-            text = font.render(f"{self.current_team}'s turn", False, self.WHITE)
-        turn_text = font.render(f"{self.turn}/{self.max_turn} turn", False, self.WHITE)
-
-        text_rect = turn_text.get_rect(
-            center=(
-                self.cell_size * self.width / 2,
-                self.cell_size * (self.height + 1),
-            )
+        text = font.render(
+            f"{self.turn}/{self.max_turn} turn : {self.current_team}'s turn",
+            False,
+            self.WHITE,
         )
-        self.window_surface.blit(turn_text, text_rect)
+
         text_rect = text.get_rect(
             center=(
                 self.cell_size * self.width / 2,
-                self.cell_size * (self.height + 3),
+                self.cell_size * (self.height + 1),
             )
         )
         self.window_surface.blit(text, text_rect)
@@ -1048,7 +1037,7 @@ class Game:
             pygame.init()
             pygame.display.init()
             self.window_surface = pygame.display.set_mode(
-                (self.window_size_x, self.window_size_y + self.cell_size * 4)
+                (self.window_size_x, self.window_size_y + self.cell_size * 2)
             )
             pygame.display.set_caption("game")
         if self.clock is None:
