@@ -5,6 +5,7 @@ import keras
 import matplotlib.pyplot as plt
 import numpy as np
 from keras import layers, models
+import tensorflow as tf
 
 from MyEnv import Game
 from Utils import Util
@@ -31,20 +32,13 @@ class NNModel:
             output_size (int): 出力次元
         """
         inputs = keras.Input(input_shape)
-        x = layers.Conv2D(
-            64, (5, 5), padding="same", data_format="channels_first", activation="relu"
-        )(inputs)
-        x = layers.Conv2D(
-            64, (5, 5), padding="same", data_format="channels_first", activation="relu"
-        )(x)
+        x = tf.transpose(inputs, (0, 2, 3, 1))
+        x = layers.Conv2D(64, (5, 5), padding="same", activation="relu")(inputs)
+        x = layers.Conv2D(64, (5, 5), padding="same", activation="relu")(x)
         x = layers.MaxPooling2D((2, 2))(x)
         x = layers.Dropout(0.2)(x)
-        x = layers.Conv2D(
-            32, (5, 5), padding="same", data_format="channels_first", activation="relu"
-        )(x)
-        x = layers.Conv2D(
-            32, (5, 5), padding="same", data_format="channels_first", activation="relu"
-        )(x)
+        x = layers.Conv2D(32, (5, 5), padding="same", activation="relu")(x)
+        x = layers.Conv2D(32, (5, 5), padding="same", activation="relu")(x)
         x = layers.MaxPooling2D((2, 2))(x)
         x = layers.Dropout(0.2)(x)
         x = layers.Flatten()(x)

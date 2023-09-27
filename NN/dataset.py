@@ -47,7 +47,7 @@ class DatasetUtil:
                     y += targets_annotate
         x = np.array(x)
         y = np.array(y)
-        print(x.dtype, y.dtype)
+        print(x.shape, y.shape)
         return x, y
 
     def make_generators(self, dataset_dir, batch_size, split_rate=0.7):
