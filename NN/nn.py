@@ -1,3 +1,4 @@
+import tracemalloc
 from pathlib import Path
 
 import keras
@@ -28,18 +29,28 @@ class NNModel:
             output_size (int): 出力次元
         """
         inputs = keras.Input(input_shape)
-        x = layers.Conv2D(32, (3, 3), data_format="channels_first", activation="relu")(
-            inputs
-        )
-        x = layers.Conv2D(32, (3, 3), data_format="channels_first", activation="relu")(
-            x
-        )
-        x = layers.Flatten()(x)
-        x = layers.Dense(256, activation="relu")(x)
+        x = layers.Conv2D(
+            128, (5, 5), padding="same", data_format="channels_first", activation="relu"
+        )(inputs)
+        x = layers.Conv2D(
+            128, (5, 5), padding="same", data_format="channels_first", activation="relu"
+        )(x)
+        x = layers.MaxPooling2D((2, 2))(x)
         x = layers.Dropout(0.2)(x)
-        x = layers.Dense(256, activation="relu")(x)
+        x = layers.Conv2D(
+            64, (5, 5), padding="same", data_format="channels_first", activation="relu"
+        )(x)
+        x = layers.Conv2D(
+            64, (5, 5), padding="same", data_format="channels_first", activation="relu"
+        )(x)
+        x = layers.MaxPooling2D((2, 2))(x)
+        x = layers.Dropout(0.2)(x)
+        x = layers.Flatten()(x)
+        x = layers.Dense(512, activation="relu")(x)
+        x = layers.Dense(512, activation="relu")(x)
         x = layers.Dropout(0.2)(x)
         x = layers.Dense(64, activation="relu")(x)
+        x = layers.Dropout(0.2)(x)
         outputs = layers.Dense(output_size, activation="softmax")(x)
 
         return models.Model(inputs=inputs, outputs=outputs)
@@ -99,6 +110,7 @@ class NNModel:
             tensorboard_log (bool, optional): tensorboardログを保存するか. Defaults to True.
             plot (bool, optional): 学習履歴を可視化するか. Defaults to True.
         """
+        tracemalloc.start()
         log_dir: Path = Path(log_dir)
         log_dir.mkdir(exist_ok=True)
 
@@ -148,6 +160,7 @@ class NNModel:
             axes[1].legend(["Train", "Validation"], loc="upper left")
 
             plt.show()
+        tracemalloc.stop()
 
     def test_model(self, x, y):
         test_loss, test_acc = self.model.evaluate(x, y)

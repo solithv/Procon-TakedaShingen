@@ -229,6 +229,7 @@ class Annotator:
         data = [rotate_augment(feature, target, i + 1) for i in range(3)]
         data.append(horizontal_augment(feature, target))
         data.append(vertical_augment(feature, target))
+        data.append(horizontal_augment(*vertical_augment(feature, target)))
         features, targets = [list(x) for x in zip(*data)]
         return features, targets
 
