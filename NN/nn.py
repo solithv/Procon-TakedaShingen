@@ -90,7 +90,7 @@ class NNModel:
         model_path: str = "./model",
         model_name: str = "game",
         log_dir: str = "./log",
-        tensorboard_log: bool = True,
+        tensorboard_log: bool = False,
         plot: bool = True,
     ):
         """学習
@@ -119,29 +119,42 @@ class NNModel:
         )
         self.model.summary()
 
-        (
-            train_dataset,
-            valid_dataset,
-            train_size,
-            valid_size,
-        ) = DatasetUtil().make_generators(dataset_dir, batch_size, validation_split)
+        # (
+        #     train_dataset,
+        #     valid_dataset,
+        #     train_size,
+        #     valid_size,
+        # ) = DatasetUtil().make_generators(dataset_dir, batch_size, validation_split)
+        x, y = DatasetUtil().load_dataset(dataset_dir)
 
         callbacks = []
         early_stopping = keras.callbacks.EarlyStopping(
             monitor="val_loss", patience=20, verbose=1, restore_best_weights=True
         )
         callbacks.append(early_stopping)
+        checkpoint = keras.callbacks.ModelCheckpoint(
+            "./checkpoint", save_best_only=True
+        )
+        callbacks.append(checkpoint)
         if tensorboard_log:
             tensorboard = keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
             callbacks.append(tensorboard)
 
+        # history = self.model.fit(
+        #     train_dataset,
+        #     batch_size=batch_size,
+        #     epochs=epochs,
+        #     steps_per_epoch=train_size // batch_size,
+        #     validation_data=valid_dataset,
+        #     validation_steps=valid_size // batch_size,
+        #     callbacks=callbacks,
+        # )
         history = self.model.fit(
-            train_dataset,
+            x,
+            y,
             batch_size=batch_size,
             epochs=epochs,
-            steps_per_epoch=train_size // batch_size,
-            validation_data=valid_dataset,
-            validation_steps=valid_size // batch_size,
+            validation_split=validation_split,
             callbacks=callbacks,
         )
         self.save_model(model_path, model_name)
