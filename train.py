@@ -47,7 +47,7 @@ def train():
                 x.append(np.array(feature, dtype=np.int8))
                 y.append(target)
                 features_annotate, targets_annotate = annotator.make_augmentation(
-                    np.array(feature, dtype=np.int8), np.argmax(target)
+                    np.array(feature, dtype=np.int8), target
                 )
                 x += features_annotate
                 y += targets_annotate
