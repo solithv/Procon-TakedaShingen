@@ -9,6 +9,8 @@ from keras import layers, models
 from MyEnv import Game
 from Utils import Util
 
+from .dataset import DatasetUtil
+
 
 class NNModel:
     def make_model(self, sides: int = 5):
@@ -30,24 +32,24 @@ class NNModel:
         """
         inputs = keras.Input(input_shape)
         x = layers.Conv2D(
-            128, (5, 5), padding="same", data_format="channels_first", activation="relu"
+            64, (5, 5), padding="same", data_format="channels_first", activation="relu"
         )(inputs)
         x = layers.Conv2D(
-            128, (5, 5), padding="same", data_format="channels_first", activation="relu"
+            64, (5, 5), padding="same", data_format="channels_first", activation="relu"
         )(x)
         x = layers.MaxPooling2D((2, 2))(x)
         x = layers.Dropout(0.2)(x)
         x = layers.Conv2D(
-            64, (5, 5), padding="same", data_format="channels_first", activation="relu"
+            32, (5, 5), padding="same", data_format="channels_first", activation="relu"
         )(x)
         x = layers.Conv2D(
-            64, (5, 5), padding="same", data_format="channels_first", activation="relu"
+            32, (5, 5), padding="same", data_format="channels_first", activation="relu"
         )(x)
         x = layers.MaxPooling2D((2, 2))(x)
         x = layers.Dropout(0.2)(x)
         x = layers.Flatten()(x)
-        x = layers.Dense(512, activation="relu")(x)
-        x = layers.Dense(512, activation="relu")(x)
+        x = layers.Dense(256, activation="relu")(x)
+        x = layers.Dense(256, activation="relu")(x)
         x = layers.Dropout(0.2)(x)
         x = layers.Dense(64, activation="relu")(x)
         x = layers.Dropout(0.2)(x)
@@ -87,25 +89,25 @@ class NNModel:
 
     def train(
         self,
-        x,
-        y,
-        batch_size,
-        epochs,
-        validation_split,
+        batch_size: int,
+        epochs: int,
+        validation_split: float,
+        dataset_dir: str = "./dataset",
+        model_path: str = "./model",
+        model_name: str = "game",
         log_dir: str = "./log",
         tensorboard_log: bool = True,
         plot: bool = True,
-        *args,
-        **kwargs,
     ):
         """学習
 
         Args:
-            x (Any): 訓練データ
-            y (Any): ターゲットデータ
             batch_size (int): バッチサイズ
             epochs (int): エポック数
             validation_split (float): 検証用データ割合
+            dataset_dir (str, optional): データセットのパス. Defaults to "./dataset".
+            model_path (str, optional): モデルの保存先. Defaults to "./model".
+            model_name (str, optional): モデルの保存名. Defaults to ".game".
             log_dir (str, optional): tensorboardログの保存先. Defaults to "./log".
             tensorboard_log (bool, optional): tensorboardログを保存するか. Defaults to True.
             plot (bool, optional): 学習履歴を可視化するか. Defaults to True.
@@ -114,6 +116,7 @@ class NNModel:
         log_dir: Path = Path(log_dir)
         log_dir.mkdir(exist_ok=True)
 
+        self.make_model(5)
         self.model.compile(
             optimizer="adam",
             loss="categorical_crossentropy",
@@ -121,6 +124,13 @@ class NNModel:
             run_eagerly=True,
         )
         self.model.summary()
+
+        (
+            train_dataset,
+            valid_dataset,
+            train_size,
+            valid_size,
+        ) = DatasetUtil().make_generators(dataset_dir, batch_size, validation_split)
 
         callbacks = []
         early_stopping = keras.callbacks.EarlyStopping(
@@ -132,15 +142,15 @@ class NNModel:
             callbacks.append(tensorboard)
 
         history = self.model.fit(
-            x=x,
-            y=y,
+            train_dataset,
             batch_size=batch_size,
             epochs=epochs,
-            validation_split=validation_split,
+            steps_per_epoch=train_size // batch_size,
+            validation_data=valid_dataset,
+            validation_steps=valid_size // batch_size,
             callbacks=callbacks,
-            *args,
-            **kwargs,
         )
+        self.save_model(model_path, model_name)
 
         if plot:
             fig, axes = plt.subplots(2, 1)
@@ -158,15 +168,15 @@ class NNModel:
             axes[1].set_ylabel("Loss")
             axes[1].set_xlabel("Epoch")
             axes[1].legend(["Train", "Validation"], loc="upper left")
-
             plt.show()
+
         tracemalloc.stop()
 
     def test_model(self, x, y):
         test_loss, test_acc = self.model.evaluate(x, y)
 
-        print(test_loss)
-        print(test_acc)
+        print(f"test_loss: {test_loss}")
+        print(f"test_acc: {test_acc}")
 
     def predict(self, inputs: list[np.ndarray]):
         """予測
