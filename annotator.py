@@ -22,6 +22,7 @@ def main():
         filename,
         size=5,
         max_steps=max_steps,
+        use_pyautogui=False,
     )
     for _ in range(1):
         annotator.reset()

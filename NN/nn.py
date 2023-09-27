@@ -28,14 +28,18 @@ class NNModel:
             output_size (int): 出力次元
         """
         inputs = keras.Input(input_shape)
-        x = layers.Flatten()(inputs)
-        x = layers.Dense(128, activation="relu")(x)
-        x = layers.Dense(128, activation="relu")(x)
-        x = layers.Dropout(0.5)(x)
-        x = layers.Dense(128, activation="relu")(x)
-        x = layers.Dense(128, activation="relu")(x)
-        x = layers.Dropout(0.5)(x)
-        x = layers.Dense(32, activation="relu")(x)
+        x = layers.Conv2D(32, (3, 3), data_format="channels_first", activation="relu")(
+            inputs
+        )
+        x = layers.Conv2D(32, (3, 3), data_format="channels_first", activation="relu")(
+            x
+        )
+        x = layers.Flatten()(x)
+        x = layers.Dense(256, activation="relu")(x)
+        x = layers.Dropout(0.2)(x)
+        x = layers.Dense(256, activation="relu")(x)
+        x = layers.Dropout(0.2)(x)
+        x = layers.Dense(64, activation="relu")(x)
         outputs = layers.Dense(output_size, activation="softmax")(x)
 
         return models.Model(inputs=inputs, outputs=outputs)

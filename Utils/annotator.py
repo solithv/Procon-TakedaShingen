@@ -17,7 +17,14 @@ from .util import Util
 
 class Annotator:
     def __init__(
-        self, csv_paths, output_dir, filename="data.dat", size: int = 3, max_steps=None
+        self,
+        csv_paths,
+        output_dir,
+        filename="data.dat",
+        size: int = 3,
+        max_steps=None,
+        *args,
+        **kwargs,
     ) -> None:
         self.output_dir = Path(output_dir)
         self.filename = Path(filename)
@@ -25,7 +32,11 @@ class Annotator:
         self.csv_paths = csv_paths
         self.size = size
         self.game = Game(
-            self.csv_paths, render_mode="human", use_pyautogui=True, max_steps=max_steps
+            self.csv_paths,
+            render_mode="human",
+            max_steps=max_steps,
+            *args,
+            **kwargs,
         )
         self.game.reset()
         self.layers = self.game.CELL[: self.game.CELL.index("worker_A0")] + (
