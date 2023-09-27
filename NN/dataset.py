@@ -50,6 +50,8 @@ class DatasetUtil:
         print(x.shape, y.shape)
         return x, y
 
+    # @tf.function
+    # def augmentation(feature,target):
     def make_generators(self, dataset_dir, batch_size, split_rate=0.7):
         features, targets = self.load_dataset(dataset_dir)
         train_dataset, valid_dataset = keras.utils.split_dataset(
