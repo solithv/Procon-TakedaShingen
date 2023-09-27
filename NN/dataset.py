@@ -52,8 +52,6 @@ class DatasetUtil:
 
     def make_generators(self, dataset_dir, batch_size, split_rate=0.7):
         features, targets = self.load_dataset(dataset_dir)
-        features = tf.convert_to_tensor(features)
-        targets = tf.convert_to_tensor(targets)
         train_dataset, valid_dataset = keras.utils.split_dataset(
             (features, targets), split_rate, shuffle=True
         )
