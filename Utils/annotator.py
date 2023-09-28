@@ -116,9 +116,15 @@ class Annotator:
         vertical_trans = str.maketrans({"W": "E", "E": "W"})
 
         data = [rotate_augment(feature, target, i + 1) for i in range(3)]
-        data.append(horizontal_augment(feature, target))
-        data.append(vertical_augment(feature, target))
-        data.append(horizontal_augment(*vertical_augment(feature, target)))
+        horizontal = horizontal_augment(feature, target)
+        data.append(horizontal)
+        data += [rotate_augment(*horizontal, i + 1) for i in range(3)]
+        vertical = vertical_augment(feature, target)
+        data.append(vertical)
+        data += [rotate_augment(*vertical, i + 1) for i in range(3)]
+        both = horizontal_augment(*vertical_augment(feature, target))
+        data.append(both)
+        data += [rotate_augment(*both, i + 1) for i in range(3)]
         features, targets = [list(x) for x in zip(*data)]
         return features, targets
 
