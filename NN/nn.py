@@ -107,8 +107,6 @@ class NNModel:
             plot (bool, optional): 学習履歴を可視化するか. Defaults to True.
         """
         tracemalloc.start()
-        log_dir: Path = Path(log_dir)
-        log_dir.mkdir(exist_ok=True)
 
         self.make_model(5)
         self.model.compile(
@@ -132,6 +130,8 @@ class NNModel:
             )
             callbacks.append(checkpoint)
         if log_dir:
+            log_dir: Path = Path(log_dir)
+            log_dir.mkdir(exist_ok=True)
             tensorboard = keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
             callbacks.append(tensorboard)
 
