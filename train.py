@@ -5,6 +5,7 @@ def train():
     dataset_dir = "./dataset"
     model_path = "./model"
     model_name = "game"
+    checkpoint_dir = "./checkpoint"
     log_dir = "./log"
     batch_size = 128
     epochs = 1000
@@ -16,10 +17,10 @@ def train():
         batch_size,
         epochs,
         validation_split,
-        dataset_dir,
-        model_path,
-        model_name,
-        log_dir,
+        dataset_dir=dataset_dir,
+        model_path=model_path,
+        model_name=model_name,
+        checkpoint_dir=checkpoint_dir,
     )
 
 

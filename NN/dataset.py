@@ -2,9 +2,7 @@ import json
 import shutil
 from pathlib import Path
 
-import keras
 import numpy as np
-import tensorflow as tf
 
 from Utils import Annotator, Util
 
@@ -47,21 +45,3 @@ class DatasetUtil:
         y = np.array(y)
         print(x.shape, y.shape)
         return x, y
-
-    def make_generators(self, dataset_dir, batch_size, split_rate=0.7):
-        features, targets = self.load_dataset(dataset_dir)
-        train_dataset, valid_dataset = keras.utils.split_dataset(
-            (features, targets), split_rate, shuffle=True
-        )
-        train_dataset: tf.data.Dataset
-        valid_dataset: tf.data.Dataset
-        train_size = int(train_dataset.cardinality())
-        valid_size = int(valid_dataset.cardinality())
-        train_generator: tf.data.Dataset = (
-            train_dataset.shuffle(train_size).batch(batch_size).repeat()
-        )
-        valid_generator: tf.data.Dataset = (
-            train_dataset.map(self.augmentation).batch(batch_size).repeat()
-        )
-
-        return train_generator, valid_generator, train_size, valid_size

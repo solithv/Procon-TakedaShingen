@@ -4,8 +4,8 @@ from pathlib import Path
 import keras
 import matplotlib.pyplot as plt
 import numpy as np
-from keras import layers, models
 import tensorflow as tf
+from keras import layers, models
 
 from MyEnv import Game
 from Utils import Util
@@ -89,8 +89,8 @@ class NNModel:
         dataset_dir: str = "./dataset",
         model_path: str = "./model",
         model_name: str = "game",
-        log_dir: str = "./log",
-        tensorboard_log: bool = False,
+        checkpoint_dir: str = None,
+        log_dir: str = None,
         plot: bool = True,
     ):
         """学習
@@ -102,8 +102,8 @@ class NNModel:
             dataset_dir (str, optional): データセットのパス. Defaults to "./dataset".
             model_path (str, optional): モデルの保存先. Defaults to "./model".
             model_name (str, optional): モデルの保存名. Defaults to ".game".
-            log_dir (str, optional): tensorboardログの保存先. Defaults to "./log".
-            tensorboard_log (bool, optional): tensorboardログを保存するか. Defaults to True.
+            checkpoint_dir (str, optional): checkpointの保存先. Defaults to None.
+            log_dir (str, optional): tensorboardログの保存先. Defaults to None.
             plot (bool, optional): 学習履歴を可視化するか. Defaults to True.
         """
         tracemalloc.start()
@@ -119,12 +119,6 @@ class NNModel:
         )
         self.model.summary()
 
-        # (
-        #     train_dataset,
-        #     valid_dataset,
-        #     train_size,
-        #     valid_size,
-        # ) = DatasetUtil().make_generators(dataset_dir, batch_size, validation_split)
         x, y = DatasetUtil().load_dataset(dataset_dir)
 
         callbacks = []
@@ -132,23 +126,15 @@ class NNModel:
             monitor="val_loss", patience=20, verbose=1, restore_best_weights=True
         )
         callbacks.append(early_stopping)
-        checkpoint = keras.callbacks.ModelCheckpoint(
-            "./checkpoint", save_best_only=True
-        )
-        callbacks.append(checkpoint)
-        if tensorboard_log:
+        if checkpoint_dir:
+            checkpoint = keras.callbacks.ModelCheckpoint(
+                checkpoint_dir, save_best_only=True
+            )
+            callbacks.append(checkpoint)
+        if log_dir:
             tensorboard = keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
             callbacks.append(tensorboard)
 
-        # history = self.model.fit(
-        #     train_dataset,
-        #     batch_size=batch_size,
-        #     epochs=epochs,
-        #     steps_per_epoch=train_size // batch_size,
-        #     validation_data=valid_dataset,
-        #     validation_steps=valid_size // batch_size,
-        #     callbacks=callbacks,
-        # )
         history = self.model.fit(
             x,
             y,

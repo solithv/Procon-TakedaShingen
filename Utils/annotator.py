@@ -69,6 +69,59 @@ class Annotator:
             self.output_dir / self.filename, output_dir=self.output_dir
         )
 
+    @staticmethod
+    def make_augmentation(feature, target):
+        def rotate_augment(feature_, target_, count):
+            feature_ = np.rot90(feature_, count, axes=(1, 2))
+            target_ = np.argmax(target_)
+            target_name = Game.ACTIONS[target_]
+            for _ in range(count):
+                if target_name == "stay":
+                    continue
+                split_name = target_name.split("_")
+                target_name = f"{split_name[0]}_{rotate_trans[split_name[-1]]}"
+            target_ = Game.ACTIONS.index(target_name)
+            target_ = np.identity(len(Game.ACTIONS), dtype=np.int8)[target_]
+            return feature_, target_
+
+        def horizontal_augment(feature_, target_):
+            feature_ = np.flip(feature_, 1)
+            target_ = np.argmax(target_)
+            target_ = Game.ACTIONS.index(
+                Game.ACTIONS[target_].translate(horizontal_trans)
+            )
+            target_ = np.identity(len(Game.ACTIONS), dtype=np.int8)[target_]
+            return feature_, target_
+
+        def vertical_augment(feature_, target_):
+            feature_ = np.flip(feature_, 2)
+            target_ = np.argmax(target_)
+            target_ = Game.ACTIONS.index(
+                Game.ACTIONS[target_].translate(vertical_trans)
+            )
+            target_ = np.identity(len(Game.ACTIONS), dtype=np.int8)[target_]
+            return feature_, target_
+
+        rotate_trans = {
+            "N": "W",
+            "W": "S",
+            "S": "E",
+            "E": "N",
+            "NW": "SW",
+            "SW": "SE",
+            "SE": "NE",
+            "NE": "NW",
+        }
+        horizontal_trans = str.maketrans({"N": "S", "S": "N"})
+        vertical_trans = str.maketrans({"W": "E", "E": "W"})
+
+        data = [rotate_augment(feature, target, i + 1) for i in range(3)]
+        data.append(horizontal_augment(feature, target))
+        data.append(vertical_augment(feature, target))
+        data.append(horizontal_augment(*vertical_augment(feature, target)))
+        features, targets = [list(x) for x in zip(*data)]
+        return features, targets
+
     def do_annotate(self, only=False):
         features = []
         targets = []
@@ -180,59 +233,6 @@ class Annotator:
                     ),
                     file=f,
                 )
-
-    @staticmethod
-    def make_augmentation(feature, target):
-        def rotate_augment(feature_, target_, count):
-            feature_ = np.rot90(feature_, count, axes=(1, 2))
-            target_ = np.argmax(target_)
-            target_name = Game.ACTIONS[target_]
-            for _ in range(count):
-                if target_name == "stay":
-                    continue
-                split_name = target_name.split("_")
-                target_name = f"{split_name[0]}_{rotate_trans[split_name[-1]]}"
-            target_ = Game.ACTIONS.index(target_name)
-            target_ = np.identity(len(Game.ACTIONS), dtype=np.int8)[target_]
-            return feature_, target_
-
-        def horizontal_augment(feature_, target_):
-            feature_ = np.flip(feature_, 1)
-            target_ = np.argmax(target_)
-            target_ = Game.ACTIONS.index(
-                Game.ACTIONS[target_].translate(horizontal_trans)
-            )
-            target_ = np.identity(len(Game.ACTIONS), dtype=np.int8)[target_]
-            return feature_, target_
-
-        def vertical_augment(feature_, target_):
-            feature_ = np.flip(feature_, 2)
-            target_ = np.argmax(target_)
-            target_ = Game.ACTIONS.index(
-                Game.ACTIONS[target_].translate(vertical_trans)
-            )
-            target_ = np.identity(len(Game.ACTIONS), dtype=np.int8)[target_]
-            return feature_, target_
-
-        rotate_trans = {
-            "N": "W",
-            "W": "S",
-            "S": "E",
-            "E": "N",
-            "NW": "SW",
-            "SW": "SE",
-            "SE": "NE",
-            "NE": "NW",
-        }
-        horizontal_trans = str.maketrans({"N": "S", "S": "N"})
-        vertical_trans = str.maketrans({"W": "E", "E": "W"})
-
-        data = [rotate_augment(feature, target, i + 1) for i in range(3)]
-        data.append(horizontal_augment(feature, target))
-        data.append(vertical_augment(feature, target))
-        data.append(horizontal_augment(*vertical_augment(feature, target)))
-        features, targets = [list(x) for x in zip(*data)]
-        return features, targets
 
     def load_from_csv(self, path: Union[str, list[str]]):
         if isinstance(path, (list, tuple)):
