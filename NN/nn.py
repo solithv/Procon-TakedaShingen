@@ -33,20 +33,17 @@ class NNModel:
         """
         inputs = keras.Input(input_shape)
         x = tf.transpose(inputs, (0, 2, 3, 1))
-        x = layers.Conv2D(64, (5, 5), padding="same", activation="relu")(x)
-        x = layers.Conv2D(64, (5, 5), padding="same", activation="relu")(x)
-        x = layers.MaxPooling2D((2, 2))(x)
-        x = layers.Dropout(0.2)(x)
+        # x = layers.Conv2D(64, (5, 5), padding="same", activation="relu")(x)
         x = layers.Conv2D(32, (5, 5), padding="same", activation="relu")(x)
-        x = layers.Conv2D(32, (5, 5), padding="same", activation="relu")(x)
-        x = layers.MaxPooling2D((2, 2))(x)
-        x = layers.Dropout(0.2)(x)
+        x = layers.SpatialDropout2D(0.2)(x)
+        # x = layers.Conv2D(128, (3, 3), padding="same", activation="relu")(x)
+        x = layers.Conv2D(32, (3, 3), activation="relu")(x)
+        x = layers.Dropout(0.5)(x)
         x = layers.Flatten()(x)
-        x = layers.Dense(256, activation="relu")(x)
-        x = layers.Dense(256, activation="relu")(x)
-        x = layers.Dropout(0.2)(x)
+        # x=layers.BatchNormalization()(x)
         x = layers.Dense(64, activation="relu")(x)
-        x = layers.Dropout(0.2)(x)
+        x = layers.Dropout(0.5)(x)
+        x = layers.Dense(32, activation="relu")(x)
         outputs = layers.Dense(output_size, activation="softmax")(x)
 
         return models.Model(inputs=inputs, outputs=outputs)
@@ -92,6 +89,7 @@ class NNModel:
         checkpoint_dir: str = None,
         log_dir: str = None,
         plot: bool = True,
+        load_model: str = None,
     ):
         """学習
 
@@ -108,13 +106,16 @@ class NNModel:
         """
         tracemalloc.start()
 
-        self.make_model(5)
-        self.model.compile(
-            optimizer="adam",
-            loss="categorical_crossentropy",
-            metrics=["accuracy"],
-            run_eagerly=True,
-        )
+        if load_model:
+            self.model: models.Model = models.load_model(load_model)
+        else:
+            self.make_model(5)
+            self.model.compile(
+                optimizer="adam",
+                loss="categorical_crossentropy",
+                metrics=["accuracy"],
+                run_eagerly=True,
+            )
         self.model.summary()
 
         x, y = DatasetUtil().load_dataset(dataset_dir)
