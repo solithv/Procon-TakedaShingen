@@ -101,6 +101,7 @@ class Game:
         max_steps: int = None,
         first_player: Optional[int] = None,
         use_pyautogui: bool = False,
+        render_fps:int=None
     ):
         """init
 
@@ -118,6 +119,8 @@ class Game:
         self.board = np.zeros(
             (len(self.CELL), self.FIELD_MAX, self.FIELD_MAX), dtype=np.int8
         )
+        if render_fps:
+            self.metadata["render_fps"]=render_fps
 
         self.window_surface = None
         self.clock = None
