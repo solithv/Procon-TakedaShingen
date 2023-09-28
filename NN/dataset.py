@@ -26,8 +26,6 @@ class DatasetUtil:
                 file.unlink()
 
     def load_dataset(self, dataset_dir):
-        annotator = Annotator(None, dataset_dir)
-
         self.unpack_dataset(dataset_dir)
         x = []
         y = []
@@ -40,7 +38,7 @@ class DatasetUtil:
                     target = np.array(target, dtype=np.int8)
                     x.append(feature)
                     y.append(target)
-                    features_annotate, targets_annotate = annotator.make_augmentation(
+                    features_annotate, targets_annotate = Annotator.make_augmentation(
                         feature, target
                     )
                     x += features_annotate
@@ -62,6 +60,8 @@ class DatasetUtil:
         train_generator: tf.data.Dataset = (
             train_dataset.shuffle(train_size).batch(batch_size).repeat()
         )
-        valid_generator: tf.data.Dataset = train_dataset.batch(batch_size).repeat()
+        valid_generator: tf.data.Dataset = (
+            train_dataset.map(self.augmentation).batch(batch_size).repeat()
+        )
 
         return train_generator, valid_generator, train_size, valid_size

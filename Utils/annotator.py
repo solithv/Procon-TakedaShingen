@@ -181,36 +181,37 @@ class Annotator:
                     file=f,
                 )
 
-    def make_augmentation(self, feature, target):
+    @staticmethod
+    def make_augmentation(feature, target):
         def rotate_augment(feature_, target_, count):
             feature_ = np.rot90(feature_, count, axes=(1, 2))
             target_ = np.argmax(target_)
-            target_name = self.game.ACTIONS[target_]
+            target_name = Game.ACTIONS[target_]
             for _ in range(count):
                 if target_name == "stay":
                     continue
                 split_name = target_name.split("_")
                 target_name = f"{split_name[0]}_{rotate_trans[split_name[-1]]}"
-            target_ = self.game.ACTIONS.index(target_name)
-            target_ = np.identity(len(self.game.ACTIONS), dtype=np.int8)[target_]
+            target_ = Game.ACTIONS.index(target_name)
+            target_ = np.identity(len(Game.ACTIONS), dtype=np.int8)[target_]
             return feature_, target_
 
         def horizontal_augment(feature_, target_):
             feature_ = np.flip(feature_, 1)
             target_ = np.argmax(target_)
-            target_ = self.game.ACTIONS.index(
-                self.game.ACTIONS[target_].translate(horizontal_trans)
+            target_ = Game.ACTIONS.index(
+                Game.ACTIONS[target_].translate(horizontal_trans)
             )
-            target_ = np.identity(len(self.game.ACTIONS), dtype=np.int8)[target_]
+            target_ = np.identity(len(Game.ACTIONS), dtype=np.int8)[target_]
             return feature_, target_
 
         def vertical_augment(feature_, target_):
             feature_ = np.flip(feature_, 2)
             target_ = np.argmax(target_)
-            target_ = self.game.ACTIONS.index(
-                self.game.ACTIONS[target_].translate(vertical_trans)
+            target_ = Game.ACTIONS.index(
+                Game.ACTIONS[target_].translate(vertical_trans)
             )
-            target_ = np.identity(len(self.game.ACTIONS), dtype=np.int8)[target_]
+            target_ = np.identity(len(Game.ACTIONS), dtype=np.int8)[target_]
             return feature_, target_
 
         rotate_trans = {
