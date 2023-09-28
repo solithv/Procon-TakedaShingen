@@ -33,7 +33,7 @@ class NNModel:
         """
         inputs = keras.Input(input_shape)
         x = tf.transpose(inputs, (0, 2, 3, 1))
-        x = layers.Conv2D(64, (5, 5), padding="same", activation="relu")(inputs)
+        x = layers.Conv2D(64, (5, 5), padding="same", activation="relu")(x)
         x = layers.Conv2D(64, (5, 5), padding="same", activation="relu")(x)
         x = layers.MaxPooling2D((2, 2))(x)
         x = layers.Dropout(0.2)(x)
