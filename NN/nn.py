@@ -39,10 +39,10 @@ class NNModel:
         # x = layers.Dropout(0.2)(x)
         # x = layers.Conv2D(128, (3, 3), padding="same", activation="relu")(x)
         x = layers.Conv2D(32, (3, 3), padding="same", activation="relu")(x)
-        x = layers.Dropout(0.5)(x)
+        # x = layers.Dropout(0.5)(x)
         x = layers.Flatten()(x)
         x = layers.Dense(64, activation="relu")(x)
-        # x = layers.Dropout(0.5)(x)
+        x = layers.Dropout(0.5)(x)
         # x = layers.Dense(32, activation="relu")(x)
         outputs = layers.Dense(output_size, activation="softmax")(x)
 
@@ -56,14 +56,16 @@ class NNModel:
             model_name (str): モデルの保存名
         """
         model_dir: Path = Path(model_dir)
-        model_name: Path = Path(model_name)
+        model_name: Path = model_name
         model_dir.mkdir(exist_ok=True)
-        model_file = model_dir / f"{model_name}.keras"
-        self.model.save(model_file)
-        self.model.save(model_dir / model_name, save_format="tf")
-        self.model.save(model_dir / model_name, save_format="h5")
-        if model_file.stat().st_size > 100 * (1024**2):
-            Util.compress_and_split(model_file, model_name, model_dir)
+        model_save = model_dir / model_name
+        self.model.save(model_save, save_format="tf")
+        if any(
+            f.stat().st_size > 100 * (1024**2)
+            for f in model_save.glob("**/*")
+            if f.is_file()
+        ):
+            Util.compress_and_split(model_save, model_name, model_dir)
 
     def load_model(self, model_dir: str, model_name: str, from_zip: bool = True):
         """モデルを読み込み
@@ -71,12 +73,12 @@ class NNModel:
         Args:
             model_dir (str): モデルの保存先
             model_name (str): モデルの保存名
-            from_zip (bool, optional): 分割zipファイルから読み込もうとするか. Defaults to True.
+            from_zip (bool, optional): 分割zipファイルからの読み込みを優先. Defaults to True.
         """
         model_dir: Path = Path(model_dir)
-        model_name: Path = Path(model_name)
-        model_file = model_dir / f"{model_name}.keras"
-        if from_zip and list(model_dir.glob(f"{model_name}.zip.[0-9][0-9][0-9]")):
+        model_name: Path = model_name
+        model_file = model_dir / model_name
+        if from_zip and list(model_dir.glob(f"{model_name}.zip*")):
             Util.combine_and_unpack(model_dir, model_name)
         self.model = models.load_model(model_file)
 
