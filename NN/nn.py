@@ -42,8 +42,8 @@ class NNModel:
         x = layers.Dropout(0.5)(x)
         x = layers.Flatten()(x)
         x = layers.Dense(64, activation="relu")(x)
-        x = layers.Dropout(0.5)(x)
-        x = layers.Dense(32, activation="relu")(x)
+        # x = layers.Dropout(0.5)(x)
+        # x = layers.Dense(32, activation="relu")(x)
         outputs = layers.Dense(output_size, activation="softmax")(x)
 
         return models.Model(inputs=inputs, outputs=outputs)
