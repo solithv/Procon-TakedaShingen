@@ -58,7 +58,7 @@ class NNModel:
         model_dir: Path = Path(model_dir)
         model_name: Path = Path(model_name)
         model_dir.mkdir(exist_ok=True)
-        model_file = model_dir / f"{model_name}.keras"
+        model_file = model_dir / f"{model_name}.h5"
         self.model.save(model_file)
         if model_file.stat().st_size > 100 * (1024**2):
             Util.compress_and_split(model_file, model_name, model_dir)
@@ -73,7 +73,7 @@ class NNModel:
         """
         model_dir: Path = Path(model_dir)
         model_name: Path = Path(model_name)
-        model_file = model_dir / f"{model_name}.keras"
+        model_file = model_dir / f"{model_name}.h5"
         if from_zip and list(model_dir.glob(f"{model_name}.zip.[0-9][0-9][0-9]")):
             Util.combine_and_unpack(model_dir, model_name)
         self.model = models.load_model(model_file)
