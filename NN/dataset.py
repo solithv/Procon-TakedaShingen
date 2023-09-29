@@ -27,7 +27,8 @@ class DatasetUtil:
         self.unpack_dataset(dataset_dir)
         x = []
         y = []
-        for dataset in Path(dataset_dir).glob("*.dat"):
+        # for dataset in Path(dataset_dir).glob("*.dat"):
+        for dataset in Path(dataset_dir).glob("data.dat"):
             print(dataset)
             with open(dataset) as f:
                 for line in f:
