@@ -248,7 +248,7 @@ class Game:
 
         self.board = self.update_blank(self.board)
 
-        self.convert_count = 0
+        self.replace_count = 0
         return self.get_observation(), info
 
     def compile_layers(
@@ -1542,7 +1542,7 @@ class Game:
                 worker, self.ACTIONS[action], stay=stay, smart=True
             ):
                 actions[i] = self.get_random_action(worker)
-                self.convert_count += 1
+                self.replace_count += 1
         return actions
 
     def get_around(
@@ -1717,7 +1717,7 @@ class Game:
         self.window_size_y = self.height * self.cell_size
         if self.render_mode == "human":
             self.reset_render()
-        self.convert_count = 0
+        self.replace_count = 0
 
     def get_stat_from_api(self, data: dict[str, Any]):
         """APIから環境状態を更新
