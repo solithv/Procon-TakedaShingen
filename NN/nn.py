@@ -38,7 +38,7 @@ class NNModel:
         x = layers.SpatialDropout2D(0.2)(x)
         # x = layers.Dropout(0.2)(x)
         # x = layers.Conv2D(128, (3, 3), padding="same", activation="relu")(x)
-        x = layers.Conv2D(32, (3, 3), activation="relu")(x)
+        x = layers.Conv2D(32, (3, 3), padding="same", activation="relu")(x)
         x = layers.Dropout(0.5)(x)
         x = layers.Flatten()(x)
         x = layers.Dense(64, activation="relu")(x)
@@ -58,8 +58,10 @@ class NNModel:
         model_dir: Path = Path(model_dir)
         model_name: Path = Path(model_name)
         model_dir.mkdir(exist_ok=True)
-        model_file = model_dir / f"{model_name}.h5"
+        model_file = model_dir / f"{model_name}.keras"
         self.model.save(model_file)
+        self.model.save(model_dir / model_name, save_format="tf")
+        self.model.save(model_dir / model_name, save_format="h5")
         if model_file.stat().st_size > 100 * (1024**2):
             Util.compress_and_split(model_file, model_name, model_dir)
 
@@ -73,7 +75,7 @@ class NNModel:
         """
         model_dir: Path = Path(model_dir)
         model_name: Path = Path(model_name)
-        model_file = model_dir / f"{model_name}.h5"
+        model_file = model_dir / f"{model_name}.keras"
         if from_zip and list(model_dir.glob(f"{model_name}.zip.[0-9][0-9][0-9]")):
             Util.combine_and_unpack(model_dir, model_name)
         self.model = models.load_model(model_file)
