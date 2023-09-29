@@ -6,15 +6,16 @@ from Utils import API
 
 
 def main():
-    model_path = "./model/game"
+    model_path = "./model"
+    model_name = "game"
     env = MyEnv.Game(
         max_steps=500,
         render_mode="human",
         use_pyautogui=True,
     )
 
-    nn = NNModel(model_path)
-    nn.load_model()
+    nn = NNModel()
+    nn.load_model(model_path, model_name)
 
     fa = API()
     match = fa.get_match()

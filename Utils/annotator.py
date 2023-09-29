@@ -3,7 +3,6 @@ import json
 import os
 import random
 import re
-import shutil
 from pathlib import Path
 from typing import Iterable, Union
 
@@ -18,15 +17,26 @@ from .util import Util
 
 class Annotator:
     def __init__(
-        self, csv_paths, output_dir, filename="data.dat", size: int = 3, max_steps=None
+        self,
+        csv_paths,
+        output_dir,
+        filename="data.dat",
+        size: int = 3,
+        max_steps=None,
+        *args,
+        **kwargs,
     ) -> None:
         self.output_dir = Path(output_dir)
-        self.filename = filename
-        self.basename = self.filename.rsplit(".", 1)[0]
+        self.filename = Path(filename)
+        self.basename = self.filename.stem
         self.csv_paths = csv_paths
         self.size = size
         self.game = Game(
-            self.csv_paths, render_mode="human", use_pyautogui=True, max_steps=max_steps
+            self.csv_paths,
+            render_mode="human",
+            max_steps=max_steps,
+            *args,
+            **kwargs,
         )
         self.game.reset()
         self.layers = self.game.CELL[: self.game.CELL.index("worker_A0")] + (
@@ -48,36 +58,75 @@ class Annotator:
         self.unpack()
 
     def unpack(self):
-        if not self.output_dir.joinpath(self.filename).exists():
-            if list(self.output_dir.glob("*.zip.[0-9][0-9][0-9]")):
-                Util.combine_split_zip(
-                    self.output_dir.joinpath(self.basename),
-                    f"{self.output_dir.joinpath(self.basename)}.zip",
-                )
-            if self.output_dir.joinpath(f"{self.basename}.zip").exists():
-                shutil.unpack_archive(
-                    self.output_dir.joinpath(f"{self.basename}.zip"), self.output_dir
-                )
+        if not (self.output_dir / self.filename).exists():
+            Util.combine_and_unpack(self.output_dir, self.basename)
 
     def reset(self):
         self.load_from_csv(self.csv_paths)
 
     def finish(self):
-        shutil.make_archive(
-            self.output_dir.joinpath(self.basename),
-            format="zip",
-            root_dir=self.output_dir,
-            base_dir=self.filename,
+        Util.compress_and_split(
+            self.output_dir / self.filename, output_dir=self.output_dir
         )
-        self.output_dir.joinpath(self.filename).unlink()
-        if self.output_dir.joinpath(f"{self.basename}.zip").stat().st_size > 100 * (
-            1024**2
-        ):
-            Util.split_zip(
-                f"{self.output_dir.joinpath(self.basename)}.zip",
-                self.output_dir.joinpath(self.basename),
+
+    @staticmethod
+    def make_augmentation(feature, target):
+        def rotate_augment(feature_, target_, count):
+            feature_ = np.rot90(feature_, count, axes=(1, 2))
+            target_ = np.argmax(target_)
+            target_name = Game.ACTIONS[target_]
+            for _ in range(count):
+                if target_name == "stay":
+                    continue
+                split_name = target_name.split("_")
+                target_name = f"{split_name[0]}_{rotate_trans[split_name[-1]]}"
+            target_ = Game.ACTIONS.index(target_name)
+            target_ = np.identity(len(Game.ACTIONS), dtype=np.int8)[target_]
+            return feature_, target_
+
+        def horizontal_augment(feature_, target_):
+            feature_ = np.flip(feature_, 1)
+            target_ = np.argmax(target_)
+            target_ = Game.ACTIONS.index(
+                Game.ACTIONS[target_].translate(horizontal_trans)
             )
-            self.output_dir.joinpath(f"{self.basename}.zip").unlink()
+            target_ = np.identity(len(Game.ACTIONS), dtype=np.int8)[target_]
+            return feature_, target_
+
+        def vertical_augment(feature_, target_):
+            feature_ = np.flip(feature_, 2)
+            target_ = np.argmax(target_)
+            target_ = Game.ACTIONS.index(
+                Game.ACTIONS[target_].translate(vertical_trans)
+            )
+            target_ = np.identity(len(Game.ACTIONS), dtype=np.int8)[target_]
+            return feature_, target_
+
+        rotate_trans = {
+            "N": "W",
+            "W": "S",
+            "S": "E",
+            "E": "N",
+            "NW": "SW",
+            "SW": "SE",
+            "SE": "NE",
+            "NE": "NW",
+        }
+        horizontal_trans = str.maketrans({"N": "S", "S": "N"})
+        vertical_trans = str.maketrans({"W": "E", "E": "W"})
+
+        data = [rotate_augment(feature, target, i + 1) for i in range(3)]
+        horizontal = horizontal_augment(feature, target)
+        data.append(horizontal)
+        data += [rotate_augment(*horizontal, i + 1) for i in range(3)]
+        vertical = vertical_augment(feature, target)
+        data.append(vertical)
+        data += [rotate_augment(*vertical, i + 1) for i in range(3)]
+        both = horizontal_augment(*vertical_augment(feature, target))
+        data.append(both)
+        data += [rotate_augment(*both, i + 1) for i in range(3)]
+        features, targets = [list(x) for x in zip(*data)]
+        return features, targets
 
     def do_annotate(self, only=False):
         features = []
@@ -190,57 +239,6 @@ class Annotator:
                     ),
                     file=f,
                 )
-
-    def make_augmentation(self, feature, target):
-        def rotate_augment(feature_, target_, count):
-            feature_ = np.rot90(feature_, count, axes=(1, 2))
-            target_ = np.argmax(target_)
-            target_name = self.game.ACTIONS[target_]
-            for _ in range(count):
-                if target_name == "stay":
-                    continue
-                split_name = target_name.split("_")
-                target_name = f"{split_name[0]}_{rotate_trans[split_name[-1]]}"
-            target_ = self.game.ACTIONS.index(target_name)
-            target_ = np.identity(len(self.game.ACTIONS), dtype=np.int8)[target_]
-            return feature_, target_
-
-        def horizontal_augment(feature_, target_):
-            feature_ = np.flip(feature_, 1)
-            target_ = np.argmax(target_)
-            target_ = self.game.ACTIONS.index(
-                self.game.ACTIONS[target_].translate(horizontal_trans)
-            )
-            target_ = np.identity(len(self.game.ACTIONS), dtype=np.int8)[target_]
-            return feature_, target_
-
-        def vertical_augment(feature_, target_):
-            feature_ = np.flip(feature_, 2)
-            target_ = np.argmax(target_)
-            target_ = self.game.ACTIONS.index(
-                self.game.ACTIONS[target_].translate(vertical_trans)
-            )
-            target_ = np.identity(len(self.game.ACTIONS), dtype=np.int8)[target_]
-            return feature_, target_
-
-        rotate_trans = {
-            "N": "W",
-            "W": "S",
-            "S": "E",
-            "E": "N",
-            "NW": "SW",
-            "SW": "SE",
-            "SE": "NE",
-            "NE": "NW",
-        }
-        horizontal_trans = str.maketrans({"N": "S", "S": "N"})
-        vertical_trans = str.maketrans({"W": "E", "E": "W"})
-
-        data = [rotate_augment(feature, target, i + 1) for i in range(3)]
-        data.append(horizontal_augment(feature, target))
-        data.append(vertical_augment(feature, target))
-        features, targets = [list(x) for x in zip(*data)]
-        return features, targets
 
     def load_from_csv(self, path: Union[str, list[str]]):
         if isinstance(path, (list, tuple)):

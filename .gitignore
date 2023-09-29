@@ -7,3 +7,4 @@ dataset/*.dat
 server_configs/
 log/
 資料/
+checkpoint/

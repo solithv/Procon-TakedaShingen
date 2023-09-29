@@ -6,15 +6,16 @@ from NN import NNModel
 
 def main():
     fields = glob.glob("./field_data/*.csv")
-    model_path = "./model/game"
+    model_path = "./model"
+    model_name = "game"
     env = MyEnv.Game(
         csv_path=fields,
         render_mode="human",
         use_pyautogui=True,
     )
 
-    nn = NNModel(model_path)
-    nn.load_model()
+    nn = NNModel()
+    nn.load_model(model_path, model_name)
     # nn.make_model(5)
     nn.model.summary()
 
