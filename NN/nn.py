@@ -5,13 +5,71 @@ import keras
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
-import tensorflow_models as tfm
 
 from keras import layers, models
 from MyEnv import Game
 from Utils import Util
 
 from .dataset import DatasetUtil
+
+
+class MultiHeadSelfAttention(layers.Layer):
+    def __init__(self, embed_dim, num_heads):
+        super(MultiHeadSelfAttention, self).__init__()
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        if embed_dim % num_heads != 0:
+            raise ValueError(
+                "Embedding dimension should be divisible by the number of heads."
+            )
+        self.projection_dim = embed_dim // num_heads
+        self.query_dense = layers.Dense(embed_dim)
+        self.key_dense = layers.Dense(embed_dim)
+        self.value_dense = layers.Dense(embed_dim)
+        self.combine_heads = layers.Dense(embed_dim)
+
+    def call(self, inputs):
+        batch_size = tf.shape(inputs)[0]
+        query = self.query_dense(inputs)
+        key = self.key_dense(inputs)
+        value = self.value_dense(inputs)
+        query = tf.reshape(query, (batch_size, -1, self.num_heads, self.projection_dim))
+        key = tf.reshape(key, (batch_size, -1, self.num_heads, self.projection_dim))
+        value = tf.reshape(value, (batch_size, -1, self.num_heads, self.projection_dim))
+        query = tf.transpose(query, perm=[0, 2, 1, 3])
+        key = tf.transpose(key, perm=[0, 2, 1, 3])
+        value = tf.transpose(value, perm=[0, 2, 1, 3])
+        attention_scores = tf.matmul(query, key, transpose_b=True)
+        attention_scores = tf.math.divide(
+            attention_scores, tf.math.sqrt(tf.cast(self.projection_dim, tf.float32))
+        )
+        attention_scores = tf.nn.softmax(attention_scores, axis=-1)
+        output = tf.matmul(attention_scores, value)
+        output = tf.transpose(output, perm=[0, 2, 1, 3])
+        output = tf.reshape(output, (batch_size, -1, self.embed_dim))
+        return self.combine_heads(output)
+
+
+class TransformerBlock(layers.Layer):
+    def __init__(self, embed_dim, num_heads, ff_dim, rate=0.1):
+        super(TransformerBlock, self).__init__()
+        self.att = MultiHeadSelfAttention(embed_dim, num_heads)
+        self.ffn = keras.Sequential(
+            [
+                layers.Dense(ff_dim, activation="relu"),
+                layers.Dense(embed_dim),
+            ]
+        )
+        self.layernorm1 = layers.LayerNormalization(epsilon=1e-6)
+        self.layernorm2 = layers.LayerNormalization(epsilon=1e-6)
+        self.dropout1 = layers.Dropout(rate)
+        self.dropout2 = layers.Dropout(rate)
+
+    def call(self, inputs):
+        attn_output = self.att(inputs)
+        out1 = self.layernorm1(inputs + self.dropout1(attn_output))
+        ffn_output = self.ffn(out1)
+        return self.layernorm2(out1 + self.dropout2(ffn_output))
 
 
 class NNModel:
@@ -25,30 +83,35 @@ class NNModel:
         output_size = len(Game.ACTIONS)
         self.model = self.define_model(input_shape, output_size, *args, **kwargs)
 
-    def define_model(
-        self,
-        input_shape,
-        num_classes,
-        block_num=4,
-        num_heads=4,
-        key_dim=11,
-        hidden_layer_size=128,
-        dropout_rate=0.25,
-    ):
-        # モデルを構築
-        inputs = layers.Input(shape=input_shape)
-        x = inputs
-        # Transformerブロックを定義
-        for _ in range(block_num):
-            x = tf.keras.layers.MultiHeadAttention(
-                num_heads=num_heads, key_dim=key_dim
-            )(x, x, x)
-            x = tf.keras.layers.Dense(hidden_layer_size, activation="relu")(x)
-            x = tf.keras.layers.Dropout(dropout_rate)(x)
-        x = layers.Flatten()(x)
-        outputs = layers.Dense(num_classes, activation="softmax")(x)
-        model = models.Model(inputs, outputs)
+    def define_model(self, input_shape, num_classes, num_heads=8, dim_feedforward=256):
+        input_layer = tf.keras.layers.Input(shape=input_shape)
 
+        positional_encoding_layer = tf.keras.layers.Embedding(
+            input_shape[0] * input_shape[1], input_shape[2]
+        )(tf.range(input_shape[0] * input_shape[1]))
+        positional_encoding_layer = tf.reshape(
+            positional_encoding_layer, (input_shape[0], input_shape[1], input_shape[2])
+        )
+        positional_encoding_layer = tf.expand_dims(positional_encoding_layer, axis=0)
+        positional_encoding_layer = tf.tile(
+            positional_encoding_layer, [tf.shape(input_layer)[0], 1, 1, 1]
+        )
+        x = tf.keras.layers.Add()([input_layer, positional_encoding_layer])
+
+        x = tf.keras.layers.MultiHeadAttention(
+            num_heads=num_heads, key_dim=input_shape[2]
+        )(x, x)
+        x = tf.keras.layers.LayerNormalization(epsilon=1e-6)(x)
+
+        x = tf.keras.layers.Conv1D(
+            filters=dim_feedforward, kernel_size=1, activation="relu"
+        )(x)
+        x = tf.keras.layers.Conv1D(filters=input_shape[2], kernel_size=1)(x)
+        x = tf.keras.layers.LayerNormalization(epsilon=1e-6)(x)
+        x = tf.keras.layers.GlobalAveragePooling2D()(x)
+        output_layer = tf.keras.layers.Dense(num_classes, activation="softmax")(x)
+
+        model = tf.keras.models.Model(inputs=input_layer, outputs=output_layer)
         return model
 
     def save_model(self, model_dir: str, model_name: str):
@@ -188,6 +251,6 @@ class NNModel:
         Returns:
             list[int]: 行動のリスト
         """
-        out = self.model.predict(np.array(inputs, dtype=np.int8))
+        out = self.model.predict(np.array(inputs, dtype=np.float32))
         args = np.argmax(out, axis=1)
         return args
