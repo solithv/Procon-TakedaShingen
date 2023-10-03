@@ -5,70 +5,13 @@ import keras
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
-from keras import layers, models
+import tensorflow_models as tfm
 
+from keras import layers, models
 from MyEnv import Game
 from Utils import Util
 
 from .dataset import DatasetUtil
-
-
-class MultiHeadAttention(tf.keras.layers.Layer):
-    def __init__(self, d_model, num_heads):
-        super(MultiHeadAttention, self).__init__()
-        self.num_heads = num_heads
-        self.depth = d_model // num_heads
-        self.wq = tf.keras.layers.Dense(d_model)
-        self.wk = tf.keras.layers.Dense(d_model)
-        self.wv = tf.keras.layers.Dense(d_model)
-        self.dense = tf.keras.layers.Dense(d_model)
-        self.d_model = d_model
-
-    def split_heads(self, x, batch_size):
-        x = tf.reshape(x, (batch_size, -1, self.num_heads, self.depth))
-        return tf.transpose(x, perm=[0, 2, 1, 3])
-
-    def call(self, q, k, v, mask):
-        def scaled_dot_product_attention(q, k, v, mask):
-            matmul_qk = tf.matmul(q, k, transpose_b=True)
-            d_k = tf.cast(tf.shape(k)[-1], tf.float32)
-            scaled_attention_logits = matmul_qk / tf.math.sqrt(d_k)
-
-            if mask is not None:
-                scaled_attention_logits += mask * -1e9
-
-            attention_weights = tf.nn.softmax(scaled_attention_logits, axis=-1)
-            output = tf.matmul(attention_weights, v)
-            return output, attention_weights
-
-        batch_size = tf.shape(q)[0]
-        q = self.split_heads(self.wq(q), batch_size)
-        k = self.split_heads(self.wk(k), batch_size)
-        v = self.split_heads(self.wv(v), batch_size)
-        output, attention_weights = scaled_dot_product_attention(q, k, v, mask)
-        output = tf.transpose(output, perm=[0, 2, 1, 3])
-        output = tf.reshape(output, (batch_size, -1, self.d_model))
-        output = self.dense(output)
-        return output, attention_weights
-
-
-class PositionalEncoding(tf.keras.layers.Layer):
-    def __init__(self):
-        super(PositionalEncoding, self).__init__()
-
-    def call(self, inputs):
-        position = tf.range(start=0, limit=tf.shape(inputs)[1], delta=1)
-        position = tf.cast(position, dtype=tf.float32)
-        position = position / tf.cast(tf.shape(inputs)[1], dtype=tf.float32)
-        position = tf.expand_dims(position, axis=0)
-        position_encoding = position + tf.zeros(
-            shape=(tf.shape(inputs)[1], tf.shape(inputs)[2]), dtype=tf.float32
-        )
-        position_encoding = tf.expand_dims(position_encoding, axis=0)
-        position_encoding = tf.expand_dims(position_encoding, axis=3)
-        print(inputs)
-        print(position_encoding)
-        return inputs + position_encoding
 
 
 class NNModel:
@@ -85,38 +28,27 @@ class NNModel:
     def define_model(
         self,
         input_shape,
-        output_dim,
+        num_classes,
+        block_num=4,
         num_heads=4,
-        num_layers=2,
-        dff=32,
-        dropout_rate=0.1,
+        key_dim=11,
+        hidden_layer_size=128,
+        dropout_rate=0.25,
     ):
-        def create_transformer_model(
-            input_shape, output_dim, num_heads, num_layers, dff
-        ):
-            inputs = tf.keras.layers.Input(shape=input_shape)
-            x = PositionalEncoding()(inputs)
-            for _ in range(num_layers):
-                x, _ = MultiHeadAttention(d_model=input_shape[-1], num_heads=num_heads)(
-                    x, x, x, mask=None
-                )
-                x = tf.keras.layers.LayerNormalization(epsilon=1e-6)(x)
-                ffn = tf.keras.Sequential(
-                    [
-                        tf.keras.layers.Dense(dff, activation="relu"),
-                        tf.keras.layers.Dense(input_shape[-1]),
-                    ]
-                )
-                x = ffn(x)
-                x = tf.keras.layers.LayerNormalization(epsilon=1e-6)(x)
-            x = tf.keras.layers.GlobalAveragePooling1D()(x)
-            outputs = tf.keras.layers.Dense(output_dim, activation="softmax")(x)
-            model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
-            return model
+        # モデルを構築
+        inputs = layers.Input(shape=input_shape)
+        x = inputs
+        # Transformerブロックを定義
+        for _ in range(block_num):
+            x = tf.keras.layers.MultiHeadAttention(
+                num_heads=num_heads, key_dim=key_dim
+            )(x, x, x)
+            x = tf.keras.layers.Dense(hidden_layer_size, activation="relu")(x)
+            x = tf.keras.layers.Dropout(dropout_rate)(x)
+        x = layers.Flatten()(x)
+        outputs = layers.Dense(num_classes, activation="softmax")(x)
+        model = models.Model(inputs, outputs)
 
-        model = create_transformer_model(
-            input_shape, output_dim, num_heads, num_layers, dff
-        )
         return model
 
     def save_model(self, model_dir: str, model_name: str):
@@ -184,6 +116,7 @@ class NNModel:
         if load_model:
             self.model: models.Model = models.load_model(load_model)
         else:
+            self.make_model(5)
             self.model.compile(
                 optimizer="adam",
                 loss="categorical_crossentropy",

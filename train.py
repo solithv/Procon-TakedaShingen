@@ -7,12 +7,12 @@ def train():
     model_name = "game"
     checkpoint_dir = "./checkpoint"
     log_dir = "./log"
-    batch_size = 8192
+    batch_size = 2048
     epochs = 1000
     validation_split = 0.7
 
     nn = NNModel()
-    nn.make_model(sides=5)
+    nn.make_model(sides=5, num_heads=11)
 
     nn.train(
         batch_size,
