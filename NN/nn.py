@@ -5,9 +5,8 @@ import keras
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
-from vit_keras import vit, utils
-
 from keras import layers, models
+
 from MyEnv import Game
 from Utils import Util
 
@@ -25,45 +24,78 @@ class NNModel:
         output_size = len(Game.ACTIONS)
         self.model = self.define_model(input_shape, output_size, *args, **kwargs)
 
-    def define_model(self, input_shape, num_classes):
-        num_patches = input_shape[0] * input_shape[1]  # パッチの数
-        patch_size = input_shape[2]  # パッチのサイズ（チャンネル数）
-        # 入力層
-        input_layer = tf.keras.layers.Input(shape=input_shape)
+    def define_model(
+        self,
+        input_shape: tuple[int],
+        num_classes: int,
+        patch_size: tuple[int] = (1, 1),
+        embedding_dim: int = 64,
+        num_heads: int = 4,
+        mlp_dim: int = 128,
+        num_layers: int = 4,
+        dropout_rate: float = 0.1,
+    ):
+        """モデルを定義
 
-        # チャンネルをパッチとして抽出
-        reshaped_input = tf.keras.layers.Reshape((num_patches, patch_size))(input_layer)
-
-        # # パッチの位置情報をエンベディング
-        # position_embedding = tf.keras.layers.Embedding(
-        #     input_dim=num_patches * patch_size, output_dim=patch_size
-        # )(reshaped_input)
-
-        # # パッチの位置情報を加算
-        # combined_input = position_embedding + reshaped_input
-
-        # Multi-Head Attention
-        attention_output = tf.keras.layers.MultiHeadAttention(num_heads=8, key_dim=32)(
-            reshaped_input, reshaped_input
+        Args:
+            input_shape (tuple[int]): 入力の形状
+            num_classes (int): 出力のクラス数
+            patch_size (tuple[int], optional): パッチのサイズ. Defaults to (1, 1).
+            embedding_dim (int, optional): パッチの埋め込み次元. Defaults to 64.
+            num_heads (int, optional): 注意ヘッドの数. Defaults to 4.
+            mlp_dim (int, optional): MLPの隠れ層の次元. Defaults to 128.
+            num_layers (int, optional): Transformerレイヤーの数. Defaults to 4.
+            dropout_rate (float, optional): ドロップアウト率. Defaults to 0.1.
+        """
+        num_patches = (input_shape[0] // patch_size[0]) * (
+            input_shape[1] // patch_size[1]
         )
+        # 入力レイヤー
+        inputs = layers.Input(shape=input_shape)
 
-        # レイヤー正規化
-        attention_output = tf.keras.layers.LayerNormalization(epsilon=1e-6)(
-            attention_output + reshaped_input
+        # パッチの抽出
+        patch_dim = input_shape[2]
+        patches = layers.Reshape((num_patches, patch_dim))(inputs)
+
+        # パッチの埋め込み
+        embedding_layer = layers.Dense(embedding_dim, activation="relu")
+        embedded_patches = embedding_layer(patches)
+
+        # ポジショナルエンコーディング
+        position_embedding_layer = layers.Embedding(
+            input_dim=num_patches, output_dim=embedding_dim
         )
+        positions = tf.range(start=0, limit=num_patches, delta=1)
+        position_embeddings = position_embedding_layer(positions)
 
-        # MLPヘッド
-        mlp_output = tf.keras.layers.Dense(512, activation="relu")(attention_output)
-        mlp_output = tf.keras.layers.Dense(patch_size, activation="relu")(mlp_output)
+        # パッチ埋め込みとポジションエンコーディングの結合
+        patch_embeddings = embedded_patches + position_embeddings
 
-        # 出力層
-        output_layer = tf.keras.layers.Flatten()(mlp_output)
-        output_layer = tf.keras.layers.Dense(num_classes, activation="softmax")(
-            output_layer
-        )
+        # Transformerエンコーダーの構築
+        x = patch_embeddings
+        for _ in range(num_layers):
+            # Multi-Head Self-Attention
+            x = layers.MultiHeadAttention(
+                num_heads=num_heads, key_dim=embedding_dim // num_heads
+            )(x, x)
+            x = layers.LayerNormalization(epsilon=1e-6)(
+                x + patch_embeddings
+            )  # Residual Connection
+            x = layers.Dropout(rate=dropout_rate)(x)  # ドロップアウト
 
-        # モデルを定義
-        model = tf.keras.models.Model(inputs=input_layer, outputs=output_layer)
+            # MLPブロック
+            y = layers.Dense(mlp_dim, activation="relu")(x)
+            y = layers.Dense(embedding_dim)(y)
+            x = layers.LayerNormalization(epsilon=1e-6)(x + y)  # Residual Connection
+            x = layers.Dropout(rate=dropout_rate)(x)  # ドロップアウト
+
+        # 全結合層を追加してクラス分類を行う
+        x = layers.Flatten()(x)
+        x = layers.Dropout(rate=dropout_rate)(x)  # ドロップアウト
+        outputs = layers.Dense(num_classes, activation="softmax")(x)
+
+        # モデルを構築
+        model = models.Model(inputs=inputs, outputs=outputs)
         return model
 
     def save_model(self, model_dir: str, model_name: str):
@@ -202,6 +234,8 @@ class NNModel:
         Returns:
             list[int]: 行動のリスト
         """
-        out = self.model.predict(np.array(inputs, dtype=np.float32))
+        out = self.model.predict(
+            np.array(inputs, dtype=np.float32).transpose((0, 2, 3, 1))
+        )
         args = np.argmax(out, axis=1)
         return args
