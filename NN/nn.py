@@ -13,65 +13,6 @@ from Utils import Util
 from .dataset import DatasetUtil
 
 
-class MultiHeadSelfAttention(layers.Layer):
-    def __init__(self, embed_dim, num_heads):
-        super(MultiHeadSelfAttention, self).__init__()
-        self.embed_dim = embed_dim
-        self.num_heads = num_heads
-        if embed_dim % num_heads != 0:
-            raise ValueError(
-                "Embedding dimension should be divisible by the number of heads."
-            )
-        self.projection_dim = embed_dim // num_heads
-        self.query_dense = layers.Dense(embed_dim)
-        self.key_dense = layers.Dense(embed_dim)
-        self.value_dense = layers.Dense(embed_dim)
-        self.combine_heads = layers.Dense(embed_dim)
-
-    def call(self, inputs):
-        batch_size = tf.shape(inputs)[0]
-        query = self.query_dense(inputs)
-        key = self.key_dense(inputs)
-        value = self.value_dense(inputs)
-        query = tf.reshape(query, (batch_size, -1, self.num_heads, self.projection_dim))
-        key = tf.reshape(key, (batch_size, -1, self.num_heads, self.projection_dim))
-        value = tf.reshape(value, (batch_size, -1, self.num_heads, self.projection_dim))
-        query = tf.transpose(query, perm=[0, 2, 1, 3])
-        key = tf.transpose(key, perm=[0, 2, 1, 3])
-        value = tf.transpose(value, perm=[0, 2, 1, 3])
-        attention_scores = tf.matmul(query, key, transpose_b=True)
-        attention_scores = tf.math.divide(
-            attention_scores, tf.math.sqrt(tf.cast(self.projection_dim, tf.float32))
-        )
-        attention_scores = tf.nn.softmax(attention_scores, axis=-1)
-        output = tf.matmul(attention_scores, value)
-        output = tf.transpose(output, perm=[0, 2, 1, 3])
-        output = tf.reshape(output, (batch_size, -1, self.embed_dim))
-        return self.combine_heads(output)
-
-
-class TransformerBlock(layers.Layer):
-    def __init__(self, embed_dim, num_heads, ff_dim, rate=0.1):
-        super(TransformerBlock, self).__init__()
-        self.att = MultiHeadSelfAttention(embed_dim, num_heads)
-        self.ffn = keras.Sequential(
-            [
-                layers.Dense(ff_dim, activation="relu"),
-                layers.Dense(embed_dim),
-            ]
-        )
-        self.layernorm1 = layers.LayerNormalization(epsilon=1e-6)
-        self.layernorm2 = layers.LayerNormalization(epsilon=1e-6)
-        self.dropout1 = layers.Dropout(rate)
-        self.dropout2 = layers.Dropout(rate)
-
-    def call(self, inputs):
-        attn_output = self.att(inputs)
-        out1 = self.layernorm1(inputs + self.dropout1(attn_output))
-        ffn_output = self.ffn(out1)
-        return self.layernorm2(out1 + self.dropout2(ffn_output))
-
-
 class NNModel:
     def make_model(self, sides: int = 5, *args, **kwargs):
         """モデルを作成
@@ -83,35 +24,30 @@ class NNModel:
         output_size = len(Game.ACTIONS)
         self.model = self.define_model(input_shape, output_size, *args, **kwargs)
 
-    def define_model(self, input_shape, num_classes, num_heads=8, dim_feedforward=256):
-        input_layer = tf.keras.layers.Input(shape=input_shape)
+    def define_model(
+        self, input_shape, num_classes, num_heads=4, ff_dim=32, dropout_rate=0.1
+    ):
+        inputs = tf.keras.layers.Input(shape=input_shape)
 
-        positional_encoding_layer = tf.keras.layers.Embedding(
-            input_shape[0] * input_shape[1], input_shape[2]
-        )(tf.range(input_shape[0] * input_shape[1]))
-        positional_encoding_layer = tf.reshape(
-            positional_encoding_layer, (input_shape[0], input_shape[1], input_shape[2])
+        attention = tf.keras.layers.MultiHeadAttention(num_heads=num_heads, key_dim=11)(
+            inputs, inputs, inputs
         )
-        positional_encoding_layer = tf.expand_dims(positional_encoding_layer, axis=0)
-        positional_encoding_layer = tf.tile(
-            positional_encoding_layer, [tf.shape(input_layer)[0], 1, 1, 1]
+        attention = tf.keras.layers.Dropout(rate=dropout_rate)(attention)
+        residual = tf.keras.layers.LayerNormalization(epsilon=1e-6)(inputs + attention)
+
+        ffn = keras.Sequential(
+            [
+                tf.keras.layers.Dense(ff_dim, activation="relu"),
+                tf.keras.layers.Dense(input_shape[-1]),
+            ]
         )
-        x = tf.keras.layers.Add()([input_layer, positional_encoding_layer])
+        ffn_output = ffn(residual)
+        ffn_output = tf.keras.layers.Dropout(rate=dropout_rate)(ffn_output)
+        output = tf.keras.layers.LayerNormalization(epsilon=1e-6)(residual + ffn_output)
+        output = tf.keras.layers.Flatten()(output)
+        output = tf.keras.layers.Dense(num_classes, activation="softmax")(output)
 
-        x = tf.keras.layers.MultiHeadAttention(
-            num_heads=num_heads, key_dim=input_shape[2]
-        )(x, x)
-        x = tf.keras.layers.LayerNormalization(epsilon=1e-6)(x)
-
-        x = tf.keras.layers.Conv1D(
-            filters=dim_feedforward, kernel_size=1, activation="relu"
-        )(x)
-        x = tf.keras.layers.Conv1D(filters=input_shape[2], kernel_size=1)(x)
-        x = tf.keras.layers.LayerNormalization(epsilon=1e-6)(x)
-        x = tf.keras.layers.GlobalAveragePooling2D()(x)
-        output_layer = tf.keras.layers.Dense(num_classes, activation="softmax")(x)
-
-        model = tf.keras.models.Model(inputs=input_layer, outputs=output_layer)
+        model = tf.keras.models.Model(inputs, output)
         return model
 
     def save_model(self, model_dir: str, model_name: str):
