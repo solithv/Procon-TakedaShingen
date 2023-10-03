@@ -5,6 +5,7 @@ import keras
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
+from vit_keras import vit, utils
 
 from keras import layers, models
 from MyEnv import Game
@@ -24,32 +25,45 @@ class NNModel:
         output_size = len(Game.ACTIONS)
         self.model = self.define_model(input_shape, output_size, *args, **kwargs)
 
-    def define_model(
-        self, input_shape, num_classes, num_heads=4, ff_dim=32, dropout_rate=0.1
-    ):
-        inputs = tf.keras.layers.Input(shape=input_shape)
+    def define_model(self, input_shape, num_classes):
+        num_patches = input_shape[0] * input_shape[1]  # パッチの数
+        patch_size = input_shape[2]  # パッチのサイズ（チャンネル数）
+        # 入力層
+        input_layer = tf.keras.layers.Input(shape=input_shape)
 
-        attention = tf.keras.layers.MultiHeadAttention(num_heads=num_heads, key_dim=11)(
-            inputs, inputs, inputs
+        # チャンネルをパッチとして抽出
+        reshaped_input = tf.keras.layers.Reshape((num_patches, patch_size))(input_layer)
+
+        # # パッチの位置情報をエンベディング
+        # position_embedding = tf.keras.layers.Embedding(
+        #     input_dim=num_patches * patch_size, output_dim=patch_size
+        # )(reshaped_input)
+
+        # # パッチの位置情報を加算
+        # combined_input = position_embedding + reshaped_input
+
+        # Multi-Head Attention
+        attention_output = tf.keras.layers.MultiHeadAttention(num_heads=8, key_dim=32)(
+            reshaped_input, reshaped_input
         )
-        attention = tf.keras.layers.LayerNormalization(epsilon=1e-6)(attention)
-        attention = tf.keras.layers.Dropout(rate=dropout_rate)(attention)
 
-        ffn = tf.keras.Sequential(
-            [
-                tf.keras.layers.Dense(ff_dim, activation="relu"),
-                tf.keras.layers.BatchNormalization(),
-                tf.keras.layers.Dropout(rate=dropout_rate),
-                tf.keras.layers.Dense(input_shape[-1]),
-            ]
+        # レイヤー正規化
+        attention_output = tf.keras.layers.LayerNormalization(epsilon=1e-6)(
+            attention_output + reshaped_input
         )
-        ffn_output = ffn(attention)
-        output = tf.keras.layers.Add()([attention, ffn_output])
-        output = tf.keras.layers.LayerNormalization(epsilon=1e-6)(output)
-        output = tf.keras.layers.Flatten()(output)
-        output = tf.keras.layers.Dense(num_classes, activation="softmax")(output)
 
-        model = tf.keras.models.Model(inputs, output)
+        # MLPヘッド
+        mlp_output = tf.keras.layers.Dense(512, activation="relu")(attention_output)
+        mlp_output = tf.keras.layers.Dense(patch_size, activation="relu")(mlp_output)
+
+        # 出力層
+        output_layer = tf.keras.layers.Flatten()(mlp_output)
+        output_layer = tf.keras.layers.Dense(num_classes, activation="softmax")(
+            output_layer
+        )
+
+        # モデルを定義
+        model = tf.keras.models.Model(inputs=input_layer, outputs=output_layer)
         return model
 
     def save_model(self, model_dir: str, model_name: str):
@@ -117,7 +131,6 @@ class NNModel:
         if load_model:
             self.model: models.Model = models.load_model(load_model)
         else:
-            self.make_model(5)
             self.model.compile(
                 optimizer="adam",
                 loss="categorical_crossentropy",

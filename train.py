@@ -7,7 +7,7 @@ def train():
     model_name = "game"
     checkpoint_dir = "./checkpoint"
     log_dir = "./log"
-    batch_size = 2048
+    batch_size = 4096
     epochs = 1000
     validation_split = 0.7
 
