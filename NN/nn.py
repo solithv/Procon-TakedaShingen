@@ -32,18 +32,20 @@ class NNModel:
         attention = tf.keras.layers.MultiHeadAttention(num_heads=num_heads, key_dim=11)(
             inputs, inputs, inputs
         )
+        attention = tf.keras.layers.LayerNormalization(epsilon=1e-6)(attention)
         attention = tf.keras.layers.Dropout(rate=dropout_rate)(attention)
-        residual = tf.keras.layers.LayerNormalization(epsilon=1e-6)(inputs + attention)
 
-        ffn = keras.Sequential(
+        ffn = tf.keras.Sequential(
             [
                 tf.keras.layers.Dense(ff_dim, activation="relu"),
+                tf.keras.layers.BatchNormalization(),
+                tf.keras.layers.Dropout(rate=dropout_rate),
                 tf.keras.layers.Dense(input_shape[-1]),
             ]
         )
-        ffn_output = ffn(residual)
-        ffn_output = tf.keras.layers.Dropout(rate=dropout_rate)(ffn_output)
-        output = tf.keras.layers.LayerNormalization(epsilon=1e-6)(residual + ffn_output)
+        ffn_output = ffn(attention)
+        output = tf.keras.layers.Add()([attention, ffn_output])
+        output = tf.keras.layers.LayerNormalization(epsilon=1e-6)(output)
         output = tf.keras.layers.Flatten()(output)
         output = tf.keras.layers.Dense(num_classes, activation="softmax")(output)
 
