@@ -13,6 +13,23 @@ from Utils import Util
 from .dataset import DatasetUtil
 
 
+class PositionalEmbedding(layers.Layer):
+    def __init__(self, sequence_length, input_dim, output_dim):
+        super(PositionalEmbedding, self).__init__()
+        self.pos_embedding = self.add_weight(
+            "pos_embedding",
+            shape=(1, sequence_length, input_dim),
+            initializer=tf.keras.initializers.RandomNormal(),
+            trainable=True,
+        )
+        self.input_dim = input_dim
+        self.output_dim = output_dim
+        print(self.pos_embedding)
+
+    def call(self, inputs):
+        return inputs + self.pos_embedding
+
+
 class NNModel:
     def make_model(self, sides: int = 5):
         """モデルを作成
@@ -24,29 +41,81 @@ class NNModel:
         output_size = len(Game.ACTIONS)
         self.model = self.define_model(input_shape, output_size)
 
-    def define_model(self, input_shape: tuple[int], output_size: int):
+    def define_model(
+        self,
+        input_shape: tuple[int],
+        output_dim: int,
+        num_heads: int = 4,
+        ff_dim: int = 32,
+        num_layers: int = 2,
+    ):
         """モデルを定義
 
         Args:
-            input_shape (tuple[int]): 入力次元
-            output_size (int): 出力次元
+            input_shape (tuple[int]): 入力の形状
+            output_dim (int): 出力の次元数
+            num_heads (int, optional): マルチヘッドアテンションのヘッド数. Defaults to 4.
+            ff_dim (int, optional): フィードフォワードネットワークの次元数. Defaults to 32.
+            num_layers (int, optional): トランスフォーマーレイヤーの数. Defaults to 2.
         """
-        inputs = keras.Input(input_shape)
-        x = tf.transpose(inputs, (0, 2, 3, 1))
-        # x = layers.Conv2D(64, (5, 5), padding="same", activation="relu")(x)
-        x = layers.Conv2D(16, (3, 3), padding="same", activation="relu")(x)
-        x = layers.SpatialDropout2D(0.2)(x)
-        # x = layers.Dropout(0.2)(x)
-        # x = layers.Conv2D(128, (3, 3), padding="same", activation="relu")(x)
-        x = layers.Conv2D(32, (3, 3), padding="same", activation="relu")(x)
-        # x = layers.Dropout(0.5)(x)
-        x = layers.Flatten()(x)
-        x = layers.Dense(64, activation="relu")(x)
-        x = layers.Dropout(0.5)(x)
-        # x = layers.Dense(32, activation="relu")(x)
-        outputs = layers.Dense(output_size, activation="softmax")(x)
 
-        return models.Model(inputs=inputs, outputs=outputs)
+        def transformer_layer(
+            input_shape, input_dim, num_heads, ff_dim, dropout_rate=0.1
+        ):
+            inputs = keras.Input(shape=(None, input_dim))
+            print(input_shape)
+            x = PositionalEmbedding(input_shape[0], input_dim, input_dim)(inputs)
+            x = keras.layers.MultiHeadAttention(
+                key_dim=input_dim, num_heads=num_heads, dropout=dropout_rate
+            )(x, x)
+            x = keras.layers.LayerNormalization(epsilon=1e-6)(x)
+            x = keras.layers.Dropout(dropout_rate)(x)
+
+            res = x + inputs
+            x = keras.layers.Conv1D(filters=ff_dim, kernel_size=1, activation="relu")(
+                res
+            )
+            x = keras.layers.Dropout(dropout_rate)(x)
+            x = keras.layers.Conv1D(filters=input_dim, kernel_size=1)(x)
+
+            output = x + res
+            return keras.Model(inputs, output)
+
+        def build_transformer(
+            input_shape, num_layers, num_heads, ff_dim, output_dim, dropout_rate=0.1
+        ):
+            inputs = keras.Input(shape=input_shape)
+            x = tf.transpose(inputs, (0, 2, 3, 1))
+            input_shape = tuple(input_shape[i] for i in (1, 2, 0))
+            for _ in range(num_layers):
+                x = transformer_layer(
+                    input_shape, input_shape[-1], num_heads, ff_dim, dropout_rate
+                )(x)
+            x = keras.layers.GlobalAveragePooling1D()(x)
+            x = keras.layers.Dense(output_dim, activation="softmax")(x)
+            return keras.Model(inputs, x)
+
+        model = build_transformer(
+            input_shape, num_layers, num_heads, ff_dim, output_dim
+        )
+        return model
+
+        # inputs = keras.Input(input_shape)
+        # x = tf.transpose(inputs, (0, 2, 3, 1))
+        # # x = layers.Conv2D(64, (5, 5), padding="same", activation="relu")(x)
+        # x = layers.Conv2D(16, (3, 3), padding="same", activation="relu")(x)
+        # x = layers.SpatialDropout2D(0.2)(x)
+        # # x = layers.Dropout(0.2)(x)
+        # # x = layers.Conv2D(128, (3, 3), padding="same", activation="relu")(x)
+        # x = layers.Conv2D(32, (3, 3), padding="same", activation="relu")(x)
+        # # x = layers.Dropout(0.5)(x)
+        # x = layers.Flatten()(x)
+        # x = layers.Dense(64, activation="relu")(x)
+        # x = layers.Dropout(0.5)(x)
+        # # x = layers.Dense(32, activation="relu")(x)
+        # outputs = layers.Dense(output_size, activation="softmax")(x)
+
+        # return models.Model(inputs=inputs, outputs=outputs)
 
     def save_model(self, model_dir: str, model_name: str):
         """モデルを保存
