@@ -47,7 +47,7 @@ class NNModel:
         output_dim: int,
         num_heads: int = 4,
         ff_dim: int = 32,
-        num_layers: int = 2,
+        num_layers: int = 12,
     ):
         """モデルを定義
 
@@ -59,45 +59,52 @@ class NNModel:
             num_layers (int, optional): トランスフォーマーレイヤーの数. Defaults to 2.
         """
 
-        def transformer_layer(
-            input_shape, input_dim, num_heads, ff_dim, dropout_rate=0.1
-        ):
-            inputs = keras.Input(shape=(None, input_dim))
-            print(input_shape)
-            x = PositionalEmbedding(input_shape[0], input_dim, input_dim)(inputs)
-            x = keras.layers.MultiHeadAttention(
-                key_dim=input_dim, num_heads=num_heads, dropout=dropout_rate
-            )(x, x)
-            x = keras.layers.LayerNormalization(epsilon=1e-6)(x)
-            x = keras.layers.Dropout(dropout_rate)(x)
-
-            res = x + inputs
-            x = keras.layers.Conv1D(filters=ff_dim, kernel_size=1, activation="relu")(
-                res
-            )
-            x = keras.layers.Dropout(dropout_rate)(x)
-            x = keras.layers.Conv1D(filters=input_dim, kernel_size=1)(x)
-
-            output = x + res
-            return keras.Model(inputs, output)
-
-        def build_transformer(
-            input_shape, num_layers, num_heads, ff_dim, output_dim, dropout_rate=0.1
-        ):
-            inputs = keras.Input(shape=input_shape)
-            x = tf.transpose(inputs, (0, 2, 3, 1))
-            input_shape = tuple(input_shape[i] for i in (1, 2, 0))
-            for _ in range(num_layers):
-                x = transformer_layer(
-                    input_shape, input_shape[-1], num_heads, ff_dim, dropout_rate
-                )(x)
-            x = keras.layers.GlobalAveragePooling1D()(x)
-            x = keras.layers.Dense(output_dim, activation="softmax")(x)
-            return keras.Model(inputs, x)
-
-        model = build_transformer(
-            input_shape, num_layers, num_heads, ff_dim, output_dim
+        # 入力パッチ化
+        input_layer = keras.layers.Input(shape=input_shape)
+        patches = layers.Reshape((input_shape[0] * input_shape[1], input_shape[2]))(
+            input_layer
         )
+
+        # 位置エンコーディング
+        positional_embedding = layers.Embedding(
+            input_dim=input_shape[0] * input_shape[1], output_dim=input_shape[2]
+        )(tf.range(input_shape[0] * input_shape[1]))
+
+        # パッチエンベディングと位置エンコーディングを結合
+        patch_embeddings = layers.Add()([patches, positional_embedding])
+
+        # トランスフォーマブロック
+        num_layers = 12  # トランスフォーマブロックの数
+        num_heads = 4  # 注意ヘッドの数
+        embedding_dim = input_shape[2]  # 埋め込み次元
+
+        for _ in range(num_layers):
+            # Multi-Head Self Attention
+            attention_output = layers.MultiHeadAttention(num_heads=num_heads, key_dim=embedding_dim // num_heads)(value=patch_embeddings,query=patch_embeddings,key=patch_embeddings,attention_mask=None,)
+            attention_output = layers.LayerNormalization(epsilon=1e-6)(
+                layers.Add()([patch_embeddings, attention_output])
+            )
+
+            # Feed Forward Network
+            feed_forward = layers.Conv1D(
+                filters=embedding_dim, kernel_size=1, activation="relu"
+            )(attention_output)
+            feed_forward = layers.Conv1D(filters=embedding_dim, kernel_size=1)(
+                feed_forward
+            )
+            feed_forward = layers.LayerNormalization(epsilon=1e-6)(
+                layers.Add()([attention_output, feed_forward])
+            )
+
+            patch_embeddings = feed_forward
+
+        # クラス予測用の出力ヘッド
+        cls_token = patch_embeddings[:, 0, :]  # クラス情報はCLSトークンから取得
+        output_layer = layers.Dense(output_dim, activation="softmax")(cls_token)
+
+        # モデルを構築
+        model = keras.models.Model(inputs=input_layer, outputs=output_layer)
+
         return model
 
         # inputs = keras.Input(input_shape)
