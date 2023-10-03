@@ -4,7 +4,6 @@ from pathlib import Path
 import keras
 import matplotlib.pyplot as plt
 import numpy as np
-import tensorflow as tf
 from keras import layers, models
 
 from MyEnv import Game
@@ -13,121 +12,50 @@ from Utils import Util
 from .dataset import DatasetUtil
 
 
-class Patches(layers.Layer):
-    def __init__(self, patch_size):
-        super().__init__()
-        self.patch_size = patch_size
-
-    def call(self, images):
-        batch_size = tf.shape(images)[0]
-        patches = tf.image.extract_patches(
-            images=images,
-            sizes=[1, self.patch_size, self.patch_size, 1],
-            strides=[1, self.patch_size, self.patch_size, 1],
-            rates=[1, 1, 1, 1],
-            padding="VALID",
-        )
-        patch_dims = patches.shape[-1]
-        patches = tf.reshape(patches, [batch_size, -1, patch_dims])
-        return patches
-
-
-class PatchEncoder(layers.Layer):
-    def __init__(self, num_patches, projection_dim):
-        super().__init__()
-        self.num_patches = num_patches
-        self.projection = layers.Dense(units=projection_dim)
-        self.position_embedding = layers.Embedding(
-            input_dim=num_patches, output_dim=projection_dim
-        )
-
-    def call(self, patch):
-        positions = tf.range(start=0, limit=self.num_patches, delta=1)
-        encoded = self.projection(patch) + self.position_embedding(positions)
-        return encoded
-
-
 class NNModel:
-    def make_model(self, sides: int = 5):
+    def make_model(self, sides: int = 5, *args, **kwargs):
         """モデルを作成
 
         Args:
             sides (int, optional): 1辺の長さ. Defaults to 3.
         """
-        input_shape = (len(Game.CELL[: Game.CELL.index("worker_A0")]) + 2, sides, sides)
+        input_shape = (sides, sides, len(Game.CELL[: Game.CELL.index("worker_A0")]) + 2)
         output_size = len(Game.ACTIONS)
-        self.model = self.define_model(input_shape, output_size, patch_size=5)
+        self.model = self.define_model(input_shape, output_size, *args, **kwargs)
 
     def define_model(
-        self,
-        input_shape,
-        num_classes,
-        learning_rate=0.001,
-        weight_decay=0.0001,
-        batch_size=256,
-        num_epochs=100,
-        image_size=72,  # We'll resize input images to this size
-        patch_size=6,  # Size of the patches to be extract from the input images
-        projection_dim=64,
-        num_heads=4,
-        transformer_layers=8,
-        mlp_head_units=[2048, 1024],  # Size of the dense layers of the final classifier
+        self, input_shape, output_dim, num_heads=4, ff_dim=32, dropout_rate=0.1
     ):
-        def mlp(x, hidden_units, dropout_rate):
-            for units in hidden_units:
-                x = layers.Dense(units, activation=tf.nn.gelu)(x)
-                x = layers.Dropout(dropout_rate)(x)
-            return x
+        # 入力レイヤー
+        inputs = layers.Input(shape=input_shape)
 
-        def create_vit_classifier(input_shape, num_classes):
-            inputs = layers.Input(shape=input_shape)
-            print(inputs)
-            preshape = tf.transpose(inputs, (0, 2, 3, 1))
-            print(preshape)
+        # Multi-Head Attention レイヤーの入力辞書を準備
+        attention_input = {"query": inputs, "key": inputs, "value": inputs}
 
-            # Create patches.
-            patches = Patches(patch_size)(preshape)
-            # Encode patches.
-            encoded_patches = PatchEncoder(num_patches, projection_dim)(patches)
+        # Multi-Head Attention レイヤー
+        attention = layers.MultiHeadAttention(num_heads=num_heads, key_dim=11)(
+            **attention_input
+        )
+        attention = layers.Dropout(rate=dropout_rate)(attention)
+        residual = layers.LayerNormalization(epsilon=1e-6)(inputs + attention)
 
-            # Create multiple layers of the Transformer block.
-            for _ in range(transformer_layers):
-                # Layer normalization 1.
-                x1 = layers.LayerNormalization(epsilon=1e-6)(encoded_patches)
-                # Create a multi-head attention layer.
-                attention_output = layers.MultiHeadAttention(
-                    num_heads=num_heads, key_dim=projection_dim, dropout=0.1
-                )(x1, x1)
-                # Skip connection 1.
-                x2 = layers.Add()([attention_output, encoded_patches])
-                # Layer normalization 2.
-                x3 = layers.LayerNormalization(epsilon=1e-6)(x2)
-                # MLP.
-                x3 = mlp(x3, hidden_units=transformer_units, dropout_rate=0.1)
-                # Skip connection 2.
-                encoded_patches = layers.Add()([x3, x2])
+        # フィードフォワードネットワーク
+        ffn = keras.Sequential(
+            [layers.Dense(ff_dim, activation="relu"), layers.Dense(input_shape[-1])]
+        )
+        ffn_output = ffn(residual)
+        ffn_output = layers.Dropout(rate=dropout_rate)(ffn_output)
+        output = layers.LayerNormalization(epsilon=1e-6)(residual + ffn_output)
 
-            # Create a [batch_size, projection_dim] tensor.
-            representation = layers.LayerNormalization(epsilon=1e-6)(encoded_patches)
-            representation = layers.Flatten()(representation)
-            representation = layers.Dropout(0.5)(representation)
-            # Add MLP.
-            features = mlp(
-                representation, hidden_units=mlp_head_units, dropout_rate=0.5
-            )
-            # Classify outputs.
-            logits = layers.Dense(num_classes)(features)
-            # Create the Keras model.
-            model = keras.Model(inputs=inputs, outputs=logits)
-            return model
+        # フラット化
+        output = layers.Flatten()(output)
 
-        num_patches = (image_size // patch_size) ** 2
-        transformer_units = [
-            projection_dim * 2,
-            projection_dim,
-        ]  # Size of the transformer layers
+        # 出力レイヤー
+        output = layers.Dense(output_dim, activation="softmax")(output)
 
-        return create_vit_classifier(input_shape, num_classes)
+        # モデルの作成
+        model = models.Model(inputs, output)
+        return model
 
     def save_model(self, model_dir: str, model_name: str):
         """モデルを保存
@@ -194,7 +122,6 @@ class NNModel:
         if load_model:
             self.model: models.Model = models.load_model(load_model)
         else:
-            self.make_model(5)
             self.model.compile(
                 optimizer="adam",
                 loss="categorical_crossentropy",

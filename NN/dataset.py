@@ -42,7 +42,7 @@ class DatasetUtil:
                     )
                     x += features_annotate
                     y += targets_annotate
-        x = np.array(x)
+        x = np.array(x).transpose((0, 2, 3, 1))
         y = np.array(y)
         print(x.shape, y.shape)
         return x, y
