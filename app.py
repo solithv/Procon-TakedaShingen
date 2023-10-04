@@ -41,6 +41,7 @@ def main():
             f"turn:{info['turn']}, score_A:{info['score_A']}, score_B:{info['score_B']}"
         )
     print("game end")
+    print(f"{env.replace_count} action replaced")
     env.end_game_render()
     env.close()
 

@@ -27,7 +27,8 @@ class DatasetUtil:
         self.unpack_dataset(dataset_dir)
         x = []
         y = []
-        for dataset in Path(dataset_dir).glob("*.dat"):
+        # for dataset in Path(dataset_dir).glob("*.dat"):
+        for dataset in Path(dataset_dir).glob("data.dat"):
             print(dataset)
             with open(dataset) as f:
                 for line in f:
@@ -41,7 +42,9 @@ class DatasetUtil:
                     )
                     x += features_annotate
                     y += targets_annotate
-        x = np.array(x)
-        y = np.array(y)
+                    # if len(y) > 1000:
+                    #     break
+        x = np.array(x).transpose((0, 2, 3, 1)).astype(np.float32)
+        y = np.array(y).astype(np.float32)
         print(x.shape, y.shape)
         return x, y

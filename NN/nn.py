@@ -14,38 +14,89 @@ from .dataset import DatasetUtil
 
 
 class NNModel:
-    def make_model(self, sides: int = 5):
+    def make_model(self, sides: int = 5, *args, **kwargs):
         """モデルを作成
 
         Args:
             sides (int, optional): 1辺の長さ. Defaults to 3.
         """
-        input_shape = (len(Game.CELL[: Game.CELL.index("worker_A0")]) + 2, sides, sides)
+        input_shape = (sides, sides, len(Game.CELL[: Game.CELL.index("worker_A0")]) + 2)
         output_size = len(Game.ACTIONS)
-        self.model = self.define_model(input_shape, output_size)
+        self.model = self.define_model(input_shape, output_size, *args, **kwargs)
 
-    def define_model(self, input_shape: tuple[int], output_size: int):
+    def define_model(
+        self,
+        input_shape: tuple[int],
+        num_classes: int,
+        patch_size: tuple[int] = (1, 1),
+        embedding_dim: int = 64,
+        num_heads: int = 4,
+        mlp_dim: int = 128,
+        num_layers: int = 4,
+        dropout_rate: float = 0.1,
+    ):
         """モデルを定義
 
         Args:
-            input_shape (tuple[int]): 入力次元
-            output_size (int): 出力次元
+            input_shape (tuple[int]): 入力の形状
+            num_classes (int): 出力のクラス数
+            patch_size (tuple[int], optional): パッチのサイズ. Defaults to (1, 1).
+            embedding_dim (int, optional): パッチの埋め込み次元. Defaults to 64.
+            num_heads (int, optional): 注意ヘッドの数. Defaults to 4.
+            mlp_dim (int, optional): MLPの隠れ層の次元. Defaults to 128.
+            num_layers (int, optional): Transformerレイヤーの数. Defaults to 4.
+            dropout_rate (float, optional): ドロップアウト率. Defaults to 0.1.
         """
-        inputs = keras.Input(input_shape)
-        x = tf.transpose(inputs, (0, 2, 3, 1))
-        # x = layers.Conv2D(64, (5, 5), padding="same", activation="relu")(x)
-        x = layers.Conv2D(16, (5, 5), padding="same", activation="relu")(x)
-        x = layers.SpatialDropout2D(0.2)(x)
-        # x = layers.Conv2D(128, (3, 3), padding="same", activation="relu")(x)
-        x = layers.Conv2D(32, (3, 3), activation="relu")(x)
-        x = layers.Dropout(0.5)(x)
-        x = layers.Flatten()(x)
-        x = layers.Dense(64, activation="relu")(x)
-        x = layers.Dropout(0.5)(x)
-        x = layers.Dense(32, activation="relu")(x)
-        outputs = layers.Dense(output_size, activation="softmax")(x)
+        num_patches = (input_shape[0] // patch_size[0]) * (
+            input_shape[1] // patch_size[1]
+        )
+        # 入力レイヤー
+        inputs = layers.Input(shape=input_shape)
 
-        return models.Model(inputs=inputs, outputs=outputs)
+        # パッチの抽出
+        patch_dim = input_shape[2]
+        patches = layers.Reshape((num_patches, patch_dim))(inputs)
+
+        # パッチの埋め込み
+        embedding_layer = layers.Dense(embedding_dim, activation="relu")
+        embedded_patches = embedding_layer(patches)
+
+        # ポジショナルエンコーディング
+        position_embedding_layer = layers.Embedding(
+            input_dim=num_patches, output_dim=embedding_dim
+        )
+        positions = tf.range(start=0, limit=num_patches, delta=1)
+        position_embeddings = position_embedding_layer(positions)
+
+        # パッチ埋め込みとポジションエンコーディングの結合
+        patch_embeddings = embedded_patches + position_embeddings
+
+        # Transformerエンコーダーの構築
+        x = patch_embeddings
+        for _ in range(num_layers):
+            # Multi-Head Self-Attention
+            x = layers.MultiHeadAttention(
+                num_heads=num_heads, key_dim=embedding_dim // num_heads
+            )(x, x)
+            x = layers.LayerNormalization(epsilon=1e-6)(
+                x + patch_embeddings
+            )  # Residual Connection
+            x = layers.Dropout(rate=dropout_rate)(x)  # ドロップアウト
+
+            # MLPブロック
+            y = layers.Dense(mlp_dim, activation="relu")(x)
+            y = layers.Dense(embedding_dim)(y)
+            x = layers.LayerNormalization(epsilon=1e-6)(x + y)  # Residual Connection
+            x = layers.Dropout(rate=dropout_rate)(x)  # ドロップアウト
+
+        # 全結合層を追加してクラス分類を行う
+        x = layers.Flatten()(x)
+        x = layers.Dropout(rate=dropout_rate)(x)  # ドロップアウト
+        outputs = layers.Dense(num_classes, activation="softmax")(x)
+
+        # モデルを構築
+        model = models.Model(inputs=inputs, outputs=outputs)
+        return model
 
     def save_model(self, model_dir: str, model_name: str):
         """モデルを保存
@@ -55,12 +106,16 @@ class NNModel:
             model_name (str): モデルの保存名
         """
         model_dir: Path = Path(model_dir)
-        model_name: Path = Path(model_name)
+        model_name: Path = model_name
         model_dir.mkdir(exist_ok=True)
-        model_file = model_dir / f"{model_name}.keras"
-        self.model.save(model_file)
-        if model_file.stat().st_size > 100 * (1024**2):
-            Util.compress_and_split(model_file, model_name, model_dir)
+        model_save = model_dir / model_name
+        self.model.save(model_save, save_format="tf")
+        if any(
+            f.stat().st_size > 100 * (1024**2)
+            for f in model_save.glob("**/*")
+            if f.is_file()
+        ):
+            Util.compress_and_split(model_save, model_name, model_dir)
 
     def load_model(self, model_dir: str, model_name: str, from_zip: bool = True):
         """モデルを読み込み
@@ -68,12 +123,12 @@ class NNModel:
         Args:
             model_dir (str): モデルの保存先
             model_name (str): モデルの保存名
-            from_zip (bool, optional): 分割zipファイルから読み込もうとするか. Defaults to True.
+            from_zip (bool, optional): 分割zipファイルからの読み込みを優先. Defaults to True.
         """
         model_dir: Path = Path(model_dir)
-        model_name: Path = Path(model_name)
-        model_file = model_dir / f"{model_name}.keras"
-        if from_zip and list(model_dir.glob(f"{model_name}.zip.[0-9][0-9][0-9]")):
+        model_name: Path = model_name
+        model_file = model_dir / model_name
+        if from_zip and list(model_dir.glob(f"{model_name}.zip*")):
             Util.combine_and_unpack(model_dir, model_name)
         self.model = models.load_model(model_file)
 
@@ -108,7 +163,6 @@ class NNModel:
         if load_model:
             self.model: models.Model = models.load_model(load_model)
         else:
-            self.make_model(5)
             self.model.compile(
                 optimizer="adam",
                 loss="categorical_crossentropy",
@@ -180,6 +234,8 @@ class NNModel:
         Returns:
             list[int]: 行動のリスト
         """
-        out = self.model.predict(np.array(inputs, dtype=np.int8))
+        out = self.model.predict(
+            np.array(inputs, dtype=np.float32).transpose((0, 2, 3, 1))
+        )
         args = np.argmax(out, axis=1)
         return args
