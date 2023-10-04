@@ -16,19 +16,6 @@ class Worker:
         self.is_action = True
 
     def move(self, y, x):
-<<<<<<< HEAD
-        self.x = x
-        self.y = y
-        self.action_log.append(("move", (y, x)))
-        self.is_action = True
-
-    def build(self, y, x):
-        self.action_log.append(("build", (y, x)))
-        self.is_action = True
-
-    def break_(self, y, x):
-        self.action_log.append(("break", (y, x)))
-=======
         self.action_log.append(("move", (self.y, self.x), (y, x)))
         self.x = x
         self.y = y
@@ -40,7 +27,6 @@ class Worker:
 
     def break_(self, y, x):
         self.action_log.append(("break", (self.y, self.x), (y, x)))
->>>>>>> origin/3x3
         self.is_action = True
 
     def get_coordinate(self):

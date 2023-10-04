@@ -1,17 +1,3 @@
-<<<<<<< HEAD
-import time
-import requests as req
-import os
-from dotenv import load_dotenv
-class API:
-
-    #.envはトークンを格納しているファイル
-    load_dotenv(".env")
-    token = os.getenv("TOKEN")
-    match_url = os.getenv("MATCH_URL") + "/matches"
-    header = {"procon-token": token}
-    # query = {"token": token}
-=======
 import os
 import time
 
@@ -25,23 +11,12 @@ class API:
     token = os.getenv("TOKEN")
     match_url = f"{os.getenv('MATCH_URL')}/matches"
     header = {"procon-token": token}
->>>>>>> origin/3x3
 
     def get_match(self):
         """
         試合一覧取得API
         返り値 id_: 試合idを格納した行列
         """
-<<<<<<< HEAD
-        while(True):
-            #返答が200(正常)でなければ0.1
-            r = req.get(self.match_url, headers=self.header)
-            if(r.status_code == 200):
-                break
-            print(r.status_code)
-            time.sleep(0.1)
-            
-=======
         while True:
             # 返答が200(正常)でなければ0.1
             r = req.get(self.match_url, headers=self.header)
@@ -50,7 +25,6 @@ class API:
             print(r.status_code)
             time.sleep(0.1)
 
->>>>>>> origin/3x3
         matches = r.json()
         return matches["matches"]
 
@@ -59,15 +33,9 @@ class API:
         試合状態取得API
         引数(試合id)
         """
-<<<<<<< HEAD
-        while(True):
-            r = req.get(f"{self.match_url}/{path}",headers=self.header)
-            if(r.status_code == 200):
-=======
         while True:
             r = req.get(f"{self.match_url}/{path}", headers=self.header)
             if r.status_code == 200:
->>>>>>> origin/3x3
                 break
             print(r.status_code)
             time.sleep(0.1)
@@ -80,18 +48,6 @@ class API:
         行動計画更新API
         引数(jsonファイル , 試合id)
         """
-<<<<<<< HEAD
-        if not opponent:
-            header=self.header
-        else:
-            header={"procon-token": "dummy-token"}
-        while(True):
-            r = req.post(f"{self.match_url}/{path}", headers=header, json=act)
-            if(r.status_code == 200):
-                break
-            print(r.status_code)
-            time.sleep(0.1)
-=======
         header = self.header if not opponent else {"procon-token": "dummy-token"}
         while True:
             r = req.post(f"{self.match_url}/{path}", headers=header, json=act)
@@ -99,4 +55,3 @@ class API:
                 break
             print(r.status_code)
             time.sleep(0.1)
->>>>>>> origin/3x3
