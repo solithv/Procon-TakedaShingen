@@ -33,7 +33,7 @@ def main():
             print(actions)
         else:
             actions = env.get_random_actions()
-            actions = env.random_act()
+            # actions = env.random_act()
             # actions = env.get_actions("pygame")
         # print(actions)
         observation, reward, terminated, truncated, info = env.step(actions)

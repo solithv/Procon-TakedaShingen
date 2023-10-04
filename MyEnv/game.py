@@ -1539,7 +1539,7 @@ class Game:
         ]
         for i, (worker, action) in enumerate(zip(self.workers[team], actions)):
             if not self.is_actionable(
-                worker, self.ACTIONS[action], stay=stay, smart=True
+                worker, self.ACTIONS[action], stay=stay, smart=True, smart_move=True
             ):
                 actions[i] = self.get_random_action(worker)
                 self.replace_count += 1
