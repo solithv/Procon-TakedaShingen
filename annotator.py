@@ -7,11 +7,7 @@ from Utils import Annotator
 def main():
     output_dir = "./dataset"
     csv_dir = "./field_data"
-<<<<<<< HEAD
-    filename = "data_mori.dat"
-=======
     filename = "data1.dat"
->>>>>>> origin/3x3
     # random: ランダム
     # smart: 強ランダム
     # human: 手動
