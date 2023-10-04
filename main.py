@@ -11,12 +11,17 @@ from Utils import API
 
 
 def main():
+<<<<<<< HEAD
     model_path = "./model/game"
 <<<<<<< HEAD
     env = gym.make(
         "TaniJoh-v0",
         max_steps=200,
 =======
+=======
+    model_path = "./model"
+    model_name = "game"
+>>>>>>> origin/3x3
     env = MyEnv.Game(
         max_steps=500,
 >>>>>>> origin/3x3
@@ -24,8 +29,8 @@ def main():
         use_pyautogui=True,
     )
 
-    nn = NNModel(model_path)
-    nn.load_model()
+    nn = NNModel()
+    nn.load_model(model_path, model_name)
 
     fa = API()
     match = fa.get_match()

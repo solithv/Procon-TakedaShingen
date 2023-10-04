@@ -7,9 +7,13 @@ from Utils import Annotator
 def main():
     output_dir = "./dataset"
     csv_dir = "./field_data"
+<<<<<<< HEAD
     filename = "data_mori.dat"
+=======
+    filename = "data1.dat"
+>>>>>>> origin/3x3
     # random: ランダム
-    # smart: 強強ランダム
+    # smart: 強ランダム
     # human: 手動
     enemy = "smart"
     # 最大ターン数を指定
@@ -22,6 +26,7 @@ def main():
         filename,
         size=5,
         max_steps=max_steps,
+        use_pyautogui=False,
     )
     for _ in range(1):
         annotator.reset()

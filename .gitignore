@@ -18,10 +18,15 @@ dataset/*.dat
 .env
 server_configs/
 log/
+<<<<<<< HEAD
 >>>>>>> 3x3
 =======
 .env
 server_configs/
 log/
 資料/
+>>>>>>> origin/3x3
+=======
+資料/
+checkpoint/
 >>>>>>> origin/3x3

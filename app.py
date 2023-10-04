@@ -15,12 +15,17 @@ from NN import NNModel
 
 def main():
     fields = glob.glob("./field_data/*.csv")
+<<<<<<< HEAD
     model_path = "./model/game"
 <<<<<<< HEAD
     env = gym.make(
         "TaniJoh-v0",
         max_steps=200,
 =======
+=======
+    model_path = "./model"
+    model_name = "game"
+>>>>>>> origin/3x3
     env = MyEnv.Game(
 >>>>>>> origin/3x3
         csv_path=fields,
@@ -28,11 +33,16 @@ def main():
         use_pyautogui=True,
     )
 
+<<<<<<< HEAD
     nn = NNModel(model_path)
     nn.load_model()
 <<<<<<< HEAD
     nn.make_model(5)
 =======
+=======
+    nn = NNModel()
+    nn.load_model(model_path, model_name)
+>>>>>>> origin/3x3
     # nn.make_model(5)
 >>>>>>> origin/3x3
     nn.model.summary()
