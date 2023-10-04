@@ -58,7 +58,7 @@ class NNModel:
         patches = layers.Reshape((num_patches, patch_dim))(inputs)
 
         # パッチの埋め込み
-        embedding_layer = layers.Dense(embedding_dim, activation="relu")
+        embedding_layer = layers.Dense(embedding_dim, activation=tf.nn.gelu)
         embedded_patches = embedding_layer(patches)
 
         # ポジショナルエンコーディング
@@ -84,7 +84,7 @@ class NNModel:
             x = layers.Dropout(rate=dropout_rate)(x)  # ドロップアウト
 
             # MLPブロック
-            y = layers.Dense(mlp_dim, activation="relu")(x)
+            y = layers.Dense(mlp_dim, activation=tf.nn.gelu)(x)
             y = layers.Dense(embedding_dim)(y)
             x = layers.LayerNormalization(epsilon=1e-6)(x + y)  # Residual Connection
             x = layers.Dropout(rate=dropout_rate)(x)  # ドロップアウト
