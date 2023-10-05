@@ -359,10 +359,9 @@ class Game:
                 )
                 territory[y, x] = 1
                 res = (
-                    self.fill_area(territory).sum()
-                    >= self.fill_area(
-                        self.board[self.CELL.index(f"rampart_{worker.team}")]
-                    ).sum()
+                    self.board[self.CELL.index(f"open_territory_{worker.team}"),y,x] != 1
+                    and self.fill_area(territory).sum()
+                    >= self.board[self.CELL.index(f"territory_{worker.team}")].sum()
                 )
                 return res
             else:
