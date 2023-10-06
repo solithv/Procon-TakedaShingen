@@ -119,6 +119,7 @@ class Game:
         self.board = np.zeros(
             (len(self.CELL), self.FIELD_MAX, self.FIELD_MAX), dtype=np.int8
         )
+        self.preBoard = self.board[:]
         if render_fps:
             self.metadata["render_fps"] = render_fps
 
@@ -1489,6 +1490,7 @@ class Game:
         worker.turn_init()
         actionable = []
         group = "break"
+
         for action in reversed(self.ACTIONS):
             if group != action.split("_")[0] and len(actionable):
                 break
@@ -1519,9 +1521,57 @@ class Game:
         act = []
         for worker in self.workers[team]:
             act.append(self.get_random_action(worker))
-
+        print("act1:", act)
+        
+        # nextAction = np.full(self.WORKER_MAX, -1)
+        requiredPattern = np.array(
+            [
+                [1, 0],
+                [0, 1]
+            ]
+        )
+        side_length = 5
+        for workerIndex, workerAround in enumerate(self.get_around_workers(side_length = side_length)):
+            pondCastleMap = workerAround[8] + workerAround[7] * -1 + workerAround[6] * -1 + workerAround[5] * -1
+            
+            for i_index, i in enumerate(range(side_length - 2 + 1)):
+                for j_index, j in enumerate(range(side_length - 2 + 1)):
+                    patternOne = np.array_equal(pondCastleMap[i:i+2, j:j+2], requiredPattern)
+                    patternTwo = np.array_equal(pondCastleMap[i:i+2, j:j+2], requiredPattern[::-1])
+                    if patternOne:
+                        pondDirection = (j_index - 2, i_index - 2)
+                    elif patternTwo:
+                        pondDirection = (j_index - 2, i_index - 2)
+                    
+                    if patternOne or patternTwo:
+                        direction = int(
+                                (
+                                    (
+                                        np.round(
+                                            np.degrees(
+                                                np.arctan2(
+                                                    pondDirection[0],
+                                                    -1 * pondDirection[1],
+                                                )
+                                            )
+                                        )
+                                        / 45
+                                    )
+                                    % 8
+                                )
+                                + 1
+                            )
+                        act[workerIndex] = 0
+                        print(f"{workerIndex}\n{pondCastleMap}\n(j: {pondDirection[0]}, i: {pondDirection[1]}), direction{direction}")
+                        # print(act)
+                        break
+            
+            
+        print("act2:", act, "\n")
+        
         while self.WORKER_MAX > len(act):
             act.append(self.ACTIONS.index("stay"))
+        
         return act
 
     def check_actions(self, actions: list[int], team: str = None, stay=False):
