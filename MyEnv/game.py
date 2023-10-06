@@ -336,7 +336,7 @@ class Game:
         else:
             return False
 
-    def is_buildable(self, worker: Worker, y: int, x: int, smart: bool = False):
+    def is_buildable(self, worker: Worker, y: int, x: int, mode: str = None):
         """
         内部関数
         建築可能判定
@@ -353,23 +353,35 @@ class Game:
                 *[f"worker_{worker.opponent_team}{i}" for i in range(self.WORKER_MAX)],
             )[y, x]
         ):
-            if smart:
+            if mode is not None:
+                if (
+                    self.board[self.CELL.index(f"open_territory_{worker.team}"), y, x]
+                    != 1
+                ):
+                    return False
+                result = True
+                if mode == "outside":
+                    self.check_side(worker, y, x)
+                if mode == "inside":
+                    self.check_side(worker, y, x)
                 territory = copy.deepcopy(
                     self.board[self.CELL.index(f"rampart_{worker.team}")]
                 )
                 territory[y, x] = 1
-                res = (
-                    self.board[self.CELL.index(f"open_territory_{worker.team}"),y,x] != 1
-                    and self.fill_area(territory).sum()
-                    >= self.board[self.CELL.index(f"territory_{worker.team}")].sum()
-                )
-                return res
-            else:
-                return True
+                new_territory = self.fill_area(territory).sum()
+                if mode == "more":
+                    result = (
+                        new_territory
+                        > self.board[self.CELL.index(f"territory_{worker.team}")].sum()
+                    )
+                else:
+                    return result
+                return result
+            return True
         else:
             return False
 
-    def is_breakable(self, worker: Worker, y: int, x: int, smart: bool = False):
+    def is_breakable(self, worker: Worker, y: int, x: int, mode: str = None):
         """
         内部関数
         破壊可能判定
@@ -380,23 +392,29 @@ class Game:
             and 0 <= x < self.width
             and self.compile_layers(self.board, "rampart_A", "rampart_B")[y, x]
         ):
-            if (
-                smart
-                and self.compile_layers(self.board, f"rampart_{worker.team}")[y, x]
-            ):
-                territory = copy.deepcopy(
-                    self.board[self.CELL.index(f"rampart_{worker.team}")]
-                )
-                territory[y, x] = 0
-                res = (
-                    self.fill_area(territory).sum()
-                    > self.fill_area(
-                        self.board[self.CELL.index(f"rampart_{worker.team}")]
-                    ).sum()
-                )
-                return res
-            else:
-                return True
+            if result is not None:
+                if mode == "opponent":
+                    result = (
+                        self.board[
+                            self.CELL.index(f"rampart_{worker.opponent_team}"), y, x
+                        ]
+                        == 1
+                    )
+                elif mode == "both":
+                    result = False
+                    if self.board[self.CELL.index(f"rampart_{worker.team}"), y, x] == 1:
+                        territory = copy.deepcopy(
+                            self.board[self.CELL.index(f"rampart_{worker.team}")]
+                        )
+                        territory[y, x] = 0
+                        result = (
+                            self.fill_area(territory).sum()
+                            > self.board[
+                                self.CELL.index(f"territory_{worker.team}")
+                            ].sum()
+                        )
+                return result
+            return True
         else:
             return False
 
@@ -429,6 +447,20 @@ class Game:
         elif stay and action == "stay":
             return True
         return False
+
+    def check_side(self, worker: Worker, y: int, x: int):
+        worker_x, worker_y = worker.get_coordinate()
+        diff = {
+            "up": worker_y,
+            "down": self.height - worker_y,
+            "left": worker_x,
+            "right": self.width - worker_x,
+        }
+        angle = np.arctan2((self.height / 2) + worker_y, worker_x - (self.width / 2))
+        angle = np.rad2deg(-angle)
+        print(worker.name)
+        print(worker.get_coordinate())
+        print(angle)
 
     def get_direction(self, action: int):
         """
@@ -1486,18 +1518,60 @@ class Game:
             worker (Worker): 職人
         """
         worker.turn_init()
-        actionable = []
-        group = "break"
-        for action in reversed(self.ACTIONS):
-            if group != action.split("_")[0] and len(actionable):
-                break
-            group = action.split("_")[0]
-            if self.is_actionable(worker, action, smart=True, smart_move=True):
-                actionable.append(self.ACTIONS.index(action))
-        if len(actionable) == 0:
-            for action in self.ACTIONS:
-                if self.is_actionable(worker, action, smart=True, smart_move=False):
-                    actionable.append(self.ACTIONS.index(action))
+        actionable = defaultdict(list)
+        action_priority = (
+            "break_opponent",
+            "build_more_territory",
+            "move_target",
+            "break_more_territory",
+            "build_outside",
+            "build_inside",
+            "move_",
+            "move",
+        )
+        for action in self.ACTIONS:
+            position = worker.get_coordinate()
+            direction = self.get_direction(self.ACTIONS.index(action))
+            act_pos = (np.array(position) + np.array(direction)).astype(int)
+            if "break" in action:
+                if self.is_breakable(worker, *act_pos, mode="opponent"):
+                    actionable["break_opponent"].append(self.ACTIONS.index(action))
+                if self.is_breakable(worker, *act_pos, mode="both"):
+                    actionable["break_more_territory"].append(
+                        self.ACTIONS.index(action)
+                    )
+            elif "build" in action:
+                if self.is_buildable(worker, *act_pos, mode - "more"):
+                    actionable["build_more_territory"].append(
+                        self.ACTIONS.index(action)
+                    )
+                if self.is_buildable(worker, *act_pos):
+                    actionable["build_outside"].append(self.ACTIONS.index(action))
+                if self.is_buildable(worker, *act_pos):
+                    actionable["build_inside"].append(self.ACTIONS.index(action))
+            elif "move" in action:
+                if self.is_movable(worker, *act_pos):
+                    actionable["move_target"].append(self.ACTIONS.index(action))
+                if self.is_movable(worker, *act_pos):
+                    actionable["move_"].append(self.ACTIONS.index(action))
+                if self.is_movable(worker, *act_pos):
+                    actionable["move"].append(self.ACTIONS.index(action))
+        for mode in action_priority:
+            actions = actionable.get(mode)
+            if actions:
+                return random.choice(actions)
+        return self.ACTIONS.index("stay")
+        # group = "break"
+        # for action in reversed(self.ACTIONS):
+        #     if group != action.split("_")[0] and len(actionable):
+        #         break
+        #     group = action.split("_")[0]
+        #     if self.is_actionable(worker, action, smart=True, smart_move=True):
+        #         actionable.append(self.ACTIONS.index(action))
+        # if len(actionable) == 0:
+        #     for action in self.ACTIONS:
+        #         if self.is_actionable(worker, action, smart=True, smart_move=False):
+        #             actionable.append(self.ACTIONS.index(action))
 
         if len(actionable) > 0:
             return random.choice(actionable)
