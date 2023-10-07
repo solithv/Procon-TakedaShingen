@@ -119,7 +119,6 @@ class Game:
         self.board = np.zeros(
             (len(self.CELL), self.FIELD_MAX, self.FIELD_MAX), dtype=np.int8
         )
-        self.preBoard = self.board[:]
         if render_fps:
             self.metadata["render_fps"] = render_fps
 
@@ -160,7 +159,35 @@ class Game:
         )
         board = np.where(np.any(board < 0, axis=0), -1, board)
         return board
+    
+    def find_pond_boundary(self, board: np.ndarray):
+        """
+        池の境界を検出し、boardにレイヤーを追加する
+        """
+        targetLayer = board[8]
+        requiredPattern = np.array(
+            # patternOne
+            [
+                [1, 0],
+                [0, 1]
+            ]
+        )
+        boundaryMap = np.full((25, 25), -1)
+        boundaryMap[0:self.width, 0:self.width] = 0
+        for i in range(self.width - 1):
+            for j in range(self.width - 1):
+                patternOne = np.array_equal(targetLayer[i:i+2, j:j+2], requiredPattern)
+                patternTwo = np.array_equal(targetLayer[i:i+2, j:j+2], requiredPattern[::-1])
+                if patternOne:
+                    boundaryMap[i + 1, j] = 1
+                    boundaryMap[i, j + 1] = 1
+                elif patternTwo:
+                    boundaryMap[i, j] = 1
+                    boundaryMap[i + 1, j + 1] = 1
+        self.board = np.concatenate([self.board, [boundaryMap]])
 
+        print(self.board[-1])
+        
     def load_from_csv(self, path: Union[str, list[str]]):
         """
         内部関数
@@ -204,7 +231,9 @@ class Game:
         assert a_count == b_count, "チーム間の職人数が不一致"
         self.worker_count = a_count
         self.board = self.update_blank(self.board)
-
+        self.find_pond_boundary(self.board)
+        
+        
         return name
 
     def reset(self, seed=None):
@@ -1521,53 +1550,6 @@ class Game:
         act = []
         for worker in self.workers[team]:
             act.append(self.get_random_action(worker))
-        print("act1:", act)
-        
-        # nextAction = np.full(self.WORKER_MAX, -1)
-        requiredPattern = np.array(
-            [
-                [1, 0],
-                [0, 1]
-            ]
-        )
-        side_length = 5
-        for workerIndex, workerAround in enumerate(self.get_around_workers(side_length = side_length)):
-            pondCastleMap = workerAround[8] + workerAround[7] * -1 + workerAround[6] * -1 + workerAround[5] * -1
-            
-            for i_index, i in enumerate(range(side_length - 2 + 1)):
-                for j_index, j in enumerate(range(side_length - 2 + 1)):
-                    patternOne = np.array_equal(pondCastleMap[i:i+2, j:j+2], requiredPattern)
-                    patternTwo = np.array_equal(pondCastleMap[i:i+2, j:j+2], requiredPattern[::-1])
-                    if patternOne:
-                        pondDirection = (j_index - 2, i_index - 2)
-                    elif patternTwo:
-                        pondDirection = (j_index - 2, i_index - 2)
-                    
-                    if patternOne or patternTwo:
-                        direction = int(
-                                (
-                                    (
-                                        np.round(
-                                            np.degrees(
-                                                np.arctan2(
-                                                    pondDirection[0],
-                                                    -1 * pondDirection[1],
-                                                )
-                                            )
-                                        )
-                                        / 45
-                                    )
-                                    % 8
-                                )
-                                + 1
-                            )
-                        act[workerIndex] = 0
-                        print(f"{workerIndex}\n{pondCastleMap}\n(j: {pondDirection[0]}, i: {pondDirection[1]}), direction{direction}")
-                        # print(act)
-                        break
-            
-            
-        print("act2:", act, "\n")
         
         while self.WORKER_MAX > len(act):
             act.append(self.ACTIONS.index("stay"))
