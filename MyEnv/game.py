@@ -101,7 +101,7 @@ class Game:
         max_steps: int = None,
         first_player: Optional[int] = None,
         use_pyautogui: bool = False,
-        render_fps:int=None
+        render_fps: int = None,
     ):
         """init
 
@@ -120,7 +120,7 @@ class Game:
             (len(self.CELL), self.FIELD_MAX, self.FIELD_MAX), dtype=np.int8
         )
         if render_fps:
-            self.metadata["render_fps"]=render_fps
+            self.metadata["render_fps"] = render_fps
 
         self.window_surface = None
         self.clock = None
@@ -247,6 +247,8 @@ class Game:
             self.reset_render()
 
         self.board = self.update_blank(self.board)
+
+        self.replace_count = 0
         return self.get_observation(), info
 
     def compile_layers(
@@ -1537,9 +1539,10 @@ class Game:
         ]
         for i, (worker, action) in enumerate(zip(self.workers[team], actions)):
             if not self.is_actionable(
-                worker, self.ACTIONS[action], stay=stay, smart=True
+                worker, self.ACTIONS[action], stay=stay, smart=True, smart_move=True
             ):
                 actions[i] = self.get_random_action(worker)
+                self.replace_count += 1
         return actions
 
     def get_around(
@@ -1714,6 +1717,7 @@ class Game:
         self.window_size_y = self.height * self.cell_size
         if self.render_mode == "human":
             self.reset_render()
+        self.replace_count = 0
 
     def get_stat_from_api(self, data: dict[str, Any]):
         """APIから環境状態を更新
