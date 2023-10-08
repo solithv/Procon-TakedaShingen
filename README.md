@@ -16,6 +16,8 @@ pip install -r requirements.txt
 TOKEN=***
 MATCH_URL=http://***
 ```
+`TOKEN`: 接続トークン \
+`MATCH_URL`: サーバURL
 
 ### 学習用データ作成
 
@@ -36,7 +38,7 @@ python app.py
 ```
 
 ### サーバでの動作確認
-
+サーバ用configファイル作成
 ```bash
 python make_server_configs.py
 ```

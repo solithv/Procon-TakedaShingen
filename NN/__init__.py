@@ -1,3 +1,2 @@
 from .nn import *
-
-__all__ = ["NNModel"]
+from .dataset import *
