@@ -39,7 +39,8 @@ def main():
         print(actions)
         observation, reward, terminated, truncated, info = env.step(actions)
         print(
-            f"turn:{info['turn']}, team:{info['current_team']}, score_A:{info['score_A']}, score_B:{info['score_B']}"
+            f"turn:{info['turn']}, team:{info['current_team']}, "
+            + f"score_A:{info['score_A']}, score_B:{info['score_B']}"
         )
     print("game end")
     print(f"{env.replace_count} action replaced")

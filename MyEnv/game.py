@@ -336,7 +336,7 @@ class Game:
             worker (Worker): 職人
             y (int): y座標
             x (int): x座標
-            mode (str, optional): 判定モード("target", "around", "any", "last").
+            mode (str, optional): 判定モード("around", "any", "last").
                 Defaults to None.
             lock_length (int, optional):
                 around, anyモードで過去何ターンの地点に移動しないか.
@@ -359,10 +359,7 @@ class Game:
             and (y, x) not in self.worker_positions
         ):
             if mode is not None:
-                if mode == "target":
-                    worker.target[-1]
-                    return False
-                elif mode == "last":
+                if mode == "last":
                     if worker.action_log and worker.action_log[-1][1] == (y, x):
                         return False
                 else:
@@ -544,7 +541,6 @@ class Game:
         return np.pi < (center_angle - target_angle) % (2 * np.pi) * 2 < 3 * np.pi
 
     def get_expand_move(self, worker: Worker):
-        direction = ((), (0, 1), (0, 2), (1, 2), (2, 2), (2, 1), (2, 0), (1, 0), (0, 0))
         actionable = []
         around = self.get_around(self.board, *worker.get_coordinate(), side_length=3)
         compiled: np.ndarray = np.sum(
@@ -558,23 +554,43 @@ class Game:
             ],
             axis=0,
         )
-        temp = (
-            [compiled[direction[i]] for i in range(1, 9)],
-            compiled.tolist(),
+
+        for index, action in enumerate(self.ACTIONS):
+            if "move" in action:
+                y, x = self.get_direction(index) + 1
+                if compiled[y, x] == 0 and self.is_movable(
+                    worker, *self.get_action_position(worker, index), mode="any"
+                ):
+                    actionable.append(index)
+        if actionable:
+            return actionable
+        compiled: np.ndarray = np.sum(
+            [
+                around[self.CELL.index(layer)]
+                for layer in (
+                    f"territory_{worker.team}",
+                    f"open_territory_{worker.team}",
+                )
+            ],
+            axis=0,
         )
 
         for index, action in enumerate(self.ACTIONS):
             if "move" in action:
-                if compiled[direction[index]] == 0 and self.is_movable(
+                y, x = self.get_direction(index) + 1
+                if compiled[y, x] == 0 and self.is_movable(
                     worker, *self.get_action_position(worker, index), mode="any"
                 ):
                     actionable.append(index)
         return actionable
 
-    def get_target_direction(self, worker: Worker, y: int, x: int):
+    def get_target_move(self, worker: Worker):
         def get_action_direction(angle, split=8):
             return int(np.round(angle * split / (2 * np.pi))) % split + 1
 
+        if not worker.target:
+            return []
+        y, x = worker.target[-1]
         # center_angle = np.arctan2(
         #     (self.height // 2) - worker.y, worker.x - (self.width // 2)
         # )
@@ -583,7 +599,18 @@ class Game:
         # )
         # target_angle = np.arctan2(worker.y - y, x - worker.x)
         target_action_angle = np.arctan2(x - worker.x, worker.y - y)
-        return get_action_direction(target_action_angle)
+        action = get_action_direction(target_action_angle)
+        if self.is_actionable(worker, self.ACTIONS[action], move_mode="last"):
+            return [action]
+        actions = [
+            (action + i) % 8 if (action + i) % 8 != 0 else 8 for i in range(-1, 2, 2)
+        ]
+        actionable = [
+            action
+            for action in actions
+            if self.is_actionable(worker, self.ACTIONS[action], move_mode="last")
+        ]
+        return actionable
 
     def get_direction(self, action: int):
         """内部関数
@@ -678,6 +705,8 @@ class Game:
                 self.board[self.CELL.index(worker.name), worker.y, worker.x] = 0
                 self.board[self.CELL.index(worker.name), y, x] = 1
                 worker.move(y, x)
+                if worker.target and worker.target[-1] == (y, x):
+                    worker.target.pop()
                 self.successful.append(True)
 
             elif "build" in self.ACTIONS[action] and self.is_buildable(worker, y, x):
@@ -1686,8 +1715,8 @@ class Game:
             "move_target",
             "break_more_territory",
             "build_outside",
-            "move_expand",
             "build_inside",
+            "move_expand",
             "move_around",
             "move_any",
             "move_last",
@@ -1710,8 +1739,6 @@ class Game:
                 if self.is_buildable(worker, *act_pos, mode="both"):
                     actionable["build_both"].append(index)
             elif "move" in action:
-                if worker.target and self.is_movable(worker, *act_pos, mode="target"):
-                    actionable["move_target"].append(index)
                 if self.is_movable(worker, *act_pos, mode="around"):
                     actionable["move_around"].append(index)
                 if self.is_movable(worker, *act_pos, mode="any"):
@@ -1720,6 +1747,7 @@ class Game:
                     actionable["move_last"].append(index)
                 if self.is_movable(worker, *act_pos):
                     actionable["move"].append(index)
+        actionable["move_target"] = self.get_target_move(worker)
         actionable["move_expand"] = self.get_expand_move(worker)
         for mode in action_priority:
             actions = actionable.get(mode)
@@ -1732,6 +1760,8 @@ class Game:
                     elif "any" in mode:
                         print(worker.name, mode, actions)
                     elif "last" in mode:
+                        print(worker.name, mode, actions)
+                    elif "target" in mode:
                         print(worker.name, mode, actions)
                     else:
                         print(worker.name, mode, actions)
@@ -1981,10 +2011,10 @@ class Game:
             data (dict[str, Any]): 試合状態取得APIから受け取ったデータ
         """
         assert self.id == data["id"], f"self.id:{self.id}, data['id']:{data['id']}"
-        assert (
-            self.worker_count == data["board"]["mason"]
-        ), f"self.worker_count:{self.worker_count}, \
-            data['board']['mason']:{data['board']['mason']}"
+        assert self.worker_count == data["board"]["mason"], (
+            f"self.worker_count:{self.worker_count}, "
+            + f"data['board']['mason']:{data['board']['mason']}"
+        )
         assert (
             self.turn - 1 == data["turn"]
         ), f"self.turn:{self.turn}, data['turn']:{data['turn']}"

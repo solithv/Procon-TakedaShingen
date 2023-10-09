@@ -689,8 +689,8 @@ class Annotator:
                     actions = self.game.random_act()
             observation, reward, terminated, truncated, info = self.game.step(actions)
             print(
-                f"turn:{info['turn']}, score_A:{info['score_A']}, \
-                    score_B:{info['score_B']}"
+                f"turn:{info['turn']}, score_A:{info['score_A']}, "
+                + f"score_B:{info['score_B']}"
             )
         self.game.end_game_render()
         self.game.close()
