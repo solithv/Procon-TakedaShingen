@@ -1585,7 +1585,7 @@ class Game:
                 self.replace_count += 1
  
         # 東西南北に池の境界を塞げるところがあったら塞ぐ
-        boundaryMap = self.board[self.CELL.index("pond_boundary")]
+        boundaryMap = self.board[self.CELL.index("pond_boundary")] + self.board[self.CELL.index("rampart_A")] * -1
         for workerIndex, workerPosition in enumerate(self.worker_positions):
             # print(f"\nworkerIndex: {workerIndex}\n(x, y) = {workerPosition}")
             for direction in self.DIRECTIONS:
