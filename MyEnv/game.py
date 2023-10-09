@@ -170,15 +170,17 @@ class Game:
             np.ndarray: blank層を更新した盤面
         """
         assert self.CELL.index("blank") != len(self.CELL) - 1
+        excludingList = ["blank", "pond_boundary"]
+        mask = [cell not in excludingList for cell in self.CELL]
         board[self.CELL.index("blank")] = np.where(
-            board[self.CELL.index("blank") + 1 :].any(axis=0), 0, 1
+            board[mask].any(axis=0), 0, 1
         )
         board = np.where(np.any(board < 0, axis=0), -1, board)
         return board
 
     def find_pond_boundary(self, board: np.ndarray):
             """
-            池の境界を検出し、boardにレイヤーを追加する
+            池の境界を検出し、boardのpond_boundaryレイヤーを更新する
             """
             targetLayer = board[self.CELL.index("pond")]
             requiredPattern = np.array(
@@ -201,9 +203,6 @@ class Game:
                         boundaryMap[i, j] = 1
                         boundaryMap[i + 1, j + 1] = 1
             self.board[self.CELL.index("pond_boundary")] = boundaryMap
-
-            # print(self.board[self.CELL.index("pond_boundary")])
-            # print(boundaryMap)
 
     def load_from_csv(self, path: Union[str, list[str]]):
         """
@@ -253,7 +252,6 @@ class Game:
         self.worker_count = a_count
         self.board = self.update_blank(self.board)
         self.find_pond_boundary(self.board)
-        
         
         return name
 
@@ -526,6 +524,29 @@ class Game:
         else:
             return False
 
+    def is_next_to_boundary(self, worker: Worker, any: bool = False):
+        """内部関数
+        東西南北に池の境界を塞げるマスがあるか判定
+        
+        Args:
+            worker (Worker): 職人
+            any (bool): `True`にすると返される配列に`any()`がかかる Default to False.
+            
+        Return:
+            ndarray (bool):
+                `DIRECTIONS`の順番で判定を
+                `[True, False, False, False]`
+                のように返す
+        """
+        print(worker.get_coordinate())
+        boundaryMap = self.board[self.CELL.index("pond_boundary")] + self.board[self.CELL.index("rampart_A")] * -1
+        for direction in self.DIRECTIONS:
+            workerDirection = self.DIRECTIONS[direction] + workerPosition
+            if boundaryMap[*workerDirection] == 1:
+                pass
+                # actions[workerIndex] = self.ACTIONS.index("build_" + direction)    
+        return 0
+    
     def is_actionable(
         self,
         worker: Worker,
@@ -1744,7 +1765,7 @@ class Game:
         act = []
         for worker in self.workers[team]:
             act.append(self.get_random_action(worker))
-        
+        self.is_next_to_boundary(self.workers[team][0])
         while self.WORKER_MAX > len(act):
             act.append(self.ACTIONS.index("stay"))
         
@@ -1772,15 +1793,7 @@ class Game:
             ):
                 actions[i] = self.get_random_action(worker)
                 self.replace_count += 1
- 
-        # 東西南北に池の境界を塞げるところがあったら塞ぐ
-        boundaryMap = self.board[self.CELL.index("pond_boundary")] + self.board[self.CELL.index("rampart_A")] * -1
-        for workerIndex, workerPosition in enumerate(self.worker_positions):
-            for direction in self.DIRECTIONS:
-                workerDirection = self.DIRECTIONS[direction] + workerPosition
-                if boundaryMap[*workerDirection] == 1:
-                    actions[workerIndex] = self.ACTIONS.index("build_" + direction)
-                    
+  
         return actions
 
     def get_around(
@@ -1951,6 +1964,7 @@ class Game:
         self.board[:, self.height :, :] = -1
         self.board[:, :, self.width :] = -1
         self.board = self.update_blank(self.board)
+        self.find_pond_boundary(self.board)
         self.update_territory()
 
         self.max_turn = (
