@@ -8,7 +8,7 @@ from typing import Any, Optional, Union
 
 import numpy as np
 import pygame
-from pygame.locals import *
+from pygame.locals import KEYDOWN
 
 from .worker import Worker
 
@@ -110,9 +110,12 @@ class Game:
         Args:
             csv_path (Union[str, list[str]]): フィールドデータのパス
             render_mode (str, optional): 描画方法. Defaults to "ansi".
-            max_steps (int, optional): 最大ステップ数 未指定でマップサイズに応じて変動. Defaults to None.
-            first_player (Optional[int], optional): 先行プレイヤーの番号. Defaults to None.
-            use_pyautogui (bool): PyAutoGUIを使って描画windowサイズを指定するか. Defaults to False.
+            max_steps (int, optional): 最大ステップ数 未指定でマップサイズに応じて変動.
+                Defaults to None.
+            first_player (Optional[int], optional): 先行プレイヤーの番号.
+                Defaults to None.
+            use_pyautogui (bool): PyAutoGUIを使って描画windowサイズを指定するか.
+                Defaults to False.
         """
         self.csv_path = csv_path
         self.render_mode = render_mode
@@ -135,15 +138,21 @@ class Game:
             self.display_size_x, self.display_size_y = 960, 960
 
     def get_observation(self):
-        """状態を整形して観測空間として返す"""
+        """内部関数
+        状態を整形して観測空間として返す
+
+        Returns:
+            np.ndarray: 観測空間
+        """
         return self.board
 
     def change_player(self, no_change: bool = False):
-        """
-        内部関数
+        """内部関数
         操作対象のチームを更新する
+
         Args:
-            no_change (bool, optional): チームの変更は行わずに変数の更新のみを行う (default=False)
+            no_change (bool, optional): チームの変更は行わずに変数の更新のみを行う.
+                Defaults to False.
         """
         if not no_change:
             self.current_player = 1 - self.current_player
@@ -151,9 +160,14 @@ class Game:
         self.opponent_team = self.TEAM[1 - self.current_player]
 
     def update_blank(self, board: np.ndarray):
-        """
-        内部関数
+        """内部関数
         blank層を更新
+
+        Args:
+            board (np.ndarray): 盤面
+
+        Returns:
+            np.ndarray: blank層を更新した盤面
         """
         assert self.CELL.index("blank") != len(self.CELL) - 1
         board[self.CELL.index("blank")] = np.where(
@@ -161,42 +175,46 @@ class Game:
         )
         board = np.where(np.any(board < 0, axis=0), -1, board)
         return board
-    
-    def find_pond_boundary(self, board: np.ndarray):
-        """
-        池の境界を検出し、boardにレイヤーを追加する
-        """
-        targetLayer = board[self.CELL.index("pond")]
-        requiredPattern = np.array(
-            # patternOne
-            [
-                [1, 0],
-                [0, 1]
-            ]
-        )
-        boundaryMap = np.full((self.FIELD_MAX, self.FIELD_MAX), -1)
-        boundaryMap[0:self.width, 0:self.width] = 0
-        for i in range(self.width - 1):
-            for j in range(self.width - 1):
-                patternOne = np.array_equal(targetLayer[i:i+2, j:j+2], requiredPattern)
-                patternTwo = np.array_equal(targetLayer[i:i+2, j:j+2], requiredPattern[::-1])
-                if patternOne:
-                    boundaryMap[i + 1, j] = 1
-                    boundaryMap[i, j + 1] = 1
-                elif patternTwo:
-                    boundaryMap[i, j] = 1
-                    boundaryMap[i + 1, j + 1] = 1
-        self.board[self.CELL.index("pond_boundary")] = boundaryMap
 
-        # print(self.board[self.CELL.index("pond_boundary")])
-        # print(boundaryMap)
-        
+    def find_pond_boundary(self, board: np.ndarray):
+            """
+            池の境界を検出し、boardにレイヤーを追加する
+            """
+            targetLayer = board[self.CELL.index("pond")]
+            requiredPattern = np.array(
+                # patternOne
+                [
+                    [1, 0],
+                    [0, 1]
+                ]
+            )
+            boundaryMap = np.full((self.FIELD_MAX, self.FIELD_MAX), -1)
+            boundaryMap[0:self.width, 0:self.width] = 0
+            for i in range(self.width - 1):
+                for j in range(self.width - 1):
+                    patternOne = np.array_equal(targetLayer[i:i+2, j:j+2], requiredPattern)
+                    patternTwo = np.array_equal(targetLayer[i:i+2, j:j+2], requiredPattern[::-1])
+                    if patternOne:
+                        boundaryMap[i + 1, j] = 1
+                        boundaryMap[i, j + 1] = 1
+                    elif patternTwo:
+                        boundaryMap[i, j] = 1
+                        boundaryMap[i + 1, j + 1] = 1
+            self.board[self.CELL.index("pond_boundary")] = boundaryMap
+
+            # print(self.board[self.CELL.index("pond_boundary")])
+            # print(boundaryMap)
+
     def load_from_csv(self, path: Union[str, list[str]]):
         """
         内部関数
         csvデータからフィールドを作成する
+
         Args:
             path (Union[str, list[str]]): csvデータのパス
+
+        Returns:
+            str: csvファイルの名前
         """
         if isinstance(path, (list, tuple)):
             path = random.choice(path)
@@ -240,9 +258,13 @@ class Game:
         return name
 
     def reset(self, seed=None):
-        """
-        gymの必須関数
-        環境の初期化
+        """環境の初期化
+
+        Args:
+            seed (Any, optional): seed値. Defaults to None.
+
+        Returns:
+            tuple[np.ndarray, dict]: 観測空間と情報
         """
         if seed is not None:
             random.seed(seed)
@@ -292,7 +314,11 @@ class Game:
         Args:
             board (np.ndarray): 盤面
             layers (tuple[str]): 結合したい層の名称
-            one_hot (bool, optional): 返り値の各要素を1,0のみにする. Defaults to True.
+            one_hot (bool, optional): 返り値の各要素を1,0のみにする.
+                Defaults to True.
+
+        Returns:
+            np.ndarray: 合成した配列
         """
         compiled = np.sum(
             [board[self.CELL.index(layer)] for layer in layers],
@@ -307,10 +333,16 @@ class Game:
     def get_team_worker_coordinate(
         self, team: str, actioned: bool = True, worker: Worker = None
     ):
-        """
-        内部関数
+        """内部関数
         行動済みの職人の座標を取得
-        team: str("A" or "B") 取得するチームを指定
+
+        Args:
+            team (str): 取得するチームを指定 ("A" or "B")
+            actioned (bool, optional): 行動済みか行動前か. Defaults to True.
+            worker (Worker, optional): 除外する職人. Defaults to None.
+
+        Returns:
+            list[tuple[int, int]]: 職人の座標のリスト
         """
         if actioned:
             result = [
@@ -328,10 +360,20 @@ class Game:
             result.remove(worker.get_coordinate())
         return result
 
-    def is_movable(self, worker: Worker, y: int, x: int, smart: bool = False):
-        """
-        内部関数
+    def is_movable(
+        self, worker: Worker, y: int, x: int, mode: str = None, lock_length: int = 5
+    ):
+        """内部関数
         行動可能判定
+
+        Args:
+            worker (Worker): 職人
+            y (int): y座標
+            x (int): x座標
+            smart (bool, optional): _description_. Defaults to False.
+
+        Returns:
+            bool: 判定結果
         """
         if (
             not worker.is_action
@@ -346,33 +388,53 @@ class Game:
             and (y, x) not in self.get_team_worker_coordinate(worker.team)
             and (y, x) not in self.worker_positions
         ):
-            if smart:
-                if (
-                    worker.action_log
-                    and worker.action_log[-1][0] == "move"
-                    and worker.action_log[-1][1] == (y, x)
-                ):
+            if mode is not None:
+                if mode == "target":
+                    worker.target[-1]
                     return False
-                field = self.get_around(self.board, y, x, side_length=3)
-                compiled: np.ndarray = np.sum(
-                    [
-                        field[self.CELL.index(layer)]
-                        for layer in (
-                            f"rampart_{worker.team}",
-                            f"territory_{worker.team}",
-                        )
-                    ],
-                    axis=0,
-                )
-                return not compiled.all()
+                elif mode == "any":
+                    if (
+                        worker.action_log
+                        # and worker.action_log[-1][0] == "move"
+                        and worker.action_log[-1][1] == (y, x)
+                    ):
+                        return False
+                else:
+                    for log in worker.action_log[:-lock_length]:
+                        if log[1] == (y, x):
+                            return False
+                if mode == "expand":
+                    return not self.is_inside(worker, y, x)
+                elif mode == "around":
+                    field = self.get_around(self.board, y, x, side_length=3)
+                    compiled: np.ndarray = np.sum(
+                        [
+                            field[self.CELL.index(layer)]
+                            for layer in (
+                                f"rampart_{worker.team}",
+                                f"territory_{worker.team}",
+                            )
+                        ],
+                        axis=0,
+                    )
+                    return not compiled.all()
             return True
         else:
             return False
 
-    def is_buildable(self, worker: Worker, y: int, x: int, smart: bool = False):
-        """
-        内部関数
+    def is_buildable(self, worker: Worker, y: int, x: int, mode: str = None):
+        """内部関数
         建築可能判定
+
+        Args:
+            worker (Worker): 職人
+            y (int): y座標
+            x (int): x座標
+            mode (str, optional): 判定モード("more","outside","inside").
+                Defaults to None.
+
+        Returns:
+            bool: 判定結果
         """
         if (
             not worker.is_action
@@ -386,27 +448,50 @@ class Game:
                 *[f"worker_{worker.opponent_team}{i}" for i in range(self.WORKER_MAX)],
             )[y, x]
         ):
-            if smart:
+            if mode is not None:
+                if (
+                    self.board[self.CELL.index(f"open_territory_{worker.team}"), y, x]
+                    == 1
+                ):
+                    return False
+                result = True
                 territory = copy.deepcopy(
                     self.board[self.CELL.index(f"rampart_{worker.team}")]
                 )
                 territory[y, x] = 1
-                res = (
-                    self.fill_area(territory).sum()
-                    >= self.fill_area(
-                        self.board[self.CELL.index(f"rampart_{worker.team}")]
-                    ).sum()
-                )
-                return res
-            else:
-                return True
+                new_territory = self.fill_area(territory).sum()
+                if mode == "outside":
+                    result = (
+                        new_territory
+                        >= self.board[self.CELL.index(f"territory_{worker.team}")].sum()
+                    ) and not self.is_inside(worker, y, x)
+                elif mode == "inside":
+                    result = (
+                        new_territory
+                        >= self.board[self.CELL.index(f"territory_{worker.team}")].sum()
+                    ) and self.is_inside(worker, y, x)
+                elif mode == "more":
+                    result = (
+                        new_territory
+                        > self.board[self.CELL.index(f"territory_{worker.team}")].sum()
+                    )
+                return result
+            return True
         else:
             return False
 
-    def is_breakable(self, worker: Worker, y: int, x: int, smart: bool = False):
-        """
-        内部関数
+    def is_breakable(self, worker: Worker, y: int, x: int, mode: str = None):
+        """内部関数
         破壊可能判定
+
+        Args:
+            worker (Worker): 職人
+            y (int): y座標
+            x (int): x座標
+            mode (str, optional): _description_. Defaults to None.
+
+        Returns:
+            bool: 判定結果
         """
         if (
             not worker.is_action
@@ -414,23 +499,30 @@ class Game:
             and 0 <= x < self.width
             and self.compile_layers(self.board, "rampart_A", "rampart_B")[y, x]
         ):
-            if (
-                smart
-                and self.compile_layers(self.board, f"rampart_{worker.team}")[y, x]
-            ):
-                territory = copy.deepcopy(
-                    self.board[self.CELL.index(f"rampart_{worker.team}")]
-                )
-                territory[y, x] = 0
-                res = (
-                    self.fill_area(territory).sum()
-                    > self.fill_area(
-                        self.board[self.CELL.index(f"rampart_{worker.team}")]
-                    ).sum()
-                )
-                return res
-            else:
-                return True
+            if mode is not None:
+                result = True
+                if mode == "opponent":
+                    result = (
+                        self.board[
+                            self.CELL.index(f"rampart_{worker.opponent_team}"), y, x
+                        ]
+                        == 1
+                    )
+                elif mode == "both":
+                    result = False
+                    if self.board[self.CELL.index(f"rampart_{worker.team}"), y, x] == 1:
+                        territory = copy.deepcopy(
+                            self.board[self.CELL.index(f"rampart_{worker.team}")]
+                        )
+                        territory[y, x] = 0
+                        result = (
+                            self.fill_area(territory).sum()
+                            > self.board[
+                                self.CELL.index(f"territory_{worker.team}")
+                            ].sum()
+                        )
+                return result
+            return True
         else:
             return False
 
@@ -448,8 +540,13 @@ class Game:
             worker (Worker): 職人
             action (str): 行動名
             stay (bool, optional): 待機を許容するか. Defaults to False.
-            smart (bool, optional): 建築、破壊が点数向上するか判定する. Defaults to False.
-            move_smart (bool, optional): 移動先が城壁と陣地で埋まっているか判定する. Defaults to False.
+            smart (bool, optional): 建築、破壊が点数向上するか判定する.
+                Defaults to False.
+            move_smart (bool, optional): 移動先が城壁と陣地で埋まっているか判定する.
+                Defaults to False.
+
+        Returns:
+            bool: 判定結果
         """
         position = worker.get_coordinate()
         direction = self.get_direction(self.ACTIONS.index(action))
@@ -464,10 +561,36 @@ class Game:
             return True
         return False
 
+    def is_inside(self, worker: Worker, y: int, x: int):
+        center_angle = np.arctan2(
+            (self.height // 2) - worker.y, worker.x - (self.width // 2)
+        )
+        target_angle = np.arctan2(worker.y - y, x - worker.x)
+        return np.pi < (center_angle - target_angle) % (2 * np.pi) * 2 < 3 * np.pi
+
+    def get_target_direction(self, worker: Worker, y: int, x: int):
+        def get_action_direction(angle, split=8):
+            return int(np.round(angle * split / (2 * np.pi))) % split + 1
+
+        # center_angle = np.arctan2(
+        #     (self.height // 2) - worker.y, worker.x - (self.width // 2)
+        # )
+        # center_action_angle = np.arctan2(
+        #     worker.x - (self.width // 2), (self.height // 2) - worker.y
+        # )
+        # target_angle = np.arctan2(worker.y - y, x - worker.x)
+        target_action_angle = np.arctan2(x - worker.x, worker.y - y)
+        return get_action_direction(target_action_angle)
+
     def get_direction(self, action: int):
-        """
-        内部関数
+        """内部関数
         入力行動に対する方向を取得
+
+        Args:
+            action (int): 行動
+
+        Returns:
+            np.ndarray: 方向
         """
         direction = np.zeros(2)
         for key, value in self.DIRECTIONS.items():
@@ -517,9 +640,11 @@ class Game:
         return workers
 
     def action_workers(self, workers: list[tuple[Worker, int]]):
-        """
-        内部関数
+        """内部関数
         職人を行動させる
+
+        Args:
+            workers (list[tuple[Worker, int]]): 職人と行動のリスト
         """
         self.worker_positions = [worker.get_coordinate() for worker, _ in workers]
         workers = self.check_stack_workers(workers)
@@ -575,9 +700,14 @@ class Game:
             self.stayed_workers.append(worker.name)
 
     def fill_area(self, array: np.ndarray):
-        """
-        内部関数
+        """内部関数
         囲まれている領域を取得
+
+        Args:
+            array (np.ndarray): 盤面
+
+        Returns:
+            np.ndarray: 囲まれている領域
         """
         array = np.where(array == 1, 0, 1)
         # 配列の形状を取得
@@ -615,10 +745,7 @@ class Game:
         return array
 
     def update_territory(self):
-        """
-        内部関数
-        陣地を更新
-        """
+        """陣地を更新"""
         self.previous_territory_A = copy.deepcopy(
             self.board[self.CELL.index("territory_A")]
         )
@@ -633,10 +760,7 @@ class Game:
         )
 
     def update_open_territory(self):
-        """
-        内部関数
-        開放陣地を更新
-        """
+        """開放陣地を更新"""
         self.previous_open_territory_A = copy.deepcopy(
             self.board[self.CELL.index("open_territory_A")]
         )
@@ -675,10 +799,7 @@ class Game:
         self.board[self.CELL.index("open_territory_B"), self.height :, :] = -1
 
     def calculate_score(self):
-        """
-        内部関数
-        得点を計算
-        """
+        """得点を計算"""
         self.previous_score_A, self.previous_score_B = self.score_A, self.score_B
 
         self.score_A = (
@@ -732,6 +853,11 @@ class Game:
         )
 
     def get_reward(self):
+        """報酬を取得
+
+        Returns:
+            float: 現在チームの即時報酬
+        """
         if self.current_team == "A":
             return self.get_reward_A()
         elif self.current_team == "B":
@@ -775,9 +901,14 @@ class Game:
         return terminated, truncated
 
     def step(self, actions: Union[list[int], tuple[int]]):
-        """
-        gymの必須関数
-        1ターン進める処理を実行
+        """ターンを進める
+
+        Args:
+            actions (Union[list[int], tuple[int]]): 行動のリスト
+
+        Returns:
+            tuple[np.ndarray, float, bool, bool, dict]:
+                観測空間, 即時報酬, 終了フラグ, ターン数上限フラグ, 情報
         """
         actions = actions[: self.worker_count]
         [worker.turn_init() for worker in self.workers[self.current_team]]
@@ -847,10 +978,7 @@ class Game:
         return self.get_observation(), reward, terminated, truncated, info
 
     def render(self, *args, **kwargs):
-        """
-        gymの必須関数
-        描画を行う
-        """
+        """描画を行う"""
         if self.render_mode == "human":
             return self.render_rgb_array(*args, **kwargs)
         elif self.render_mode == "ansi":
@@ -868,7 +996,11 @@ class Game:
             view += (
                 "|".join(
                     [
-                        f"{','.join([value for i, item in enumerate(self.board[:,y,x]) if item for key,value in self.ICONS.items() if key in self.CELL[i]]):^{cell_num}}"
+                        f"""{','.join([
+                                value for i, item in enumerate(self.board[:,y,x])
+                                if item for key,value in self.ICONS.items()
+                                if key in self.CELL[i]
+                            ]):^{cell_num}}"""
                         for x in range(self.width)
                     ]
                 )
@@ -1086,6 +1218,12 @@ class Game:
         self.drawTurnInfo()
 
     def get_actions_from_pygame(self):
+        """pygame renderから行動を入力
+
+        Returns:
+            list[int]: 行動のリスト
+        """
+
         def nonAllowedMovements(x, y, directions):
             coordinates = np.round(
                 np.array(
@@ -1450,10 +1588,14 @@ class Game:
         pygame.quit()
 
     def get_actions_from_cli(self):
-        """コンソールから行動を入力"""
+        """コンソールから行動を入力
+
+        Returns:
+            list[int]: 行動のリスト
+        """
         [print(f"{i:2}: {action}") for i, action in enumerate(self.ACTIONS)]
         print(
-            f"input team {self.current_team} actions (need {self.worker_count} input) : "
+            f"input team {self.current_team} actions (need {self.worker_count} input): "
         )
         actions = [int(input()) for _ in range(self.worker_count)]
         return actions
@@ -1463,6 +1605,9 @@ class Game:
 
         Args:
             controller (str, optional): 操作入力方法("cli", "pygame"). Defaults to None.
+
+        Returns:
+            list[int]: 行動のリスト
         """
         if controller == "pygame":
             while True:
@@ -1488,7 +1633,11 @@ class Game:
         return actions
 
     def random_act(self):
-        """行動可能な範囲でランダムな行動を返す"""
+        """行動可能な範囲でランダムな行動を返す
+
+        Returns:
+            list[int]: 行動のリスト
+        """
         [worker.turn_init() for worker in self.workers[self.current_team]]
         self.worker_positions = [
             worker.get_coordinate() for worker in self.workers[self.current_team]
@@ -1523,32 +1672,69 @@ class Game:
 
         Args:
             worker (Worker): 職人
+
+        Returns:
+            int: 行動
         """
         worker.turn_init()
-        actionable = []
-        group = "break"
-
-        for action in reversed(self.ACTIONS):
-            if group != action.split("_")[0] and len(actionable):
-                break
-            group = action.split("_")[0]
-            if self.is_actionable(worker, action, smart=True, smart_move=True):
-                actionable.append(self.ACTIONS.index(action))
-        if len(actionable) == 0:
-            for action in self.ACTIONS:
-                if self.is_actionable(worker, action, smart=True, smart_move=False):
-                    actionable.append(self.ACTIONS.index(action))
-
-        if len(actionable) > 0:
-            return random.choice(actionable)
-        else:
-            return self.ACTIONS.index("stay")
+        actionable = defaultdict(list)
+        action_priority = (
+            "break_opponent",
+            "build_more_territory",
+            "move_target",
+            "break_more_territory",
+            "build_outside",
+            "move_expand",
+            "build_inside",
+            "move_around",
+            "move_any",
+            "move",
+        )
+        for action in self.ACTIONS:
+            position = worker.get_coordinate()
+            direction = self.get_direction(self.ACTIONS.index(action))
+            act_pos = (np.array(position) + np.array(direction)).astype(int)
+            if "break" in action:
+                if self.is_breakable(worker, *act_pos, mode="opponent"):
+                    actionable["break_opponent"].append(self.ACTIONS.index(action))
+                if self.is_breakable(worker, *act_pos, mode="both"):
+                    actionable["break_more_territory"].append(
+                        self.ACTIONS.index(action)
+                    )
+            elif "build" in action:
+                if self.is_buildable(worker, *act_pos, mode="more"):
+                    actionable["build_more_territory"].append(
+                        self.ACTIONS.index(action)
+                    )
+                if self.is_buildable(worker, *act_pos, mode="outside"):
+                    actionable["build_outside"].append(self.ACTIONS.index(action))
+                if self.is_buildable(worker, *act_pos, mode="inside"):
+                    actionable["build_inside"].append(self.ACTIONS.index(action))
+            elif "move" in action:
+                if worker.target and self.is_movable(worker, *act_pos, mode="target"):
+                    actionable["move_target"].append(self.ACTIONS.index(action))
+                if self.is_movable(worker, *act_pos, mode="expand"):
+                    actionable["move_expand"].append(self.ACTIONS.index(action))
+                if self.is_movable(worker, *act_pos, mode="around"):
+                    actionable["move_around"].append(self.ACTIONS.index(action))
+                if self.is_movable(worker, *act_pos, mode="any"):
+                    actionable["move_any"].append(self.ACTIONS.index(action))
+                if self.is_movable(worker, *act_pos):
+                    actionable["move"].append(self.ACTIONS.index(action))
+        for mode in action_priority:
+            actions = actionable.get(mode)
+            if actions:
+                return random.choice(actions)
+        return self.ACTIONS.index("stay")
 
     def get_random_actions(self, team: str = None):
         """有効な行動をランダムで返す
 
         Args:
             team (str, optional): チームを指定. Defaults to None.
+
+        Returns:
+            list[int]: 行動のリスト
         """
         team = team if team is not None else self.current_team
         [worker.turn_init() for worker in self.workers[team]]
@@ -1571,6 +1757,9 @@ class Game:
             actions (list[int]): 行動のリスト
             team (str, optional): チームを指定. Defaults to None.
             stay (bool, optional): 待機を許容するか. Defaults to False.
+
+        Returns:
+            list[int]: 行動のリスト
         """
         team = team if team is not None else self.current_team
         [worker.turn_init() for worker in self.workers[team]]
@@ -1579,7 +1768,7 @@ class Game:
         ]
         for i, (worker, action) in enumerate(zip(self.workers[team], actions)):
             if not self.is_actionable(
-                worker, self.ACTIONS[action], stay=stay, smart=True
+                worker, self.ACTIONS[action], stay=stay, smart=True, smart_move=True
             ):
                 actions[i] = self.get_random_action(worker)
                 self.replace_count += 1
@@ -1605,6 +1794,9 @@ class Game:
             x (int): x座標
             side_length (int, optional): 取得領域. Defaults to 5.
             raw (bool, optional): Falseなら職人の層を結合. Defaults to False.
+
+        Returns:
+            np.ndarray: 取得した盤面
         """
         if side_length % 2 == 0:
             raise ValueError("need to input an odd number")
@@ -1625,6 +1817,9 @@ class Game:
 
         Args:
             board (ndarray): 盤面
+
+        Returns:
+            np.ndarray: 結合した盤面
         """
         a = np.sum(
             [
@@ -1654,10 +1849,14 @@ class Game:
 
         Args:
             side_length (int, optional): 1辺の長さ(奇数で指定). Defaults to 3.
-            team (str, optional): チーム名("A" or "B") 未指定で現在のチーム. Defaults to None.
+            team (str, optional): チーム名("A" or "B") 未指定で現在のチーム.
+                Defaults to None.
 
         Returns:
             list[np.ndarray]: 職人の周囲
+
+        Returns:
+            np.ndarray: 取得した盤面
         """
         if team is None:
             team = self.current_team
@@ -1777,7 +1976,8 @@ class Game:
         assert self.id == data["id"], f"self.id:{self.id}, data['id']:{data['id']}"
         assert (
             self.worker_count == data["board"]["mason"]
-        ), f"self.worker_count:{self.worker_count}, data['board']['mason']:{data['board']['mason']}"
+        ), f"""self.worker_count:{self.worker_count}, \
+            data['board']['mason']:{data['board']['mason']}"""
         assert (
             self.turn - 1 == data["turn"]
         ), f"self.turn:{self.turn}, data['turn']:{data['turn']}"
@@ -1840,6 +2040,9 @@ class Game:
 
         Args:
             actions (list[int]): 行動のリスト
+
+        Returns:
+            dict: 送信用データ
         """
 
         def get_type(action: int):

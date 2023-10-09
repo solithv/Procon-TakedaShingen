@@ -9,7 +9,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 token = os.getenv("TOKEN")
-teams = [{"name": "武田進言", "token": token}, {"name": "相手チーム", "token": "dummy-token"}]
+teams = [
+    {"name": "武田進言", "token": token},
+    {"name": "相手チーム", "token": "dummy-token"},
+]
 turns = {11: 30, 13: 54, 15: 80, 17: 100, 21: 150, 25: 200}
 seconds = {11: 3, 13: 4, 15: 6, 17: 8, 21: 11, 25: 15}
 bonus = {"wall": 10, "territory": 30, "castle": 100}

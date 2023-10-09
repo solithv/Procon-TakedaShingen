@@ -7,7 +7,7 @@ from Utils import Annotator
 def main():
     output_dir = "./dataset"
     csv_dir = "./field_data"
-    filename = "data-adi-202309201.dat"
+    filename = "data.dat"
     # random: ランダム
     # smart: 強ランダム
     # human: 手動

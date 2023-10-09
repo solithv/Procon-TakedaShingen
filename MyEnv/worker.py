@@ -4,11 +4,12 @@ class Worker:
     def __init__(self, name, y, x):
         self.name = name
         self.team = name[-2]
-        self.num = name[-1]
+        self.num = int(name[-1])
         self.opponent_team = self.TEAMS[1 - self.TEAMS.index(self.team)]
         self.y = y
         self.x = x
         self.is_action = False
+        self.target = []
         self.action_log = []
 
     def stay(self):
