@@ -1587,14 +1587,11 @@ class Game:
         # 東西南北に池の境界を塞げるところがあったら塞ぐ
         boundaryMap = self.board[self.CELL.index("pond_boundary")] + self.board[self.CELL.index("rampart_A")] * -1
         for workerIndex, workerPosition in enumerate(self.worker_positions):
-            # print(f"\nworkerIndex: {workerIndex}\n(x, y) = {workerPosition}")
             for direction in self.DIRECTIONS:
                 workerDirection = self.DIRECTIONS[direction] + workerPosition
-                # print(f"    {direction} {workerDirection} boundary = {boundaryMap[*workerDirection]}")
                 if boundaryMap[*workerDirection] == 1:
-                    # print("build_" + direction)
-                    # print(workerIndex, self.ACTIONS.index("build_" + direction))
                     actions[workerIndex] = self.ACTIONS.index("build_" + direction)
+                    
         return actions
 
     def get_around(
