@@ -29,6 +29,7 @@ class Game:
         "rampart_B",
         "castle",
         "pond",
+        "pond_boundary",
         *[f"worker_A{i}" for i in range(WORKER_MAX)],
         *[f"worker_B{i}" for i in range(WORKER_MAX)],
     )
@@ -93,6 +94,7 @@ class Game:
     SKY = (127, 176, 255)
     PINK = (255, 127, 127)
     PURPLE = (128, 0, 128)
+    TURQUOISE = (43, 237, 234)
 
     def __init__(
         self,
@@ -164,7 +166,7 @@ class Game:
         """
         池の境界を検出し、boardにレイヤーを追加する
         """
-        targetLayer = board[8]
+        targetLayer = board[self.CELL.index("pond")]
         requiredPattern = np.array(
             # patternOne
             [
@@ -172,7 +174,7 @@ class Game:
                 [0, 1]
             ]
         )
-        boundaryMap = np.full((25, 25), -1)
+        boundaryMap = np.full((self.FIELD_MAX, self.FIELD_MAX), -1)
         boundaryMap[0:self.width, 0:self.width] = 0
         for i in range(self.width - 1):
             for j in range(self.width - 1):
@@ -184,9 +186,10 @@ class Game:
                 elif patternTwo:
                     boundaryMap[i, j] = 1
                     boundaryMap[i + 1, j + 1] = 1
-        self.board = np.concatenate([self.board, [boundaryMap]])
+        self.board[self.CELL.index("pond_boundary")] = boundaryMap
 
-        print(self.board[-1])
+        # print(self.board[self.CELL.index("pond_boundary")])
+        # print(boundaryMap)
         
     def load_from_csv(self, path: Union[str, list[str]]):
         """
@@ -1056,7 +1059,6 @@ class Game:
         """
         描画を行う
         """
-
         view = [
             [
                 [
@@ -1141,16 +1143,22 @@ class Game:
                     territoryBLayer = self.compile_layers(
                         self.board, "territory_B", one_hot=True
                     )
+                    pondBoundaryLayer = self.compile_layers(
+                        self.board, "pond_boundary", one_hot=True
+                    )
                     openTerritoryALayer = self.compile_layers(
                         self.board, "open_territory_A", one_hot=True
                     )
                     openTerritoryBLayer = self.compile_layers(
                         self.board, "open_territory_B", one_hot=True
                     )
+                    print(self.board[self.CELL.index("pond_boundary")])
                     for i in range(self.height):
                         for j in range(self.width):
                             if territoryALayer[i][j] == territoryBLayer[i][j] == 1:
                                 color = self.PURPLE
+                            elif pondBoundaryLayer[i][j] == 1:
+                                color = self.TURQUOISE
                             elif territoryALayer[i][j] == 1:
                                 color = self.RED
                             elif territoryBLayer[i][j] == 1:
@@ -1575,6 +1583,18 @@ class Game:
             ):
                 actions[i] = self.get_random_action(worker)
                 self.replace_count += 1
+ 
+        # 東西南北に池の境界を塞げるところがあったら塞ぐ
+        boundaryMap = self.board[self.CELL.index("pond_boundary")]
+        for workerIndex, workerPosition in enumerate(self.worker_positions):
+            # print(f"\nworkerIndex: {workerIndex}\n(x, y) = {workerPosition}")
+            for direction in self.DIRECTIONS:
+                workerDirection = self.DIRECTIONS[direction] + workerPosition
+                # print(f"    {direction} {workerDirection} boundary = {boundaryMap[*workerDirection]}")
+                if boundaryMap[*workerDirection] == 1:
+                    # print("build_" + direction)
+                    # print(workerIndex, self.ACTIONS.index("build_" + direction))
+                    actions[workerIndex] = self.ACTIONS.index("build_" + direction)
         return actions
 
     def get_around(

@@ -27,10 +27,8 @@ def main():
         # env.print_around(env.get_around_workers(side_length=5))
         if env.current_team == "A":
             actions = env.get_random_actions()
+            actions = env.check_actions(actions)
             actions = [actions[0], 0, 0, 0, 0, 0]
-            # actions = nn.predict(env.get_around_workers(5))
-            # print(actions)
-            # actions = env.check_actions(actions)
             # print(env.ACTIONS[actions[0]])
         else:
             # actions = env.get_random_actions()
