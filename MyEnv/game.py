@@ -541,6 +541,14 @@ class Game:
         return np.pi < (center_angle - target_angle) % (2 * np.pi) * 2 < 3 * np.pi
 
     def get_expand_move(self, worker: Worker):
+        """陣地を拡張するように移動する候補を返す
+
+        Args:
+            worker (Worker): 職人
+
+        Returns:
+            list[int]: 行動のリスト
+        """
         actionable = []
         around = self.get_around(self.board, *worker.get_coordinate(), side_length=3)
         compiled: np.ndarray = np.sum(
@@ -585,6 +593,15 @@ class Game:
         return actionable
 
     def get_target_move(self, worker: Worker):
+        """目標地点に向かう行動の候補を返す
+
+        Args:
+            worker (Worker): 職人
+
+        Returns:
+            list[int]: 行動のリスト
+        """
+
         def get_action_direction(angle, split=8):
             return int(np.round(angle * split / (2 * np.pi))) % split + 1
 
