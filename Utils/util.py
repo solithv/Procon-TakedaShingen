@@ -17,7 +17,8 @@ class Util:
         Args:
             input_zip_file (str): 分割するzipファイルのパス
             output_dir (str): 出力先のパス. Defaults to "./".
-            chunk_size (int, optional): 1ファイル当たりのサイズ. Defaults to 100*(1024**2).
+            chunk_size (int, optional): 1ファイル当たりのサイズ.
+                Defaults to 100*(1024**2).
         """
         input_zip_file: Path = Path(input_zip_file)
         output_dir: Path = Path(output_dir)
@@ -46,7 +47,8 @@ class Util:
             input (Union[str, Iterable[str]]): 圧縮するファイル・フォルダ
             output_name (str, optional): 出力ファイル名. Defaults to None.
             output_dir (str, optional): 出力先のパス. Defaults to "./".
-            chunk_size (int, optional): 1ファイル当たりのサイズ. Defaults to 100*(1024**2).
+            chunk_size (int, optional): 1ファイル当たりのサイズ.
+                Defaults to 100*(1024**2).
             delete (bool): 分割した後zipファイルを削除するか. Defaults to True.
         """
         output_dir: Path = Path(output_dir)
@@ -122,7 +124,8 @@ class Util:
         Args:
             input_dir (str): 入力ファイルのパス
             basename (str): zipファイルのファイル名. Defaults to None.
-            output_dir (str, optional): 出力先のパス Noneなら入力ファイルのパスに出力. Defaults to None.
+            output_dir (str, optional): 出力先のパス Noneなら入力ファイルのパスに出力.
+                Defaults to None.
             delete (bool): 結合したzipファイルを展開後削除するか. Defaults to True.
         """
         input_dir: Path = Path(input_dir)
