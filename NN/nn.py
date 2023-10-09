@@ -123,7 +123,8 @@ class NNModel:
         Args:
             model_dir (str): モデルの保存先
             model_name (str): モデルの保存名
-            from_zip (bool, optional): 分割zipファイルからの読み込みを優先. Defaults to True.
+            from_zip (bool, optional): 分割zipファイルからの読み込みを優先.
+                Defaults to True.
         """
         model_dir: Path = Path(model_dir)
         model_name: Path = model_name

@@ -1,7 +1,8 @@
 import glob
 
 import MyEnv
-from NN import NNModel
+
+# from NN import NNModel
 
 
 def main():
@@ -14,10 +15,10 @@ def main():
         use_pyautogui=True,
     )
 
-    nn = NNModel()
-    nn.load_model(model_path, model_name)
-    # nn.make_model(5)
-    nn.model.summary()
+    # nn = NNModel()
+    # nn.load_model(model_path, model_name)
+    # # nn.make_model(5)
+    # nn.model.summary()
 
     observation = env.reset()
 
@@ -26,11 +27,11 @@ def main():
         env.render()
         # env.print_around(env.get_around_workers(side_length=5))
         if env.current_team == "A":
-            # actions = env.get_random_actions()
-            actions = nn.predict(env.get_around_workers(5))
-            print(actions)
-            actions = env.check_actions(actions)
-            print(actions)
+            actions = env.get_random_actions()
+            # actions = nn.predict(env.get_around_workers(5))
+            # print(actions)
+            # actions = env.check_actions(actions)
+            # print(actions)
         else:
             actions = env.get_random_actions()
             # actions = env.random_act()
