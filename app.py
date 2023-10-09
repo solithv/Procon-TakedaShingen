@@ -36,10 +36,10 @@ def main():
             actions = env.get_random_actions()
             # actions = env.random_act()
             # actions = env.get_actions("pygame")
-        # print(actions)
+        print(actions)
         observation, reward, terminated, truncated, info = env.step(actions)
         print(
-            f"turn:{info['turn']}, score_A:{info['score_A']}, score_B:{info['score_B']}"
+            f"turn:{info['turn']}, team:{info['current_team']}, score_A:{info['score_A']}, score_B:{info['score_B']}"
         )
     print("game end")
     print(f"{env.replace_count} action replaced")
