@@ -7,7 +7,7 @@ from Utils import Annotator
 def main():
     output_dir = "./dataset"
     csv_dir = "./field_data"
-    filename = "data.dat"
+    filename = "datami2.dat"
     # random: ランダム
     # smart: 強ランダム
     # human: 手動
@@ -20,9 +20,9 @@ def main():
         glob.glob(os.path.join(csv_dir, "*.csv")),
         output_dir,
         filename,
-        size=5,
+        size=7,
         max_steps=max_steps,
-        use_pyautogui=False,
+        use_pyautogui=True,
     )
     for _ in range(1):
         annotator.reset()
