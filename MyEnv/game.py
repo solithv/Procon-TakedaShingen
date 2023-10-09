@@ -327,7 +327,7 @@ class Game:
         return result
 
     def is_movable(
-        self, worker: Worker, y: int, x: int, mode: str = None, lock_length: int = 5
+        self, worker: Worker, y: int, x: int, mode: str = None, lock_length: int = 10
     ):
         """内部関数
         行動可能判定
@@ -336,7 +336,10 @@ class Game:
             worker (Worker): 職人
             y (int): y座標
             x (int): x座標
-            smart (bool, optional): _description_. Defaults to False.
+            mode (str, optional): 判定モード("target", "around", "expand", "any").
+                Defaults to None.
+            lock_length (int, optional): 過去何ターンの地点に移動しないか.
+                Defaults to 10.
 
         Returns:
             bool: 判定結果
@@ -359,14 +362,10 @@ class Game:
                     worker.target[-1]
                     return False
                 elif mode == "any":
-                    if (
-                        worker.action_log
-                        # and worker.action_log[-1][0] == "move"
-                        and worker.action_log[-1][1] == (y, x)
-                    ):
+                    if worker.action_log and worker.action_log[-1][1] == (y, x):
                         return False
                 else:
-                    for log in worker.action_log[:-lock_length]:
+                    for log in worker.action_log[-lock_length:]:
                         if log[1] == (y, x):
                             return False
                 if mode == "expand":
@@ -396,7 +395,7 @@ class Game:
             worker (Worker): 職人
             y (int): y座標
             x (int): x座標
-            mode (str, optional): 判定モード("more","outside","inside").
+            mode (str, optional): 判定モード("more", "outside", "inside").
                 Defaults to None.
 
         Returns:
@@ -420,28 +419,24 @@ class Game:
                     == 1
                 ):
                     return False
-                result = True
                 territory = copy.deepcopy(
                     self.board[self.CELL.index(f"rampart_{worker.team}")]
                 )
                 territory[y, x] = 1
                 new_territory = self.fill_area(territory).sum()
+                current_territory = self.board[
+                    self.CELL.index(f"territory_{worker.team}")
+                ].sum()
                 if mode == "outside":
-                    result = (
-                        new_territory
-                        >= self.board[self.CELL.index(f"territory_{worker.team}")].sum()
-                    ) and not self.is_inside(worker, y, x)
-                elif mode == "inside":
-                    result = (
-                        new_territory
-                        >= self.board[self.CELL.index(f"territory_{worker.team}")].sum()
-                    ) and self.is_inside(worker, y, x)
-                elif mode == "more":
-                    result = (
-                        new_territory
-                        > self.board[self.CELL.index(f"territory_{worker.team}")].sum()
+                    return (new_territory >= current_territory) and not self.is_inside(
+                        worker, y, x
                     )
-                return result
+                elif mode == "inside":
+                    return (new_territory >= current_territory) and self.is_inside(
+                        worker, y, x
+                    )
+                elif mode == "more":
+                    return new_territory > current_territory
             return True
         else:
             return False
@@ -466,28 +461,25 @@ class Game:
             and self.compile_layers(self.board, "rampart_A", "rampart_B")[y, x]
         ):
             if mode is not None:
-                result = True
                 if mode == "opponent":
-                    result = (
+                    return (
                         self.board[
                             self.CELL.index(f"rampart_{worker.opponent_team}"), y, x
                         ]
                         == 1
                     )
                 elif mode == "both":
-                    result = False
                     if self.board[self.CELL.index(f"rampart_{worker.team}"), y, x] == 1:
                         territory = copy.deepcopy(
                             self.board[self.CELL.index(f"rampart_{worker.team}")]
                         )
                         territory[y, x] = 0
-                        result = (
+                        return (
                             self.fill_area(territory).sum()
                             > self.board[
                                 self.CELL.index(f"territory_{worker.team}")
                             ].sum()
                         )
-                return result
             return True
         else:
             return False
@@ -1643,10 +1635,9 @@ class Game:
             "move_target",
             "break_more_territory",
             "build_outside",
-            "move_expand",
             "build_inside",
+            "move_expand",
             "move_around",
-            "move_any",
             "move",
         )
         for action in self.ACTIONS:
@@ -1677,12 +1668,12 @@ class Game:
                 if self.is_movable(worker, *act_pos, mode="around"):
                     actionable["move_around"].append(self.ACTIONS.index(action))
                 if self.is_movable(worker, *act_pos, mode="any"):
-                    actionable["move_any"].append(self.ACTIONS.index(action))
-                if self.is_movable(worker, *act_pos):
                     actionable["move"].append(self.ACTIONS.index(action))
         for mode in action_priority:
             actions = actionable.get(mode)
             if actions:
+                if "move" in mode and "expand" not in mode:
+                    print(worker.name, mode, actions)
                 return random.choice(actions)
         return self.ACTIONS.index("stay")
 
@@ -1925,8 +1916,8 @@ class Game:
         assert self.id == data["id"], f"self.id:{self.id}, data['id']:{data['id']}"
         assert (
             self.worker_count == data["board"]["mason"]
-        ), f"""self.worker_count:{self.worker_count}, \
-            data['board']['mason']:{data['board']['mason']}"""
+        ), f"self.worker_count:{self.worker_count}, \
+            data['board']['mason']:{data['board']['mason']}"
         assert (
             self.turn - 1 == data["turn"]
         ), f"self.turn:{self.turn}, data['turn']:{data['turn']}"
