@@ -81,6 +81,7 @@ class Game:
         "rampart_B": "Rb",
         "worker_A": "Wa",
         "worker_B": "Wb",
+        "pond_boundary": "PB",
         "outside": "X",
     }
     turns = {11: 30, 13: 54, 15: 80, 17: 100, 21: 150, 25: 200}
@@ -395,7 +396,7 @@ class Game:
                         return False
                 else:
                     for log in worker.action_log[-lock_length:]:
-                        if log[1] == (y, x):
+                        if log[0] == "move" and log[2] == (y, x):
                             return False
                 if mode == "around":
                     field = self.get_around(self.board, y, x, side_length=3)
@@ -554,28 +555,19 @@ class Game:
         test_worker.update_coordinate(y, x)
         pos = np.array([y, x], dtype=np.int8)
         result = False
-        if self.is_movable(worker, y, x, mode="any"):
+        if self.is_movable(worker, y, x):
             for direction in self.DIRECTIONS.values():
                 target_y, target_x = pos + direction
-                if self.is_boundary_build(test_worker, target_y, target_x):
-                    result = True
+                if (
+                    0 <= target_y < self.height
+                    and 0 <= target_x < self.width
+                    and self.board[self.CELL.index("pond_boundary"), target_y, target_x]
+                    == 1
+                    and self.board[self.CELL.index("castle"), target_y, target_x] == 0
+                ):
+                    if self.is_boundary_build(test_worker, target_y, target_x):
+                        result = True
         return result
-
-        # if (
-        #     not worker.is_action
-        #     and 0 <= y < self.height
-        #     and 0 <= x < self.width
-        # ):
-        #     if self.board[self.CELL.index("pond_boundary"), y, x] == 1:
-        #         return self.is_buildable(worker, y, x, mode="both")
-        # boundaryMap = self.board[self.CELL.index("pond_boundary")] + self.board[self.CELL.index("rampart_A")] * -1
-        # for direction in self.DIRECTIONS:
-        #     workerDirection = self.DIRECTIONS[direction] + workerPosition
-        #     if boundaryMap[*workerDirection] == 1:
-        #         pass
-        #         # actions[workerIndex] = self.ACTIONS.index("build_" + direction)
-        # return 0
-        # return False
 
     def is_actionable(
         self,
@@ -1121,11 +1113,12 @@ class Game:
         self.turn += 1
         return self.get_observation(), reward, terminated, truncated, info
 
-    def render(self, *args, **kwargs):
+    def render(self, render_mode=None, *args, **kwargs):
         """描画を行う"""
-        if self.render_mode == "human":
+        render_mode = self.render_mode if render_mode is None else render_mode
+        if render_mode == "human":
             return self.render_rgb_array(*args, **kwargs)
-        elif self.render_mode == "ansi":
+        elif render_mode == "ansi":
             return self.render_terminal(*args, **kwargs)
 
     def render_terminal(self):
@@ -1137,19 +1130,16 @@ class Game:
         )
         cell_num = icon_base * item_num + (item_num - 1)
         for y in range(self.height):
-            view += (
-                "|".join(
-                    [
-                        f"""{','.join([
-                                value for i, item in enumerate(self.board[:,y,x])
-                                if item for key,value in self.ICONS.items()
-                                if key in self.CELL[i]
-                            ]):^{cell_num}}"""
-                        for x in range(self.width)
-                    ]
-                )
-                + "\n"
-            )
+            line = []
+            for x in range(self.width):
+                cell = []
+                for key, value in self.ICONS.items():
+                    for i, item in enumerate(self.board[:, y, x]):
+                        if item:
+                            if re.match(key + r"\d?$", self.CELL[i]):
+                                cell.append(value)
+                line.append(f'{",".join(cell):^{cell_num}}')
+            view += "|".join(line) + "\n"
             if y < self.height - 1:
                 view += "-" * (self.width * cell_num + self.width - 1) + "\n"
         print(view, end="")
@@ -1828,9 +1818,9 @@ class Game:
             "build_more_territory",
             "move_target",
             "break_more_territory",
+            "move_boundary",
             "build_outside",
             "build_inside",
-            "move_boundary",
             "move_castle",
             *[f"move_expand_{i+1}" for i in range(1)],
             "move_around",
@@ -1880,7 +1870,26 @@ class Game:
         for mode in action_priority:
             actions = actionable.get(mode)
             if actions:
-                return random.choice(actions)
+                if worker.action_log:
+                    for action_ in random.sample(actions, len(actions)):
+                        print(
+                            (
+                                self.ACTIONS[action_].split("_")[0],
+                                worker.get_coordinate(),
+                                tuple(self.get_action_position(worker, action_)),
+                            )
+                        )
+                        if worker.action_log[-1] != (
+                            self.ACTIONS[action_].split("_")[0],
+                            worker.get_coordinate(),
+                            tuple(self.get_action_position(worker, action_)),
+                        ):
+                            print("debug")
+                            return action_
+                        else:
+                            print("same")
+                else:
+                    return random.choice(actions)
         return self.ACTIONS.index("stay")
 
     def get_random_actions(self, team: str = None):

@@ -20,7 +20,9 @@ def main():
     # # nn.make_model(5)
     # nn.model.summary()
 
-    observation = env.reset()
+    observation, info = env.reset()
+    print(info)
+    env.render("ansi")
 
     terminated, truncated = [False] * 2
     while not terminated and not truncated:
