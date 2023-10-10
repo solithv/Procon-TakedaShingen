@@ -524,28 +524,22 @@ class Game:
         else:
             return False
 
-    def is_next_to_boundary(self, worker: Worker, any: bool = False):
+    def is_next_to_boundary(self, worker: Worker, y: int, x: int):
         """内部関数
-        東西南北に池の境界を塞げるマスがあるか判定
+        東西南北を指定し、池の境界を塞げるマスであるか判定
         
         Args:
             worker (Worker): 職人
-            any (bool): `True`にすると返される配列に`any()`がかかる Default to False.
+            y (int): y座標
+            x (int): x座標
             
         Return:
-            ndarray (bool):
-                `DIRECTIONS`の順番で判定を
-                `[True, False, False, False]`
-                のように返す
+            bool: 判定結果
         """
-        print(worker.get_coordinate())
-        boundaryMap = self.board[self.CELL.index("pond_boundary")] + self.board[self.CELL.index("rampart_A")] * -1
-        for direction in self.DIRECTIONS:
-            workerDirection = self.DIRECTIONS[direction] + workerPosition
-            if boundaryMap[*workerDirection] == 1:
-                pass
-                # actions[workerIndex] = self.ACTIONS.index("build_" + direction)    
-        return 0
+        if self.board[self.CELL.index("pond_boundary"), y, x] == 1:
+            return self.is_buildable(worker, y, x)
+
+        return False
     
     def is_actionable(
         self,
@@ -1700,6 +1694,7 @@ class Game:
         worker.turn_init()
         actionable = defaultdict(list)
         action_priority = (
+            "fill_pond_boundary",
             "break_opponent",
             "build_more_territory",
             "move_target",
@@ -1723,6 +1718,8 @@ class Game:
                         self.ACTIONS.index(action)
                     )
             elif "build" in action:
+                if self.is_next_to_boundary(worker, *act_pos):
+                    actionable["fill_pond_boudary"].append(self.ACTIONS.index(action))
                 if self.is_buildable(worker, *act_pos, mode="more"):
                     actionable["build_more_territory"].append(
                         self.ACTIONS.index(action)
@@ -1765,7 +1762,7 @@ class Game:
         act = []
         for worker in self.workers[team]:
             act.append(self.get_random_action(worker))
-        self.is_next_to_boundary(self.workers[team][0])
+            
         while self.WORKER_MAX > len(act):
             act.append(self.ACTIONS.index("stay"))
         
