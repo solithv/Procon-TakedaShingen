@@ -1884,10 +1884,7 @@ class Game:
                             worker.get_coordinate(),
                             tuple(self.get_action_position(worker, action_)),
                         ):
-                            print("debug")
                             return action_
-                        else:
-                            print("same")
                 else:
                     return random.choice(actions)
         return self.ACTIONS.index("stay")
