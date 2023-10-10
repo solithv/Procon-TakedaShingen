@@ -3,7 +3,7 @@ import csv
 import os
 import random
 import re
-from collections import defaultdict
+from collections import defaultdict, deque
 from typing import Any, Optional, Union
 
 import numpy as np
@@ -202,7 +202,7 @@ class Game:
                 elif patternTwo:
                     boundaryMap[i, j] = 1
                     boundaryMap[i + 1, j + 1] = 1
-        self.board[self.CELL.index("pond_boundary")] = boundaryMap
+        return boundaryMap
 
     def load_from_csv(self, path: Union[str, list[str]]):
         """
@@ -251,7 +251,6 @@ class Game:
         assert a_count == b_count, "チーム間の職人数が不一致"
         self.worker_count = a_count
         self.board = self.update_blank(self.board)
-        self.find_pond_boundary(self.board)
 
         return name
 
@@ -299,6 +298,9 @@ class Game:
         if self.render_mode == "human":
             self.reset_render()
 
+        self.board[self.CELL.index("pond_boundary")] = self.find_pond_boundary(
+            self.board
+        )
         self.board = self.update_blank(self.board)
 
         self.replace_count = 0
@@ -783,11 +785,11 @@ class Game:
             workers (list[tuple[Worker, int]]): 職人と行動のリスト
         """
         self.worker_positions = [worker.get_coordinate() for worker, _ in workers]
-        workers = self.check_stack_workers(workers)
+        workers: deque[tuple[Worker, int]] = deque(self.check_stack_workers(workers))
         if not workers:
             return
         for _ in range(self.worker_count):
-            worker, action = workers.pop(0)
+            worker, action = workers.popleft()
             y, x = self.get_action_position(worker, action)
             if "stay" in self.ACTIONS[action]:
                 worker.stay()
@@ -1828,6 +1830,9 @@ class Game:
             "move_last",
             "move",
         )
+        if worker.plan:
+            print(worker.name, worker.plan)
+            return worker.plan.popleft()
         for index, action in enumerate(self.ACTIONS):
             act_pos = self.get_action_position(worker, index)
             if "break" in action:
@@ -1872,17 +1877,14 @@ class Game:
             if actions:
                 if worker.action_log:
                     for action_ in random.sample(actions, len(actions)):
-                        print(
-                            (
-                                self.ACTIONS[action_].split("_")[0],
-                                worker.get_coordinate(),
-                                tuple(self.get_action_position(worker, action_)),
-                            )
-                        )
-                        if worker.action_log[-1] != (
+                        compare_log = (
                             self.ACTIONS[action_].split("_")[0],
                             worker.get_coordinate(),
                             tuple(self.get_action_position(worker, action_)),
+                        )
+                        if (
+                            worker.action_log[-1] != compare_log
+                            or worker.action_log[-2] != compare_log
                         ):
                             return action_
                 else:
@@ -2109,9 +2111,11 @@ class Game:
             )
         self.board[:, self.height :, :] = -1
         self.board[:, :, self.width :] = -1
-        self.board = self.update_blank(self.board)
-        self.find_pond_boundary(self.board)
+        self.board[self.CELL.index("pond_boundary")] = self.find_pond_boundary(
+            self.board
+        )
         self.update_territory()
+        self.board = self.update_blank(self.board)
 
         self.max_turn = (
             self.max_steps if self.max_steps is not None else self.turns[self.width]

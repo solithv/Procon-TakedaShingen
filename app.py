@@ -22,12 +22,10 @@ def main():
 
     observation, info = env.reset()
     print(info)
-    env.render("ansi")
 
     terminated, truncated = [False] * 2
     while not terminated and not truncated:
         env.render()
-        # env.print_around(env.get_around_workers(side_length=5))
         if env.current_team == "A":
             actions = env.get_random_actions()
             actions = env.check_actions(actions)
@@ -38,7 +36,7 @@ def main():
             # actions = env.random_act()
             # actions = [0, 0, 0, 0, 0, 0]
             # actions = env.get_actions("pygame")
-        print(actions)
+        # print(actions)
         observation, reward, terminated, truncated, info = env.step(actions)
         print(
             f"turn:{info['turn']}, team:{info['current_team']}, "
