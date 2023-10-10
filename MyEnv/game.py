@@ -493,6 +493,8 @@ class Game:
             and self.compile_layers(self.board, "rampart_A", "rampart_B")[y, x]
         ):
             if mode is not None:
+                if self.board[self.CELL.index("pond_boundary"), y, x] == 1:
+                    return False
                 if mode == "opponent":
                     return (
                         self.board[
@@ -528,8 +530,13 @@ class Game:
         Return:
             bool: 判定結果
         """
-        if self.board[self.CELL.index("pond_boundary"), y, x] == 1:
-            return self.is_buildable(worker, y, x)
+        if (
+            not worker.is_action
+            and 0 <= y < self.height
+            and 0 <= x < self.width
+        ):
+            if self.board[self.CELL.index("pond_boundary"), y, x] == 1:
+                return self.is_buildable(worker, y, x)
 
         return False
     
@@ -600,27 +607,27 @@ class Game:
         """
         actionable = []
         around = self.get_around(self.board, *worker.get_coordinate(), side_length=3)
-        compiled: np.ndarray = np.sum(
-            [
-                around[self.CELL.index(layer)]
-                for layer in (
-                    f"rampart_{worker.team}",
-                    f"territory_{worker.team}",
-                    f"open_territory_{worker.team}",
-                )
-            ],
-            axis=0,
-        )
+        # compiled: np.ndarray = np.sum(
+        #     [
+        #         around[self.CELL.index(layer)]
+        #         for layer in (
+        #             f"rampart_{worker.team}",
+        #             f"territory_{worker.team}",
+        #             f"open_territory_{worker.team}",
+        #         )
+        #     ],
+        #     axis=0,
+        # )
 
-        for index, action in enumerate(self.ACTIONS):
-            if "move" in action:
-                y, x = self.get_direction(index) + 1
-                if compiled[y, x] == 0 and self.is_movable(
-                    worker, *self.get_action_position(worker, index), mode="any"
-                ):
-                    actionable.append(index)
-        if actionable:
-            return actionable
+        # for index, action in enumerate(self.ACTIONS):
+        #     if "move" in action:
+        #         y, x = self.get_direction(index) + 1
+        #         if compiled[y, x] == 0 and self.is_movable(
+        #             worker, *self.get_action_position(worker, index), mode="any"
+        #         ):
+        #             actionable.append(index)
+        # if actionable:
+        #     return actionable
         compiled: np.ndarray = np.sum(
             [
                 around[self.CELL.index(layer)]
@@ -1805,7 +1812,8 @@ class Game:
                     actionable["break_more_territory"].append(index)
             elif "build" in action:
                 if self.is_next_to_boundary(worker, *act_pos):
-                    actionable["fill_pond_boudary"].append(self.ACTIONS.index(action))
+                    print(self.turn, worker.name, act_pos)
+                    actionable["fill_pond_boundary"].append(index)
                 if self.is_buildable(worker, *act_pos, mode="more"):
                     actionable["build_more_territory"].append(index)
                 if self.is_buildable(worker, *act_pos, mode="outside"):
@@ -1828,20 +1836,6 @@ class Game:
         for mode in action_priority:
             actions = actionable.get(mode)
             if actions:
-                if "move" in mode:
-                    if "expand" in mode:
-                        print(worker.name, mode, actions)
-                    elif "around" in mode:
-                        print(worker.name, mode, actions)
-                    elif "any" in mode:
-                        print(worker.name, mode, actions)
-                    elif "last" in mode:
-                        print(worker.name, mode, actions)
-                    elif "target" in mode:
-                        print(worker.name, mode, actions)
-                    else:
-                        print(worker.name, mode, actions)
-
                 return random.choice(actions)
         return self.ACTIONS.index("stay")
 
