@@ -289,7 +289,6 @@ class Game:
             self.max_steps if self.max_steps is not None else self.turns[self.width]
         )
         self.replace_count = 0
-        self.force_replace_count = 0
         self.get_map_name()
         self.board[self.CELL.index("pond_boundary")] = self.load_pond_boundary()
         self.board = self.update_blank(self.board)
@@ -410,7 +409,7 @@ class Game:
                         if (
                             self.board[self.CELL.index("pond_boundary"), y, x] != 1
                             and log[0] == "move"
-                            and log[2] == (y, x)
+                            and (log[1] == (y, x) or log[2] == (y, x))
                         ):
                             return False
                 if not self.is_rampart_move(worker, y, x):
@@ -637,7 +636,7 @@ class Game:
     def is_actionable(
         self,
         worker: Worker,
-        action: str,
+        action: Union[str, int],
         stay: bool = False,
         move_mode: str = None,
         build_mode: str = None,
@@ -648,7 +647,7 @@ class Game:
 
         Args:
             worker (Worker): 職人
-            action (str): 行動名
+            action (Union[str, int]): 行動名
             stay (bool, optional): 待機を許容するか. Defaults to False.
             move_mode (str, optional): 移動判定モード. Defaults to None.
             build_mode (str, optional): 建築判定モード. Defaults to None.
@@ -660,6 +659,8 @@ class Game:
         Returns:
             bool: 判定結果
         """
+        if isinstance(action, int):
+            action = self.ACTIONS[action]
         act_pos = self.get_action_position(worker, action)
         if "break" in action and self.is_breakable(worker, *act_pos, break_mode):
             return True
@@ -709,8 +710,10 @@ class Game:
             layers (tuple[str]): 判定基準レイヤー名
             hot_is_ok (bool, optional): 判定基準レイヤーが1の時を条件とするか.
                 Defaults to False.
-            build_mode (str, optional): 建築判定モード. Defaults to "both".
-            break_mode (str, optional): 破壊判定モード. Defaults to "both".
+            build_mode (str, optional): 建築判定モード Noneで判定しない.
+                Defaults to "both".
+            break_mode (str, optional): 破壊判定モード Noneで判定しない.
+                Defaults to "both".
 
         Returns:
             bool: 判定結果
@@ -1879,6 +1882,8 @@ class Game:
             "move_boundary",
             "build_outside",
             "build_inside",
+            "move_castle_build",
+            "move_obstruction_build",
             "move_castle",
             "move_obstruction",
             "move_expand_1",
@@ -1890,7 +1895,7 @@ class Game:
         )
         if worker.plan:
             action = worker.plan.popleft()
-            if self.is_actionable(worker, action):
+            if self.is_actionable(worker, self.ACTIONS[action]):
                 return action
             else:
                 worker.plan.clear()
@@ -1928,6 +1933,18 @@ class Game:
                     actionable["move_last"].append(index)
                 if self.is_movable(worker, *act_pos):
                     actionable["move"].append(index)
+                if self.is_expand_move(
+                    worker, *act_pos, "castle", hot_is_ok=True, break_mode="opponent"
+                ):
+                    actionable["move_castle_build"].append(index)
+                if self.is_expand_move(
+                    worker,
+                    *act_pos,
+                    f"rampart_{worker.opponent_team}",
+                    hot_is_ok=True,
+                    break_mode="opponent",
+                ):
+                    actionable["move_obstruction_build"].append(index)
                 if self.is_expand_move(worker, *act_pos, "castle", hot_is_ok=True):
                     actionable["move_castle"].append(index)
                 if self.is_expand_move(
@@ -2017,10 +2034,6 @@ class Game:
             ):
                 actions[i] = self.get_random_action(worker)
                 self.replace_count += 1
-        for i, (worker, action) in enumerate(zip(self.workers[team], actions)):
-            if not self.is_actionable(worker, self.ACTIONS[action]):
-                actions[i] = self.get_random_action(worker)
-                self.force_replace_count += 1
 
         return actions
 
@@ -2198,7 +2211,6 @@ class Game:
         self.update_territory()
         self.board = self.update_blank(self.board)
         self.replace_count = 0
-        self.force_replace_count = 0
         self.get_map_name()
         self.board = self.update_blank(self.board)
         self.load_plan()
