@@ -2,7 +2,7 @@ import csv
 import glob
 import pygame
 import numpy as np
-
+from MyEnv.game import Game
 
 class Renderer:
     CELL_SIZE = 50
@@ -54,6 +54,13 @@ class Renderer:
         placement = (j * self.CELL_SIZE, i * self.CELL_SIZE)
         img = pygame.transform.scale(img, self.imageScaler)
         self.windowSurface.blit(img, placement)
+        if j == 0 or i == 0:
+            font = pygame.font.SysFont(None, 30)
+            text = font.render(str(i if j == 0 else j), False, (0, 0, 0))
+            text_rect = text.get_rect(
+                center=(j * self.CELL_SIZE + 10, i * self.CELL_SIZE + 10)
+            )
+            self.windowSurface.blit(text, text_rect)
 
     def captureField(self, field, fileName):
         for i in range(self.fieldHeight):
@@ -77,8 +84,12 @@ class Renderer:
 
 
 if __name__ == "__main__":
-    fieldPaths = glob.glob("./field_data/*.csv")
+    fieldPaths = glob.glob("./field_data/???.csv")
     for fieldPath in fieldPaths:
+        # print(fieldPath)
+        # g = Game()
+        # g.load_from_csv(path=fieldPath)
+        # print(g.board[g.CELL.index("pond")])
         with open(fieldPath) as f:
             field = [row for row in csv.reader(f)]
             renderer = Renderer(fieldWidth=len(field[0]), fieldHeight=len(field))
