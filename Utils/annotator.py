@@ -663,7 +663,8 @@ class Annotator:
         return action
 
     def play_game_annotator(self, enemy=""):
-        observation = self.game.reset()
+        observation, info = self.game.reset()
+        print(f'map: {info.get("csv_name")}')
 
         terminated, truncated = [False] * 2
         while not terminated and not truncated:

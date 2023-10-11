@@ -1,9 +1,11 @@
 import copy
 import csv
 import os
+import pickle
 import random
 import re
 from collections import defaultdict, deque
+from pathlib import Path
 from typing import Any, Optional, Union
 
 import numpy as np
@@ -105,6 +107,7 @@ class Game:
         first_player: Optional[int] = None,
         use_pyautogui: bool = False,
         render_fps: int = None,
+        unique_map_file: str = "./field_data/name_to_map.pkl",
     ):
         """init
 
@@ -137,6 +140,9 @@ class Game:
             self.display_size_x, self.display_size_y = pyautogui.size()
         else:
             self.display_size_x, self.display_size_y = 960, 960
+        self.unique_map: dict[str, np.ndarray] = pickle.load(
+            Path(unique_map_file).open("rb")
+        )
 
     def get_observation(self):
         """内部関数
@@ -217,14 +223,15 @@ class Game:
         """
         if isinstance(path, (list, tuple)):
             path = random.choice(path)
-        size = int(re.sub(r"[\D]", "", os.path.normpath(path).split(os.path.sep)[-1]))
-        name = os.path.normpath(path).split(os.path.sep)[-1].split(".")[0]
+        path: Path = Path(path)
+        size = int(re.sub(r"[\D]", "", path.stem))
+        name = path.stem
         self.board = np.zeros((len(self.CELL), size, size), dtype=np.int8)
         self.workers: defaultdict[str, list[Worker]] = defaultdict(list)
         self.width, self.height = [size] * 2
 
         a_count, b_count = 0, 0
-        with open(path, "r") as f:
+        with path.open() as f:
             reader = csv.reader(f)
             for y, row in enumerate(reader):
                 for x, item in enumerate(row):
@@ -1831,7 +1838,6 @@ class Game:
             "move",
         )
         if worker.plan:
-            print(worker.name, worker.plan)
             return worker.plan.popleft()
         for index, action in enumerate(self.ACTIONS):
             act_pos = self.get_action_position(worker, index)
@@ -2228,3 +2234,13 @@ class Game:
             for action in actions[: self.worker_count]
         ]
         return data
+
+    def load_plan(self):
+        wip = {}
+        for name, pond_map in self.unique_map.items():
+            if np.array_equal(self.board[self.CELL.index("pond")], pond_map):
+                map_name = name
+                break
+
+        for worker in self.workers["A"][: self.worker_count]:
+            worker.plan = deque(wip.get(map_name).get(str(worker.get_coordinate())))
