@@ -5,10 +5,13 @@ import shutil
 import zipfile
 from pathlib import Path
 from typing import Iterable, Union
+import json
 
 import numpy as np
 
 from MyEnv import Game
+
+from .annotator import Annotator
 
 
 class Util:
@@ -181,3 +184,39 @@ class Util:
                             board[y, x] = 0
             pond_fileds[name] = board
         pickle.dump(pond_fileds, (csv_folder / f"{save_name}.pkl").open("wb"))
+
+    def fix_dataset_shape(base_name, dataset_dir="./dataset"):
+        import NN
+
+        du = NN.DatasetUtil()
+
+        dat_file = Path(f"./dataset/{base_name}.dat")
+        zip_file = Path(f"./dataset/{base_name}.zip")
+        zip_file.unlink(True)
+        Util.combine_and_unpack(dataset_dir, base_name)
+        ann = Annotator(
+            csv_paths=None,
+            output_dir=dataset_dir,
+            filename=f"{base_name}.dat",
+            pond_boundary_file=None,
+            preset_file=None,
+        )
+        x = []
+        y = []
+        with dat_file.open() as f:
+            for line in f:
+                feature, target = json.loads(line).values()
+                feature = np.array(feature, dtype=np.int8)
+                if feature.shape[0] == 12:
+                    new_feature = np.concatenate([feature[:-3], feature[-2:]], axis=0)
+                else:
+                    new_feature = feature
+                target = np.array(target, dtype=np.int8)
+                x.append(new_feature)
+                y.append(target)
+        dat_file.unlink(True)
+
+        ann.save_dataset(x, y)
+        ann.finish()
+
+        # du.load_dataset("./dataset")
