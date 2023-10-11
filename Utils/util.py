@@ -1,8 +1,14 @@
+import csv
 import os
+import pickle
 import shutil
 import zipfile
 from pathlib import Path
 from typing import Iterable, Union
+
+import numpy as np
+
+from MyEnv import Game
 
 
 class Util:
@@ -154,13 +160,6 @@ class Util:
                     file.unlink()
 
     def dump_pond_map(csv_folder, save_name):
-        import csv
-        import pickle
-
-        import numpy as np
-
-        from MyEnv import Game
-
         csv_folder: Path = Path(csv_folder)
         assert csv_folder.is_dir()
         pond_fileds = {}
