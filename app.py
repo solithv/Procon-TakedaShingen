@@ -6,14 +6,13 @@ import MyEnv
 
 
 def main():
-    fields = glob.glob("./field_data/B17.csv")
+    fields = glob.glob("./field_data/*C*.csv")
     model_path = "./model"
     model_name = "game"
     env = MyEnv.Game(
         csv_path=fields,
         render_mode="human",
         use_pyautogui=True,
-        # pond_boundary_file=None,
         preset_file=None,
     )
 

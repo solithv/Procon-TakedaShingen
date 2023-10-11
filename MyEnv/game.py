@@ -402,11 +402,21 @@ class Game:
                 if (x == 0 or x == self.width - 1) and (y == 0 or y == self.width - 1):
                     return False
                 if mode == "last":
-                    if worker.action_log and worker.action_log[-1][1] == (y, x):
+                    if (
+                        self.board[self.CELL.index("pond_boundary"), y, x] != 1
+                        and worker.action_log
+                        and worker.action_log[-1][1] == (y, x)
+                        and not self.is_buildable_move(worker, y, x)
+                    ):
                         return False
                 else:
                     for log in worker.action_log[-lock_length:]:
-                        if log[0] == "move" and log[2] == (y, x):
+                        if (
+                            self.board[self.CELL.index("pond_boundary"), y, x] != 1
+                            and log[0] == "move"
+                            and log[2] == (y, x)
+                            and not self.is_buildable_move(worker, y, x)
+                        ):
                             return False
                 if mode == "around":
                     field = self.get_around(self.board, y, x, side_length=3)
@@ -529,7 +539,7 @@ class Game:
             return True
         else:
             return False
-    
+
     def is_boundary_build(self, worker: Worker, y: int, x: int):
         """内部関数
         指定マスが池の境界であり建築できるか判定
@@ -579,6 +589,18 @@ class Game:
                 ):
                     if self.is_boundary_build(test_worker, target_y, target_x):
                         result = True
+        return result
+
+    def is_buildable_move(self, worker: Worker, y: int, x: int):
+        test_worker = copy.deepcopy(worker)
+        test_worker.update_coordinate(y, x)
+        pos = np.array([y, x], dtype=np.int8)
+        result = False
+        if self.is_movable(worker, y, x):
+            for direction in self.DIRECTIONS.values():
+                target_y, target_x = pos + direction
+                if self.is_buildable(test_worker, target_y, target_x, mode="both"):
+                    result = True
         return result
 
     def is_actionable(
@@ -1443,7 +1465,6 @@ class Game:
                     openTerritoryBLayer = self.compile_layers(
                         self.board, "open_territory_B", one_hot=True
                     )
-                    print(self.board[self.CELL.index("pond_boundary")])
                     for i in range(self.height):
                         for j in range(self.width):
                             if territoryALayer[i][j] == territoryBLayer[i][j] == 1:
