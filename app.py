@@ -20,26 +20,27 @@ def main():
     # # nn.make_model(5)
     # nn.model.summary()
 
-    observation = env.reset()
+    observation, info = env.reset()
+    print(info)
 
     terminated, truncated = [False] * 2
     while not terminated and not truncated:
         env.render()
-        # env.print_around(env.get_around_workers(side_length=5))
         if env.current_team == "A":
             actions = env.get_random_actions()
-            # actions = nn.predict(env.get_around_workers(5))
-            # print(actions)
-            # actions = env.check_actions(actions)
-            # print(actions)
+            actions = env.check_actions(actions)
+            # actions = [actions[0], 0, 0, 0, 0, 0]
+            # print(env.ACTIONS[actions[0]])
         else:
             actions = env.get_random_actions()
             # actions = env.random_act()
+            # actions = [0, 0, 0, 0, 0, 0]
             # actions = env.get_actions("pygame")
-        print(actions)
+        # print(actions)
         observation, reward, terminated, truncated, info = env.step(actions)
         print(
-            f"turn:{info['turn']}, team:{info['current_team']}, score_A:{info['score_A']}, score_B:{info['score_B']}"
+            f"turn:{info['turn']}, team:{info['current_team']}, "
+            + f"score_A:{info['score_A']}, score_B:{info['score_B']}"
         )
     print("game end")
     print(f"{env.replace_count} action replaced")

@@ -1,3 +1,6 @@
+from collections import deque
+
+
 class Worker:
     TEAMS = ("A", "B")
 
@@ -9,7 +12,8 @@ class Worker:
         self.y = y
         self.x = x
         self.is_action = False
-        self.target = []
+        self.target = deque()
+        self.plan = deque()
         self.action_log = []
 
     def stay(self):

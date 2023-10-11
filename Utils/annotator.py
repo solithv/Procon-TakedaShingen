@@ -663,7 +663,8 @@ class Annotator:
         return action
 
     def play_game_annotator(self, enemy=""):
-        observation = self.game.reset()
+        observation, info = self.game.reset()
+        print(f'map: {info.get("csv_name")}')
 
         terminated, truncated = [False] * 2
         while not terminated and not truncated:
@@ -689,8 +690,8 @@ class Annotator:
                     actions = self.game.random_act()
             observation, reward, terminated, truncated, info = self.game.step(actions)
             print(
-                f"turn:{info['turn']}, score_A:{info['score_A']}, \
-                    score_B:{info['score_B']}"
+                f"turn:{info['turn']}, score_A:{info['score_A']}, "
+                + f"score_B:{info['score_B']}"
             )
         self.game.end_game_render()
         self.game.close()

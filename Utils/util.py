@@ -152,3 +152,33 @@ class Util:
                 shutil.unpack_archive(file, output_dir)
                 if is_combine.get(basename) and delete:
                     file.unlink()
+
+    def dump_pond_map(csv_folder, save_name):
+        import csv
+        import pickle
+
+        import numpy as np
+
+        from MyEnv import Game
+
+        csv_folder: Path = Path(csv_folder)
+        assert csv_folder.is_dir()
+        pond_fileds = {}
+        for csv_file in sorted(csv_folder.glob("*.csv")):
+            if "inv" in csv_file.stem:
+                continue
+
+            name = csv_file.stem
+            size = Game.FIELD_MAX
+            board = np.full((size, size), -1, dtype=np.int8)
+
+            with csv_file.open() as f:
+                reader = csv.reader(f)
+                for y, row in enumerate(reader):
+                    for x, item in enumerate(row):
+                        if item == "1":
+                            board[y, x] = 1
+                        else:
+                            board[y, x] = 0
+            pond_fileds[name] = board
+        pickle.dump(pond_fileds, (csv_folder / f"{save_name}.pkl").open("wb"))
