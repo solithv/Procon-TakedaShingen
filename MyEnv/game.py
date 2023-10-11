@@ -1826,7 +1826,6 @@ class Game:
         Returns:
             int: 行動
         """
-        print(worker.name)
         worker.turn_init()
         actionable = defaultdict(list)
         action_priority = (
