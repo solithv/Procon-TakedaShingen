@@ -20,12 +20,12 @@ def main():
     # # nn.make_model(5)
     # nn.model.summary()
 
-    observation = env.reset()
+    observation, info = env.reset()
+    print(info)
 
     terminated, truncated = [False] * 2
     while not terminated and not truncated:
         env.render()
-        # env.print_around(env.get_around_workers(side_length=5))
         if env.current_team == "A":
             actions = env.get_random_actions()
             actions = env.check_actions(actions)

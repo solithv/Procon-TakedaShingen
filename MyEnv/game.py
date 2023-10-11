@@ -3,7 +3,7 @@ import csv
 import os
 import random
 import re
-from collections import defaultdict
+from collections import defaultdict, deque
 from typing import Any, Optional, Union
 
 import numpy as np
@@ -55,10 +55,10 @@ class Game:
     )
     DIRECTIONS = {
         # [y, x]
-        "N": np.array([-1, 0]),
-        "E": np.array([0, 1]),
-        "S": np.array([1, 0]),
-        "W": np.array([0, -1]),
+        "N": np.array([-1, 0], dtype=np.int8),
+        "E": np.array([0, 1], dtype=np.int8),
+        "S": np.array([1, 0], dtype=np.int8),
+        "W": np.array([0, -1], dtype=np.int8),
     }
     POST_DIRS = {
         "NW": 1,
@@ -82,6 +82,7 @@ class Game:
         "rampart_B": "Rb",
         "worker_A": "Wa",
         "worker_B": "Wb",
+        "pond_boundary": "PB",
         "outside": "X",
     }
     turns = {11: 30, 13: 54, 15: 80, 17: 100, 21: 150, 25: 200}
@@ -173,37 +174,36 @@ class Game:
         assert self.CELL.index("blank") != len(self.CELL) - 1
         excludingList = ["blank", "pond_boundary"]
         mask = [cell not in excludingList for cell in self.CELL]
-        board[self.CELL.index("blank")] = np.where(
-            board[mask].any(axis=0), 0, 1
-        )
+        board[self.CELL.index("blank")] = np.where(board[mask].any(axis=0), 0, 1)
         board = np.where(np.any(board < 0, axis=0), -1, board)
         return board
 
     def find_pond_boundary(self, board: np.ndarray):
-            """
-            池の境界を検出し、boardのpond_boundaryレイヤーを更新する
-            """
-            targetLayer = board[self.CELL.index("pond")]
-            requiredPattern = np.array(
-                # patternOne
-                [
-                    [1, 0],
-                    [0, 1]
-                ]
-            )
-            boundaryMap = np.full((self.FIELD_MAX, self.FIELD_MAX), -1)
-            boundaryMap[0:self.width, 0:self.width] = 0
-            for i in range(self.width - 1):
-                for j in range(self.width - 1):
-                    patternOne = np.array_equal(targetLayer[i:i+2, j:j+2], requiredPattern)
-                    patternTwo = np.array_equal(targetLayer[i:i+2, j:j+2], requiredPattern[::-1])
-                    if patternOne:
-                        boundaryMap[i + 1, j] = 1
-                        boundaryMap[i, j + 1] = 1
-                    elif patternTwo:
-                        boundaryMap[i, j] = 1
-                        boundaryMap[i + 1, j + 1] = 1
-            self.board[self.CELL.index("pond_boundary")] = boundaryMap
+        """
+        池の境界を検出し、boardのpond_boundaryレイヤーを更新する
+        """
+        targetLayer = board[self.CELL.index("pond")]
+        requiredPattern = np.array(
+            # patternOne
+            [[1, 0], [0, 1]]
+        )
+        boundaryMap = np.full((self.FIELD_MAX, self.FIELD_MAX), -1)
+        boundaryMap[0 : self.width, 0 : self.width] = 0
+        for i in range(self.width - 1):
+            for j in range(self.width - 1):
+                patternOne = np.array_equal(
+                    targetLayer[i : i + 2, j : j + 2], requiredPattern
+                )
+                patternTwo = np.array_equal(
+                    targetLayer[i : i + 2, j : j + 2], requiredPattern[::-1]
+                )
+                if patternOne:
+                    boundaryMap[i + 1, j] = 1
+                    boundaryMap[i, j + 1] = 1
+                elif patternTwo:
+                    boundaryMap[i, j] = 1
+                    boundaryMap[i + 1, j + 1] = 1
+        return boundaryMap
 
     def load_from_csv(self, path: Union[str, list[str]]):
         """
@@ -252,8 +252,7 @@ class Game:
         assert a_count == b_count, "チーム間の職人数が不一致"
         self.worker_count = a_count
         self.board = self.update_blank(self.board)
-        self.find_pond_boundary(self.board)
-        
+
         return name
 
     def reset(self, seed=None):
@@ -300,6 +299,9 @@ class Game:
         if self.render_mode == "human":
             self.reset_render()
 
+        self.board[self.CELL.index("pond_boundary")] = self.find_pond_boundary(
+            self.board
+        )
         self.board = self.update_blank(self.board)
 
         self.replace_count = 0
@@ -397,7 +399,7 @@ class Game:
                         return False
                 else:
                     for log in worker.action_log[-lock_length:]:
-                        if log[1] == (y, x):
+                        if log[0] == "move" and log[2] == (y, x):
                             return False
                 if mode == "around":
                     field = self.get_around(self.board, y, x, side_length=3)
@@ -519,28 +521,57 @@ class Game:
         else:
             return False
 
-    def is_next_to_boundary(self, worker: Worker, y: int, x: int):
+    def is_boundary_build(self, worker: Worker, y: int, x: int):
         """内部関数
-        東西南北を指定し、池の境界を塞げるマスであるか判定
-        
+        指定マスが池の境界であり建築できるか判定
+
         Args:
             worker (Worker): 職人
             y (int): y座標
             x (int): x座標
-            
+
         Return:
             bool: 判定結果
         """
         if (
-            not worker.is_action
-            and 0 <= y < self.height
+            0 <= y < self.height
             and 0 <= x < self.width
+            and self.board[self.CELL.index("pond_boundary"), y, x] == 1
         ):
-            if self.board[self.CELL.index("pond_boundary"), y, x] == 1:
-                return self.is_buildable(worker, y, x)
+            return self.is_buildable(worker, y, x, mode="both")
 
         return False
-    
+
+    def is_boundary_move(self, worker: Worker, y: int, x: int):
+        """内部関数
+        池の境界を塞げるマスに移動できるか判定
+
+        Args:
+            worker (Worker): 職人
+            y (int): y座標
+            x (int): x座標
+
+        Return:
+            bool: 判定結果
+        """
+        test_worker = copy.deepcopy(worker)
+        test_worker.update_coordinate(y, x)
+        pos = np.array([y, x], dtype=np.int8)
+        result = False
+        if self.is_movable(worker, y, x):
+            for direction in self.DIRECTIONS.values():
+                target_y, target_x = pos + direction
+                if (
+                    0 <= target_y < self.height
+                    and 0 <= target_x < self.width
+                    and self.board[self.CELL.index("pond_boundary"), target_y, target_x]
+                    == 1
+                    and self.board[self.CELL.index("castle"), target_y, target_x] == 0
+                ):
+                    if self.is_boundary_build(test_worker, target_y, target_x):
+                        result = True
+        return result
+
     def is_actionable(
         self,
         worker: Worker,
@@ -597,7 +628,9 @@ class Game:
         target_angle = np.arctan2(worker.y - y, x - worker.x)
         return np.pi < (center_angle - target_angle) % (2 * np.pi) * 2 < 3 * np.pi
 
-    def get_expand_move(self, worker: Worker):
+    def get_expand_move(
+        self, worker: Worker, *layers: tuple[str], invert: bool = False, mode="any"
+    ):
         """陣地を拡張するように移動する候補を返す
 
         Args:
@@ -608,43 +641,37 @@ class Game:
         """
         actionable = []
         around = self.get_around(self.board, *worker.get_coordinate(), side_length=3)
-        # compiled: np.ndarray = np.sum(
-        #     [
-        #         around[self.CELL.index(layer)]
-        #         for layer in (
-        #             f"rampart_{worker.team}",
-        #             f"territory_{worker.team}",
-        #             f"open_territory_{worker.team}",
-        #         )
-        #     ],
-        #     axis=0,
-        # )
-
-        # for index, action in enumerate(self.ACTIONS):
-        #     if "move" in action:
-        #         y, x = self.get_direction(index) + 1
-        #         if compiled[y, x] == 0 and self.is_movable(
-        #             worker, *self.get_action_position(worker, index), mode="any"
-        #         ):
-        #             actionable.append(index)
-        # if actionable:
-        #     return actionable
-        compiled: np.ndarray = np.sum(
-            [
-                around[self.CELL.index(layer)]
-                for layer in (
-                    f"territory_{worker.team}",
-                    f"open_territory_{worker.team}",
-                )
-            ],
-            axis=0,
-        )
+        compiled = self.compile_layers(around, *layers)
+        test_worker: Worker = copy.deepcopy(worker)
 
         for index, action in enumerate(self.ACTIONS):
             if "move" in action:
+                test_worker.update_coordinate(*self.get_action_position(worker, index))
+                if not any(
+                    self.is_buildable(
+                        test_worker,
+                        *self.get_action_position(test_worker, i),
+                        mode="both",
+                    )
+                    for i, action_ in enumerate(self.ACTIONS)
+                    if "build" in action_
+                ):
+                    continue
                 y, x = self.get_direction(index) + 1
-                if compiled[y, x] == 0 and self.is_movable(
-                    worker, *self.get_action_position(worker, index), mode="any"
+                if (
+                    not invert
+                    and compiled[y, x] == 0
+                    and self.is_movable(
+                        worker, *self.get_action_position(worker, index), mode=mode
+                    )
+                ):
+                    actionable.append(index)
+                elif (
+                    invert
+                    and compiled[y, x] == 1
+                    and self.is_movable(
+                        worker, *self.get_action_position(worker, index), mode=mode
+                    )
                 ):
                     actionable.append(index)
         return actionable
@@ -759,11 +786,11 @@ class Game:
             workers (list[tuple[Worker, int]]): 職人と行動のリスト
         """
         self.worker_positions = [worker.get_coordinate() for worker, _ in workers]
-        workers = self.check_stack_workers(workers)
+        workers: deque[tuple[Worker, int]] = deque(self.check_stack_workers(workers))
         if not workers:
             return
         for _ in range(self.worker_count):
-            worker, action = workers.pop(0)
+            worker, action = workers.popleft()
             y, x = self.get_action_position(worker, action)
             if "stay" in self.ACTIONS[action]:
                 worker.stay()
@@ -1089,11 +1116,12 @@ class Game:
         self.turn += 1
         return self.get_observation(), reward, terminated, truncated, info
 
-    def render(self, *args, **kwargs):
+    def render(self, render_mode=None, *args, **kwargs):
         """描画を行う"""
-        if self.render_mode == "human":
+        render_mode = self.render_mode if render_mode is None else render_mode
+        if render_mode == "human":
             return self.render_rgb_array(*args, **kwargs)
-        elif self.render_mode == "ansi":
+        elif render_mode == "ansi":
             return self.render_terminal(*args, **kwargs)
 
     def render_terminal(self):
@@ -1105,19 +1133,16 @@ class Game:
         )
         cell_num = icon_base * item_num + (item_num - 1)
         for y in range(self.height):
-            view += (
-                "|".join(
-                    [
-                        f"""{','.join([
-                                value for i, item in enumerate(self.board[:,y,x])
-                                if item for key,value in self.ICONS.items()
-                                if key in self.CELL[i]
-                            ]):^{cell_num}}"""
-                        for x in range(self.width)
-                    ]
-                )
-                + "\n"
-            )
+            line = []
+            for x in range(self.width):
+                cell = []
+                for key, value in self.ICONS.items():
+                    for i, item in enumerate(self.board[:, y, x]):
+                        if item:
+                            if re.match(key + r"\d?$", self.CELL[i]):
+                                cell.append(value)
+                line.append(f'{",".join(cell):^{cell_num}}')
+            view += "|".join(line) + "\n"
             if y < self.height - 1:
                 view += "-" * (self.width * cell_num + self.width - 1) + "\n"
         print(view, end="")
@@ -1804,19 +1829,19 @@ class Game:
             "build_more_territory",
             "move_target",
             "break_more_territory",
+            "move_boundary",
             "build_outside",
             "build_inside",
-            "move_expand",
+            "move_castle",
+            *[f"move_expand_{i+1}" for i in range(1)],
             "move_around",
             "move_any",
             "move_last",
             "move",
         )
-        presetAction = []
-        if worker.team == "A":
-            print(worker.num, self.turn)
-            presetAction = PRESETS["C13"][worker.num]
-            
+        if worker.plan:
+            print(worker.name, worker.plan)
+            return worker.plan.popleft()
         for index, action in enumerate(self.ACTIONS):
             act_pos = self.get_action_position(worker, index)
             if len(presetAction) != 0:
@@ -1828,11 +1853,15 @@ class Game:
                 if self.is_breakable(worker, *act_pos, mode="both"):
                     actionable["break_more_territory"].append(index)
             elif "build" in action:
-                if self.is_next_to_boundary(worker, *act_pos):
-                    # print(self.turn, worker.name, act_pos)
+                if self.is_boundary_build(worker, *act_pos):
                     actionable["fill_pond_boundary"].append(index)
                 if self.is_buildable(worker, *act_pos, mode="more"):
                     actionable["build_more_territory"].append(index)
+                if any(
+                    log[0] == "move" and log[1] == tuple(act_pos)
+                    for log in worker.action_log[-4:]
+                ):
+                    continue
                 if self.is_buildable(worker, *act_pos, mode="outside"):
                     actionable["build_outside"].append(index)
                 if self.is_buildable(worker, *act_pos, mode="inside"):
@@ -1840,6 +1869,8 @@ class Game:
                 if self.is_buildable(worker, *act_pos, mode="both"):
                     actionable["build_both"].append(index)
             elif "move" in action:
+                if self.is_boundary_move(worker, *act_pos):
+                    actionable["move_boundary"].append(index)
                 if self.is_movable(worker, *act_pos, mode="around"):
                     actionable["move_around"].append(index)
                 if self.is_movable(worker, *act_pos, mode="any"):
@@ -1849,11 +1880,27 @@ class Game:
                 if self.is_movable(worker, *act_pos):
                     actionable["move"].append(index)
         actionable["move_target"] = self.get_target_move(worker)
-        actionable["move_expand"] = self.get_expand_move(worker)
+        actionable["move_castle"] = self.get_expand_move(worker, "castle", invert=True)
+        actionable["move_expand_1"] = self.get_expand_move(
+            worker, f"territory_{worker.team}", f"open_territory_{worker.team}"
+        )
         for mode in action_priority:
             actions = actionable.get(mode)
             if actions:
-                return random.choice(actions)
+                if worker.action_log:
+                    for action_ in random.sample(actions, len(actions)):
+                        compare_log = (
+                            self.ACTIONS[action_].split("_")[0],
+                            worker.get_coordinate(),
+                            tuple(self.get_action_position(worker, action_)),
+                        )
+                        if (
+                            worker.action_log[-1] != compare_log
+                            or worker.action_log[-2] != compare_log
+                        ):
+                            return action_
+                else:
+                    return random.choice(actions)
         return self.ACTIONS.index("stay")
 
     def get_random_actions(self, team: str = None):
@@ -1873,10 +1920,10 @@ class Game:
         act = []
         for worker in self.workers[team]:
             act.append(self.get_random_action(worker))
-            
+
         while self.WORKER_MAX > len(act):
             act.append(self.ACTIONS.index("stay"))
-        
+
         return act
 
     def check_actions(self, actions: list[int], team: str = None, stay=False):
@@ -1906,7 +1953,7 @@ class Game:
             ):
                 actions[i] = self.get_random_action(worker)
                 self.replace_count += 1
-            
+
         return actions
 
     def get_around(
@@ -2076,9 +2123,11 @@ class Game:
             )
         self.board[:, self.height :, :] = -1
         self.board[:, :, self.width :] = -1
-        self.board = self.update_blank(self.board)
-        self.find_pond_boundary(self.board)
+        self.board[self.CELL.index("pond_boundary")] = self.find_pond_boundary(
+            self.board
+        )
         self.update_territory()
+        self.board = self.update_blank(self.board)
 
         self.max_turn = (
             self.max_steps if self.max_steps is not None else self.turns[self.width]
