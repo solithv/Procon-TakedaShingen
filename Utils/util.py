@@ -188,8 +188,8 @@ class Util:
     def fix_dataset_shape(base_name, dataset_dir="./dataset"):
         dat_file = Path(f"./dataset/{base_name}.dat")
         zip_file = Path(f"./dataset/{base_name}.zip")
-        zip_file.unlink(True)
         Util.combine_and_unpack(dataset_dir, base_name)
+        zip_file.unlink(True)
 
         x = []
         y = []
