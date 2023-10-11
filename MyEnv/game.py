@@ -404,6 +404,8 @@ class Game:
             and (y, x) not in self.worker_positions
         ):
             if mode is not None:
+                if (x == 0 or x == self.width - 1) and (y == 0 or y == self.width - 1):
+                    return False
                 if mode == "last":
                     if worker.action_log and worker.action_log[-1][1] == (y, x):
                         return False
@@ -457,6 +459,8 @@ class Game:
             )[y, x]
         ):
             if mode is not None:
+                if (x == 0 or x == self.width - 1) and (y == 0 or y == self.width - 1):
+                    return False
                 if (
                     self.board[self.CELL.index(f"open_territory_{worker.team}"), y, x]
                     == 1
@@ -530,7 +534,7 @@ class Game:
             return True
         else:
             return False
-
+    
     def is_boundary_build(self, worker: Worker, y: int, x: int):
         """内部関数
         指定マスが池の境界であり建築できるか判定
