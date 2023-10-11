@@ -23,18 +23,19 @@ class DatasetUtil:
             if is_combine.get(basename):
                 file.unlink()
 
-    def load_dataset(self, dataset_dir):
+    def load_dataset(self, dataset_dir, shape_set=None):
         self.unpack_dataset(dataset_dir)
         x = []
         y = []
-        # for dataset in Path(dataset_dir).glob("*.dat"):
-        for dataset in Path(dataset_dir).glob("data.dat"):
+        for dataset in Path(dataset_dir).glob("*.dat"):
             print(dataset)
             with open(dataset) as f:
                 for line in f:
                     feature, target = json.loads(line).values()
                     feature = np.array(feature, dtype=np.int8)
                     target = np.array(target, dtype=np.int8)
+                    if feature.shape != shape_set:
+                        break
                     x.append(feature)
                     y.append(target)
                     features_annotate, targets_annotate = Annotator.make_augmentation(

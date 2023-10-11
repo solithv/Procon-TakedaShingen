@@ -109,6 +109,7 @@ class Game:
         use_pyautogui: bool = False,
         render_fps: int = None,
         unique_map_file: str = "./field_data/name_to_map.pkl",
+        pond_boundary_file: str = "./field_data/pond_boundary.json",
         preset_file: str = "./preset.json",
     ):
         """init
@@ -142,9 +143,12 @@ class Game:
             self.display_size_x, self.display_size_y = pyautogui.size()
         else:
             self.display_size_x, self.display_size_y = 960, 960
+
         self.unique_map: dict[str, np.ndarray] = pickle.load(
             Path(unique_map_file).open("rb")
         )
+
+        self.pond_boundary_file = pond_boundary_file
         self.preset_file = preset_file
 
     def get_observation(self):
@@ -186,32 +190,19 @@ class Game:
         board = np.where(np.any(board < 0, axis=0), -1, board)
         return board
 
-    def find_pond_boundary(self, board: np.ndarray):
+    def load_pond_boundary(self):
         """
-        池の境界を検出し、boardのpond_boundaryレイヤーを更新する
+        boardのpond_boundaryレイヤーを更新する
         """
-        targetLayer = board[self.CELL.index("pond")]
-        requiredPattern = np.array(
-            # patternOne
-            [[1, 0], [0, 1]]
-        )
-        boundaryMap = np.full((self.FIELD_MAX, self.FIELD_MAX), -1)
-        boundaryMap[0 : self.width, 0 : self.width] = 0
-        for i in range(self.width - 1):
-            for j in range(self.width - 1):
-                patternOne = np.array_equal(
-                    targetLayer[i : i + 2, j : j + 2], requiredPattern
-                )
-                patternTwo = np.array_equal(
-                    targetLayer[i : i + 2, j : j + 2], requiredPattern[::-1]
-                )
-                if patternOne:
-                    boundaryMap[i + 1, j] = 1
-                    boundaryMap[i, j + 1] = 1
-                elif patternTwo:
-                    boundaryMap[i, j] = 1
-                    boundaryMap[i + 1, j + 1] = 1
-        return boundaryMap
+        if self.pond_boundary_file is None:
+            boundary = np.full((self.FIELD_MAX, self.FIELD_MAX), -1, dtype=np.int8)
+            boundary[: self.height, :] = 0
+            boundary[:, : self.width] = 0
+            return boundary
+
+        with open(self.pond_boundary_file) as f:
+            boundaries: dict[str, np.ndarray] = json.load(f)
+        return boundaries[self.map_name]
 
     def load_from_csv(self, path: Union[str, list[str]]):
         """
@@ -297,6 +288,11 @@ class Game:
         self.max_turn = (
             self.max_steps if self.max_steps is not None else self.turns[self.width]
         )
+        self.replace_count = 0
+        self.get_map_name()
+        self.board[self.CELL.index("pond_boundary")] = self.load_pond_boundary()
+        self.board = self.update_blank(self.board)
+        self.load_plan()
 
         self.cell_size = min(
             self.display_size_x * 0.9 // self.width,
@@ -308,14 +304,13 @@ class Game:
         if self.render_mode == "human":
             self.reset_render()
 
-        self.board[self.CELL.index("pond_boundary")] = self.find_pond_boundary(
-            self.board
-        )
-        self.board = self.update_blank(self.board)
-        self.load_plan()
-
-        self.replace_count = 0
         return self.get_observation(), info
+
+    def get_map_name(self):
+        for name, pond_map in self.unique_map.items():
+            if np.array_equal(self.board[self.CELL.index("pond")], pond_map):
+                self.map_name = name
+                break
 
     def compile_layers(
         self, board: np.ndarray, *layers: tuple[str], one_hot: bool = True
@@ -1849,7 +1844,11 @@ class Game:
             "move",
         )
         if worker.plan:
-            return worker.plan.popleft()
+            action = worker.plan.popleft()
+            if self.is_actionable(worker, action):
+                return action
+            else:
+                worker.plan.clear()
         for index, action in enumerate(self.ACTIONS):
             act_pos = self.get_action_position(worker, index)
             if "break" in action:
@@ -1952,7 +1951,7 @@ class Game:
                 worker,
                 self.ACTIONS[action],
                 stay=stay,
-                move_mode="around",
+                move_mode="last",
                 build_mode="both",
                 break_mode="both",
             ):
@@ -2017,7 +2016,9 @@ class Game:
             axis=0,
         )[np.newaxis, :, :]
         b = np.where(b < 0, -1, b)
-        board = np.concatenate([board[: self.CELL.index("worker_A0")], a, b], axis=0)
+        board = np.concatenate(
+            [board[: self.CELL.index("pond_boundary")], a, b], axis=0
+        )
         return board
 
     def get_around_workers(
@@ -2128,11 +2129,14 @@ class Game:
             )
         self.board[:, self.height :, :] = -1
         self.board[:, :, self.width :] = -1
-        self.board[self.CELL.index("pond_boundary")] = self.find_pond_boundary(
-            self.board
-        )
+        self.board[self.CELL.index("pond_boundary")] = self.load_pond_boundary()
+
         self.update_territory()
         self.board = self.update_blank(self.board)
+        self.replace_count = 0
+        self.get_map_name()
+        self.board = self.update_blank(self.board)
+        self.load_plan()
 
         self.max_turn = (
             self.max_steps if self.max_steps is not None else self.turns[self.width]
@@ -2146,8 +2150,6 @@ class Game:
         self.window_size_y = self.height * self.cell_size
         if self.render_mode == "human":
             self.reset_render()
-        self.replace_count = 0
-        self.load_plan()
 
     def get_stat_from_api(self, data: dict[str, Any]):
         """APIから環境状態を更新
@@ -2249,13 +2251,11 @@ class Game:
 
     def load_plan(self):
         if self.preset_file is None:
-            return 
+            return
         with open(self.preset_file) as f:
-            preset:dict[str,dict[str,list[int]]] = json.load(f)
-        for name, pond_map in self.unique_map.items():
-            if np.array_equal(self.board[self.CELL.index("pond")], pond_map):
-                map_name = name
-                break
+            preset: dict[str, dict[str, list[int]]] = json.load(f)
 
         for worker in self.workers["A"][: self.worker_count]:
-            worker.plan = deque(preset.get(map_name).get(str(worker.get_coordinate())))
+            worker.plan = deque(
+                preset.get(self.map_name, {}).get(str(worker.get_coordinate()), [])
+            )

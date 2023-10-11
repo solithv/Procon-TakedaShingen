@@ -13,6 +13,8 @@ def main():
         csv_path=fields,
         render_mode="human",
         use_pyautogui=True,
+        # pond_boundary_file=None,
+        preset_file=None,
     )
 
     # nn = NNModel()
