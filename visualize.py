@@ -1,5 +1,6 @@
 import csv
 import glob
+import json
 import pygame
 import numpy as np
 from MyEnv.game import Game
@@ -85,15 +86,26 @@ class Renderer:
 
 if __name__ == "__main__":
     fieldPaths = glob.glob("./field_data/???.csv")
+    boundaryData = {}
+    
     for fieldPath in fieldPaths:
-        # print(fieldPath)
-        # g = Game()
-        # g.load_from_csv(path=fieldPath)
-        # print(g.board[g.CELL.index("pond")])
-        with open(fieldPath) as f:
-            field = [row for row in csv.reader(f)]
-            renderer = Renderer(fieldWidth=len(field[0]), fieldHeight=len(field))
-            renderer.captureField(
-                field,
-                fileName="./field_data/field_visualized/" + fieldPath[-7:-4] + ".png",
-            )
+        
+        mapName = fieldPath[-7:-4]
+        
+        g = Game()
+        g.load_from_csv(path=fieldPath)
+        # 今は亡き
+        boundaryMap = g.find_pond_boundary(g.board)
+        boundaryData[mapName] = boundaryMap.tolist()
+
+        
+        # with open(fieldPath) as f:
+        #     field = [row for row in csv.reader(f)]
+        #     renderer = Renderer(fieldWidth=len(field[0]), fieldHeight=len(field))
+        #     renderer.captureField(
+        #         field,
+        #         fileName="./field_data/field_visualized/" + fieldPath[-7:-4] + ".png",
+        #     )
+    
+    with open("./field_data/boundaryData.json", "w") as f:
+        json.dump(boundaryData, f, indent=4)

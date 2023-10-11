@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 def main():
-    fields = glob.glob("./field_data/*.csv")
+    fields = glob.glob("./field_data/C13.csv")
     with open("preset.json", "r") as f:
         data = json.load(f)
     for field in fields:
