@@ -109,7 +109,7 @@ class Game:
         use_pyautogui: bool = False,
         render_fps: int = None,
         unique_map_file: str = "./field_data/name_to_map.pkl",
-        pond_boundary_file: str = "./field_data/pond_boundary.json",
+        pond_boundary_file: str = "./field_data/boundaryData.json",
         preset_file: str = "./preset.json",
     ):
         """init
