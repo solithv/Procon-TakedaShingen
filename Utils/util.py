@@ -11,8 +11,6 @@ import numpy as np
 
 from MyEnv import Game
 
-from .annotator import Annotator
-
 
 class Util:
     @staticmethod
@@ -162,6 +160,7 @@ class Util:
                 if is_combine.get(basename) and delete:
                     file.unlink()
 
+    @staticmethod
     def dump_pond_map(csv_folder, save_name):
         csv_folder: Path = Path(csv_folder)
         assert csv_folder.is_dir()
@@ -185,22 +184,13 @@ class Util:
             pond_fileds[name] = board
         pickle.dump(pond_fileds, (csv_folder / f"{save_name}.pkl").open("wb"))
 
+    @staticmethod
     def fix_dataset_shape(base_name, dataset_dir="./dataset"):
-        import NN
-
-        du = NN.DatasetUtil()
-
         dat_file = Path(f"./dataset/{base_name}.dat")
         zip_file = Path(f"./dataset/{base_name}.zip")
         zip_file.unlink(True)
         Util.combine_and_unpack(dataset_dir, base_name)
-        ann = Annotator(
-            csv_paths=None,
-            output_dir=dataset_dir,
-            filename=f"{base_name}.dat",
-            pond_boundary_file=None,
-            preset_file=None,
-        )
+
         x = []
         y = []
         with dat_file.open() as f:
@@ -214,9 +204,18 @@ class Util:
                 target = np.array(target, dtype=np.int8)
                 x.append(new_feature)
                 y.append(target)
-        dat_file.unlink(True)
 
-        ann.save_dataset(x, y)
-        ann.finish()
-
-        # du.load_dataset("./dataset")
+        with dat_file.open("w") as f:
+            [
+                print(
+                    json.dumps(
+                        {
+                            "X": features.tolist(),
+                            "Y": targets.tolist(),
+                        }
+                    ),
+                    file=f,
+                )
+                for features, targets in zip(x, y)
+            ]
+        Util.compress_and_split(dat_file, output_dir=dataset_dir)
