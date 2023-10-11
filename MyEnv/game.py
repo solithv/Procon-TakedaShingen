@@ -1,5 +1,6 @@
 import copy
 import csv
+import json
 import os
 import pickle
 import random
@@ -108,6 +109,7 @@ class Game:
         use_pyautogui: bool = False,
         render_fps: int = None,
         unique_map_file: str = "./field_data/name_to_map.pkl",
+        preset_file: str = "./preset.json",
     ):
         """init
 
@@ -143,6 +145,7 @@ class Game:
         self.unique_map: dict[str, np.ndarray] = pickle.load(
             Path(unique_map_file).open("rb")
         )
+        self.preset_file = preset_file
 
     def get_observation(self):
         """内部関数
@@ -258,7 +261,7 @@ class Game:
         assert a_count == b_count, "チーム間の職人数が不一致"
         self.worker_count = a_count
         self.board = self.update_blank(self.board)
-        
+
         return name
 
     def reset(self, seed=None):
@@ -309,6 +312,7 @@ class Game:
             self.board
         )
         self.board = self.update_blank(self.board)
+        self.load_plan()
 
         self.replace_count = 0
         return self.get_observation(), info
@@ -2143,6 +2147,7 @@ class Game:
         if self.render_mode == "human":
             self.reset_render()
         self.replace_count = 0
+        self.load_plan()
 
     def get_stat_from_api(self, data: dict[str, Any]):
         """APIから環境状態を更新
@@ -2243,11 +2248,12 @@ class Game:
         return data
 
     def load_plan(self):
-        wip = {}
+        with open(self.preset_file) as f:
+            preset:dict[str,dict[str,list[int]]] = json.load(f)
         for name, pond_map in self.unique_map.items():
             if np.array_equal(self.board[self.CELL.index("pond")], pond_map):
                 map_name = name
                 break
 
         for worker in self.workers["A"][: self.worker_count]:
-            worker.plan = deque(wip.get(map_name).get(str(worker.get_coordinate())))
+            worker.plan = deque(preset.get(map_name).get(str(worker.get_coordinate())))
