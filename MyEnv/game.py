@@ -258,7 +258,7 @@ class Game:
         assert a_count == b_count, "チーム間の職人数が不一致"
         self.worker_count = a_count
         self.board = self.update_blank(self.board)
-
+        
         return name
 
     def reset(self, seed=None):
@@ -1226,6 +1226,13 @@ class Game:
             text = font.render(workerNumber, False, self.BLACK)
             text_rect = text.get_rect(
                 center=((j + 0.5) * self.cell_size, (i + 0.2) * self.cell_size)
+            )
+            self.window_surface.blit(text, text_rect)
+        if j == 0 or i == 0:
+            font = pygame.font.SysFont(None, 30)
+            text = font.render(str(i if j == 0 else j), False, self.BLACK)
+            text_rect = text.get_rect(
+                center=(j * self.cell_size + 10, i * self.cell_size + 10)
             )
             self.window_surface.blit(text, text_rect)
 
