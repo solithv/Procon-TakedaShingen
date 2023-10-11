@@ -46,7 +46,6 @@ def main():
         # )
     print("game end")
     print(f"{env.replace_count} action replaced")
-    print(f"{env.force_replace_count} action force replaced")
     env.end_game_render()
     env.close()
 
