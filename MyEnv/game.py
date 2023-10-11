@@ -201,8 +201,8 @@ class Game:
             return boundary
 
         with open(self.pond_boundary_file) as f:
-            boundaries: dict[str, np.ndarray] = json.load(f)
-        return boundaries[self.map_name]
+            boundaries: dict[str, list] = json.load(f)
+        return np.array(boundaries[self.map_name], dtype=np.int8)
 
     def load_from_csv(self, path: Union[str, list[str]]):
         """
@@ -406,8 +406,14 @@ class Game:
                         return False
                 else:
                     for log in worker.action_log[-lock_length:]:
-                        if log[0] == "move" and log[2] == (y, x):
+                        if (
+                            self.board[self.CELL.index("pond_boundary"), y, x] != 1
+                            and log[0] == "move"
+                            and (log[1] == (y, x) or log[2] == (y, x))
+                        ):
                             return False
+                if not self.is_rampart_move(worker, y, x):
+                    return False
                 if mode == "around":
                     field = self.get_around(self.board, y, x, side_length=3)
                     compiled: np.ndarray = np.sum(
@@ -529,7 +535,7 @@ class Game:
             return True
         else:
             return False
-    
+
     def is_boundary_build(self, worker: Worker, y: int, x: int):
         """内部関数
         指定マスが池の境界であり建築できるか判定
@@ -581,10 +587,56 @@ class Game:
                         result = True
         return result
 
+    def is_rampart_move(
+        self,
+        worker: Worker,
+        y: int,
+        x: int,
+        build_mode: str = "both",
+        break_mode: str = "both",
+    ):
+        """建築または敵の壁を破壊できる移動先か判定
+
+        Args:
+            worker (Worker): 職人
+            y (int): y座標
+            x (int): x座標
+            build_mode (str, optional): 建築判定モード Noneで判定しない.
+                Defaults to "both".
+            break_mode (str, optional): 破壊判定モード Noneで判定しない.
+                Defaults to "both".
+
+        Returns:
+            bool: 判定結果
+        """
+        assert build_mode is not None and break_mode is not None
+        test_worker = copy.deepcopy(worker)
+        test_worker.update_coordinate(y, x)
+        pos = np.array([y, x], dtype=np.int8)
+        if self.is_movable(worker, y, x):
+            if build_mode is not None and break_mode is not None:
+                return any(
+                    self.is_buildable(test_worker, *(pos + direction), mode=build_mode)
+                    or self.is_breakable(
+                        test_worker, *(pos + direction), mode=break_mode
+                    )
+                    for direction in self.DIRECTIONS.values()
+                )
+            elif break_mode is None:
+                return any(
+                    self.is_buildable(test_worker, *(pos + direction), mode=build_mode)
+                    for direction in self.DIRECTIONS.values()
+                )
+            elif build_mode is None:
+                return any(
+                    self.is_breakable(test_worker, *(pos + direction), mode=break_mode)
+                    for direction in self.DIRECTIONS.values()
+                )
+
     def is_actionable(
         self,
         worker: Worker,
-        action: str,
+        action: Union[str, int],
         stay: bool = False,
         move_mode: str = None,
         build_mode: str = None,
@@ -595,7 +647,7 @@ class Game:
 
         Args:
             worker (Worker): 職人
-            action (str): 行動名
+            action (Union[str, int]): 行動名
             stay (bool, optional): 待機を許容するか. Defaults to False.
             move_mode (str, optional): 移動判定モード. Defaults to None.
             build_mode (str, optional): 建築判定モード. Defaults to None.
@@ -607,6 +659,8 @@ class Game:
         Returns:
             bool: 判定結果
         """
+        if isinstance(action, int):
+            action = self.ACTIONS[action]
         act_pos = self.get_action_position(worker, action)
         if "break" in action and self.is_breakable(worker, *act_pos, break_mode):
             return True
@@ -637,53 +691,42 @@ class Game:
         target_angle = np.arctan2(worker.y - y, x - worker.x)
         return np.pi < (center_angle - target_angle) % (2 * np.pi) * 2 < 3 * np.pi
 
-    def get_expand_move(
-        self, worker: Worker, *layers: tuple[str], invert: bool = False, mode="any"
+    def is_expand_move(
+        self,
+        worker: Worker,
+        y: int,
+        x: int,
+        *layers: tuple[str],
+        hot_is_ok: bool = False,
+        build_mode: str = "both",
+        break_mode: str = "both",
     ):
-        """陣地を拡張するように移動する候補を返す
+        """陣地を拡張するように移動できるか判定
 
         Args:
             worker (Worker): 職人
+            y (int): y座標
+            x (int): x座標
+            layers (tuple[str]): 判定基準レイヤー名
+            hot_is_ok (bool, optional): 判定基準レイヤーが1の時を条件とするか.
+                Defaults to False.
+            build_mode (str, optional): 建築判定モード Noneで判定しない.
+                Defaults to "both".
+            break_mode (str, optional): 破壊判定モード Noneで判定しない.
+                Defaults to "both".
 
         Returns:
-            list[int]: 行動のリスト
+            bool: 判定結果
         """
-        actionable = []
-        around = self.get_around(self.board, *worker.get_coordinate(), side_length=3)
-        compiled = self.compile_layers(around, *layers)
-        test_worker: Worker = copy.deepcopy(worker)
-
-        for index, action in enumerate(self.ACTIONS):
-            if "move" in action:
-                test_worker.update_coordinate(*self.get_action_position(worker, index))
-                if not any(
-                    self.is_buildable(
-                        test_worker,
-                        *self.get_action_position(test_worker, i),
-                        mode="both",
-                    )
-                    for i, action_ in enumerate(self.ACTIONS)
-                    if "build" in action_
-                ):
-                    continue
-                y, x = self.get_direction(index) + 1
-                if (
-                    not invert
-                    and compiled[y, x] == 0
-                    and self.is_movable(
-                        worker, *self.get_action_position(worker, index), mode=mode
-                    )
-                ):
-                    actionable.append(index)
-                elif (
-                    invert
-                    and compiled[y, x] == 1
-                    and self.is_movable(
-                        worker, *self.get_action_position(worker, index), mode=mode
-                    )
-                ):
-                    actionable.append(index)
-        return actionable
+        compiled = self.compile_layers(self.board, *layers)
+        if self.is_rampart_move(
+            worker, y, x, build_mode=build_mode, break_mode=break_mode
+        ):
+            if hot_is_ok and compiled[y, x] == 1:
+                return True
+            elif not hot_is_ok and compiled[y, x] == 0:
+                return True
+        return False
 
     def get_target_move(self, worker: Worker):
         """目標地点に向かう行動の候補を返す
@@ -1443,7 +1486,6 @@ class Game:
                     openTerritoryBLayer = self.compile_layers(
                         self.board, "open_territory_B", one_hot=True
                     )
-                    print(self.board[self.CELL.index("pond_boundary")])
                     for i in range(self.height):
                         for j in range(self.width):
                             if territoryALayer[i][j] == territoryBLayer[i][j] == 1:
@@ -1840,8 +1882,12 @@ class Game:
             "move_boundary",
             "build_outside",
             "build_inside",
+            "move_castle_build",
+            "move_obstruction_build",
             "move_castle",
-            *[f"move_expand_{i+1}" for i in range(1)],
+            "move_obstruction",
+            "move_expand_1",
+            "move_expand_2",
             "move_around",
             "move_any",
             "move_last",
@@ -1849,7 +1895,7 @@ class Game:
         )
         if worker.plan:
             action = worker.plan.popleft()
-            if self.is_actionable(worker, action):
+            if self.is_actionable(worker, self.ACTIONS[action]):
                 return action
             else:
                 worker.plan.clear()
@@ -1887,11 +1933,38 @@ class Game:
                     actionable["move_last"].append(index)
                 if self.is_movable(worker, *act_pos):
                     actionable["move"].append(index)
+                if self.is_expand_move(
+                    worker, *act_pos, "castle", hot_is_ok=True, break_mode="opponent"
+                ):
+                    actionable["move_castle_build"].append(index)
+                if self.is_expand_move(
+                    worker,
+                    *act_pos,
+                    f"rampart_{worker.opponent_team}",
+                    hot_is_ok=True,
+                    break_mode="opponent",
+                ):
+                    actionable["move_obstruction_build"].append(index)
+                if self.is_expand_move(worker, *act_pos, "castle", hot_is_ok=True):
+                    actionable["move_castle"].append(index)
+                if self.is_expand_move(
+                    worker, *act_pos, f"rampart_{worker.opponent_team}", hot_is_ok=True
+                ):
+                    actionable["move_obstruction"].append(index)
+                if self.is_expand_move(
+                    worker,
+                    *act_pos,
+                    f"territory_{worker.team}",
+                    f"open_territory_{worker.team}",
+                ):
+                    actionable["move_expand_1"].append(index)
+                if self.is_expand_move(
+                    worker,
+                    *act_pos,
+                    f"open_territory_{worker.team}",
+                ):
+                    actionable["move_expand_2"].append(index)
         actionable["move_target"] = self.get_target_move(worker)
-        actionable["move_castle"] = self.get_expand_move(worker, "castle", invert=True)
-        actionable["move_expand_1"] = self.get_expand_move(
-            worker, f"territory_{worker.team}", f"open_territory_{worker.team}"
-        )
         for mode in action_priority:
             actions = actionable.get(mode)
             if actions:

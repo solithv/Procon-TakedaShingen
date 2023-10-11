@@ -6,14 +6,13 @@ import MyEnv
 
 
 def main():
-    fields = glob.glob("./field_data/B17.csv")
+    fields = glob.glob("./field_data/*C*.csv")
     model_path = "./model"
     model_name = "game"
     env = MyEnv.Game(
         csv_path=fields,
         render_mode="human",
         use_pyautogui=True,
-        # pond_boundary_file=None,
         preset_file=None,
     )
 
@@ -35,7 +34,7 @@ def main():
             # print(env.ACTIONS[actions[0]])
         else:
             actions = env.get_random_actions()
-            actions = env.check_actions(actions)
+            # actions = env.check_actions(actions)
             # actions = env.random_act()
             # actions = [0, 0, 0, 0, 0, 0]
             # actions = env.get_actions("pygame")
