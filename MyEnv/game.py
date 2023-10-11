@@ -11,7 +11,6 @@ import pygame
 from pygame.locals import KEYDOWN
 
 from .worker import Worker
-from .preset import PRESETS
 
 
 class Game:
@@ -252,7 +251,7 @@ class Game:
         assert a_count == b_count, "チーム間の職人数が不一致"
         self.worker_count = a_count
         self.board = self.update_blank(self.board)
-
+        
         return name
 
     def reset(self, seed=None):
@@ -1844,9 +1843,6 @@ class Game:
             return worker.plan.popleft()
         for index, action in enumerate(self.ACTIONS):
             act_pos = self.get_action_position(worker, index)
-            if len(presetAction) != 0:
-                print(presetAction[self.turn / 2])
-                return presetAction[self.turn / 2]
             if "break" in action:
                 if self.is_breakable(worker, *act_pos, mode="opponent"):
                     actionable["break_opponent"].append(index)
