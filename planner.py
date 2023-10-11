@@ -15,7 +15,11 @@ def main():
     model_path = "./model"
     model_name = "game"
     env = MyEnv.Game(
-        csv_path=field, render_mode="human", use_pyautogui=True, first_player=0
+        csv_path=field,
+        render_mode="human",
+        use_pyautogui=True,
+        first_player=0,
+        preset_file=None,
     )
     observation, info = env.reset()
     print(info)
@@ -51,7 +55,7 @@ def main():
 
             print(data)
             with open("preset.json", "w") as f:
-                json.dump(data, f)
+                json.dump(data, f, indent=4)
 
         observation, reward, terminated, truncated, info = env.step(actions)
 

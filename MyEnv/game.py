@@ -2248,6 +2248,8 @@ class Game:
         return data
 
     def load_plan(self):
+        if self.preset_file is None:
+            return 
         with open(self.preset_file) as f:
             preset:dict[str,dict[str,list[int]]] = json.load(f)
         for name, pond_map in self.unique_map.items():
