@@ -34,7 +34,7 @@ class DatasetUtil:
                     feature, target = json.loads(line).values()
                     feature = np.array(feature, dtype=np.int8)
                     target = np.array(target, dtype=np.int8)
-                    if feature.shape != shape_set:
+                    if shape_set is not None and feature.shape != shape_set:
                         break
                     x.append(feature)
                     y.append(target)
