@@ -289,6 +289,7 @@ class Game:
             self.max_steps if self.max_steps is not None else self.turns[self.width]
         )
         self.replace_count = 0
+        self.force_replace_count = 0
         self.get_map_name()
         self.board[self.CELL.index("pond_boundary")] = self.load_pond_boundary()
         self.board = self.update_blank(self.board)
@@ -402,12 +403,7 @@ class Game:
                 if (x == 0 or x == self.width - 1) and (y == 0 or y == self.width - 1):
                     return False
                 if mode == "last":
-                    if (
-                        self.board[self.CELL.index("pond_boundary"), y, x] != 1
-                        and worker.action_log
-                        and worker.action_log[-1][1] == (y, x)
-                        and not self.is_rampart_move(worker, y, x)
-                    ):
+                    if worker.action_log and worker.action_log[-1][1] == (y, x):
                         return False
                 else:
                     for log in worker.action_log[-lock_length:]:
@@ -415,9 +411,10 @@ class Game:
                             self.board[self.CELL.index("pond_boundary"), y, x] != 1
                             and log[0] == "move"
                             and log[2] == (y, x)
-                            and not self.is_rampart_move(worker, y, x)
                         ):
                             return False
+                if not self.is_rampart_move(worker, y, x):
+                    return False
                 if mode == "around":
                     field = self.get_around(self.board, y, x, side_length=3)
                     compiled: np.ndarray = np.sum(
@@ -591,27 +588,51 @@ class Game:
                         result = True
         return result
 
-    def is_rampart_move(self, worker: Worker, y: int, x: int, mode: str = "both"):
+    def is_rampart_move(
+        self,
+        worker: Worker,
+        y: int,
+        x: int,
+        build_mode: str = "both",
+        break_mode: str = "both",
+    ):
         """建築または敵の壁を破壊できる移動先か判定
 
         Args:
             worker (Worker): 職人
             y (int): y座標
             x (int): x座標
-            mode (str, optional): 建築判定モード. Defaults to "both".
+            build_mode (str, optional): 建築判定モード Noneで判定しない.
+                Defaults to "both".
+            break_mode (str, optional): 破壊判定モード Noneで判定しない.
+                Defaults to "both".
 
         Returns:
             bool: 判定結果
         """
+        assert build_mode is not None and break_mode is not None
         test_worker = copy.deepcopy(worker)
         test_worker.update_coordinate(y, x)
         pos = np.array([y, x], dtype=np.int8)
         if self.is_movable(worker, y, x):
-            return any(
-                self.is_buildable(test_worker, *(pos + direction), mode="both")
-                or self.is_breakable(test_worker, *(pos + direction), mode="opponent")
-                for direction in self.DIRECTIONS.values()
-            )
+            if build_mode is not None and break_mode is not None:
+                return any(
+                    self.is_buildable(test_worker, *(pos + direction), mode=build_mode)
+                    or self.is_breakable(
+                        test_worker, *(pos + direction), mode=break_mode
+                    )
+                    for direction in self.DIRECTIONS.values()
+                )
+            elif break_mode is None:
+                return any(
+                    self.is_buildable(test_worker, *(pos + direction), mode=build_mode)
+                    for direction in self.DIRECTIONS.values()
+                )
+            elif build_mode is None:
+                return any(
+                    self.is_breakable(test_worker, *(pos + direction), mode=break_mode)
+                    for direction in self.DIRECTIONS.values()
+                )
 
     def is_actionable(
         self,
@@ -676,7 +697,8 @@ class Game:
         x: int,
         *layers: tuple[str],
         hot_is_ok: bool = False,
-        mode="any",
+        build_mode: str = "both",
+        break_mode: str = "both",
     ):
         """陣地を拡張するように移動できるか判定
 
@@ -687,13 +709,16 @@ class Game:
             layers (tuple[str]): 判定基準レイヤー名
             hot_is_ok (bool, optional): 判定基準レイヤーが1の時を条件とするか.
                 Defaults to False.
-            mode (str, optional): 建築判定モード. Defaults to "both".
+            build_mode (str, optional): 建築判定モード. Defaults to "both".
+            break_mode (str, optional): 破壊判定モード. Defaults to "both".
 
         Returns:
             bool: 判定結果
         """
         compiled = self.compile_layers(self.board, *layers)
-        if self.is_rampart_move(worker, y, x, mode=mode):
+        if self.is_rampart_move(
+            worker, y, x, build_mode=build_mode, break_mode=break_mode
+        ):
             if hot_is_ok and compiled[y, x] == 1:
                 return True
             elif not hot_is_ok and compiled[y, x] == 0:
@@ -1926,7 +1951,6 @@ class Game:
         for mode in action_priority:
             actions = actionable.get(mode)
             if actions:
-                print(worker.name, mode)
                 if worker.action_log:
                     for action_ in random.sample(actions, len(actions)):
                         compare_log = (
@@ -1993,6 +2017,10 @@ class Game:
             ):
                 actions[i] = self.get_random_action(worker)
                 self.replace_count += 1
+        for i, (worker, action) in enumerate(zip(self.workers[team], actions)):
+            if not self.is_actionable(worker, self.ACTIONS[action]):
+                actions[i] = self.get_random_action(worker)
+                self.force_replace_count += 1
 
         return actions
 
@@ -2170,6 +2198,7 @@ class Game:
         self.update_territory()
         self.board = self.update_blank(self.board)
         self.replace_count = 0
+        self.force_replace_count = 0
         self.get_map_name()
         self.board = self.update_blank(self.board)
         self.load_plan()
