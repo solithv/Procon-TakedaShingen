@@ -20,7 +20,11 @@ class NNModel:
         Args:
             sides (int, optional): 1辺の長さ. Defaults to 3.
         """
-        input_shape = (sides, sides, len(Game.CELL[: Game.CELL.index("worker_A0")]) + 2)
+        input_shape = (
+            sides,
+            sides,
+            len(Game.CELL[: Game.CELL.index("pond_boundary")]) + 2,
+        )
         output_size = len(Game.ACTIONS)
         self.model = self.define_model(input_shape, output_size, *args, **kwargs)
 
@@ -172,7 +176,9 @@ class NNModel:
             )
         self.model.summary()
 
-        x, y = DatasetUtil().load_dataset(dataset_dir)
+        set_shape = list(self.model.input_shape[1:])
+        set_shape[0], set_shape[2] = set_shape[2], set_shape[0]
+        x, y = DatasetUtil().load_dataset(dataset_dir, tuple(set_shape))
 
         callbacks = []
         early_stopping = keras.callbacks.EarlyStopping(

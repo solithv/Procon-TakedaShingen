@@ -12,7 +12,7 @@ def train():
     validation_split = 0.7
 
     nn = NNModel()
-    nn.make_model(sides=5)
+    nn.make_model(sides=7)
 
     nn.train(
         batch_size,
