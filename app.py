@@ -6,7 +6,7 @@ import MyEnv
 
 
 def main():
-    fields = glob.glob("./field_data/*.csv")
+    fields = glob.glob("./field_data/C13.csv")
     model_path = "./model"
     model_name = "game"
     env = MyEnv.Game(
@@ -36,12 +36,12 @@ def main():
             # actions = env.random_act()
             # actions = [0, 0, 0, 0, 0, 0]
             # actions = env.get_actions("pygame")
-        print(actions)
+        # print(actions)
         observation, reward, terminated, truncated, info = env.step(actions)
-        print(
-            f"turn:{info['turn']}, team:{info['current_team']}, "
-            + f"score_A:{info['score_A']}, score_B:{info['score_B']}"
-        )
+        # print(
+        #     f"turn:{info['turn']}, team:{info['current_team']}, "
+        #     + f"score_A:{info['score_A']}, score_B:{info['score_B']}"
+        # )
     print("game end")
     print(f"{env.replace_count} action replaced")
     env.end_game_render()

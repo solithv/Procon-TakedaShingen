@@ -11,6 +11,7 @@ import pygame
 from pygame.locals import KEYDOWN
 
 from .worker import Worker
+from .preset import PRESETS
 
 
 class Game:
@@ -1196,6 +1197,13 @@ class Game:
                 center=((j + 0.5) * self.cell_size, (i + 0.2) * self.cell_size)
             )
             self.window_surface.blit(text, text_rect)
+        if j == 0 or i == 0:
+            font = pygame.font.SysFont(None, 30)
+            text = font.render(str(i if j == 0 else j), False, self.BLACK)
+            text_rect = text.get_rect(
+                center=(j * self.cell_size + 10, i * self.cell_size + 10)
+            )
+            self.window_surface.blit(text, text_rect)
 
     def drawAll(self, view):
         for i in range(self.height):
@@ -1787,6 +1795,7 @@ class Game:
         Returns:
             int: 行動
         """
+        print(worker.name)
         worker.turn_init()
         actionable = defaultdict(list)
         action_priority = (
@@ -1803,8 +1812,16 @@ class Game:
             "move_last",
             "move",
         )
+        presetAction = []
+        if worker.team == "A":
+            print(worker.num, self.turn)
+            presetAction = PRESETS["C13"][worker.num]
+            
         for index, action in enumerate(self.ACTIONS):
             act_pos = self.get_action_position(worker, index)
+            if len(presetAction) != 0:
+                print(presetAction[self.turn / 2])
+                return presetAction[self.turn / 2]
             if "break" in action:
                 if self.is_breakable(worker, *act_pos, mode="opponent"):
                     actionable["break_opponent"].append(index)
@@ -1812,7 +1829,7 @@ class Game:
                     actionable["break_more_territory"].append(index)
             elif "build" in action:
                 if self.is_next_to_boundary(worker, *act_pos):
-                    print(self.turn, worker.name, act_pos)
+                    # print(self.turn, worker.name, act_pos)
                     actionable["fill_pond_boundary"].append(index)
                 if self.is_buildable(worker, *act_pos, mode="more"):
                     actionable["build_more_territory"].append(index)
@@ -1889,7 +1906,7 @@ class Game:
             ):
                 actions[i] = self.get_random_action(worker)
                 self.replace_count += 1
-  
+            
         return actions
 
     def get_around(
