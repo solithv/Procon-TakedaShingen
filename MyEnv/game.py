@@ -202,7 +202,7 @@ class Game:
 
         with open(self.pond_boundary_file) as f:
             boundaries: dict[str, np.ndarray] = json.load(f)
-        return boundaries[self.map_name]
+        return np.array(boundaries[self.map_name], dtype=np.int8)
 
     def load_from_csv(self, path: Union[str, list[str]]):
         """
