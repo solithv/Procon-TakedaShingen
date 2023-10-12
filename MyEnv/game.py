@@ -18,7 +18,7 @@ from .worker import Worker
 
 
 class Game:
-    metadata = {"render_modes": ["human", "ansi"], "render_fps": 25}
+    metadata = {"render_modes": ["human", "ansi"], "render_fps": 5}
     SCORE_MULTIPLIER = {"castle": 100, "territory": 30, "rampart": 10}
     TEAM = ("A", "B")
     FIELD_MIN, FIELD_MAX = 11, 25
@@ -1322,9 +1322,6 @@ class Game:
                 elif "pond" in cellInfo:
                     self.placeImage(self.POND_IMG, i, j)
                 elif "rampart_A" in cellInfo:
-                    # for t in range(20):
-                    #     time.sleep(0.1)
-                    #     self.placeImage(self.RAMPART_A_IMG, i, j, scale=t/10)
                     self.placeImage(self.RAMPART_A_IMG, i, j)
                 elif "rampart_B" in cellInfo:
                     self.placeImage(self.RAMPART_B_IMG, i, j)
@@ -1430,7 +1427,6 @@ class Game:
         actingWorker = 0
         while actingWorker < self.worker_count:
             for event in pygame.event.get():
-                print(event)
                 
                 if actingWorker >= self.worker_count:
                     break
@@ -1545,16 +1541,18 @@ class Game:
                             ):
                                 continue
                             actions.append(action)
-                        self.placeImage(self.BLANK_IMG, workerY, workerX)
-                        self.placeImage(
-                            eval(f"self.WORKER_{self.current_team}_IMG"),
-                            cellY,
-                            cellX,
-                            workerNumber=str(actingWorker),
-                        )
-                        self.drawGrids()
+                        for t in range(12):
+                            self.placeImage(self.BLANK_IMG, workerY, workerX)
+                            self.placeImage(
+                                eval(f"self.WORKER_{self.current_team}_IMG"),
+                                cellY,
+                                cellX,
+                                workerNumber=str(actingWorker),
+                                scale=t/11
+                            )
+                            self.drawGrids()
+                            pygame.display.update()
                         actingWorker += 1
-                        pygame.display.update()
                     # build
                     elif event.key == pygame.K_2:
                         if not np.any(
@@ -1595,11 +1593,12 @@ class Game:
                             workerX,
                             workerNumber=str(actingWorker - 1),
                         )
-                        self.placeImage(
-                            eval(f"self.RAMPART_{self.current_team}_IMG"), cellY, cellX
-                        )
-                        self.drawGrids()
-                        pygame.display.update()
+                        for t in range(12):
+                            self.placeImage(
+                                eval(f"self.RAMPART_{self.current_team}_IMG"), cellY, cellX, scale=t/11
+                            )
+                            self.drawGrids()
+                            pygame.display.update()
 
                     # break
                     elif event.key == pygame.K_3:
