@@ -195,6 +195,7 @@ class Game:
         """
         boardのpond_boundaryレイヤーを更新する
         """
+        # if self.pond_boundary_file is None or self.map_name is None:
         if self.pond_boundary_file is None:
             boundary = np.full((self.FIELD_MAX, self.FIELD_MAX), -1, dtype=np.int8)
             boundary[: self.height, :] = 0
@@ -311,7 +312,8 @@ class Game:
         for name, pond_map in self.unique_map.items():
             if np.array_equal(self.board[self.CELL.index("pond")], pond_map):
                 self.map_name = name
-                break
+                return
+        # self.map_name = None
 
     def compile_layers(
         self, board: np.ndarray, *layers: tuple[str], one_hot: bool = True
@@ -1506,7 +1508,6 @@ class Game:
         actingWorker = 0
         while actingWorker < self.worker_count:
             for event in pygame.event.get():
-                
                 if actingWorker >= self.worker_count:
                     break
                 mouseX, mouseY = pygame.mouse.get_pos()
@@ -1542,6 +1543,8 @@ class Game:
                         for j in range(self.width):
                             if territoryALayer[i][j] == territoryBLayer[i][j] == 1:
                                 color = self.PURPLE
+                            # elif pondBoundaryLayer[i][j] == 1:
+                            #     color = self.TURQUOISE
                             elif territoryALayer[i][j] == 1:
                                 color = self.RED
                             elif territoryBLayer[i][j] == 1:
@@ -1625,7 +1628,7 @@ class Game:
                                 cellY,
                                 cellX,
                                 workerNumber=str(actingWorker),
-                                scale=t/11
+                                scale=t / 11,
                             )
                             self.drawGrids()
                             pygame.display.update()
@@ -1672,7 +1675,10 @@ class Game:
                         )
                         for t in range(12):
                             self.placeImage(
-                                eval(f"self.RAMPART_{self.current_team}_IMG"), cellY, cellX, scale=t/11
+                                eval(f"self.RAMPART_{self.current_team}_IMG"),
+                                cellY,
+                                cellX,
+                                scale=t / 11,
                             )
                             self.drawGrids()
                             pygame.display.update()
@@ -2264,14 +2270,13 @@ class Game:
             )
         self.board[:, self.height :, :] = -1
         self.board[:, :, self.width :] = -1
+        self.get_map_name()
         self.board[self.CELL.index("pond_boundary")] = self.load_pond_boundary()
 
         self.update_territory()
         self.board = self.update_blank(self.board)
-        self.replace_count = 0
-        self.get_map_name()
-        self.board = self.update_blank(self.board)
         self.load_plan()
+        self.replace_count = 0
 
         self.max_turn = (
             self.max_steps if self.max_steps is not None else self.turns[self.width]
