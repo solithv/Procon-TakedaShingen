@@ -4,6 +4,7 @@ test*
 .devcontainer
 dataset/*.dat
 .env
+server/
 server_configs/
 log/
 資料/

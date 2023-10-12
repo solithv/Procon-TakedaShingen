@@ -1,6 +1,7 @@
 import copy
 import csv
 import json
+import time
 import os
 import pickle
 import random
@@ -17,7 +18,7 @@ from .worker import Worker
 
 
 class Game:
-    metadata = {"render_modes": ["human", "ansi"], "render_fps": 5}
+    metadata = {"render_modes": ["human", "ansi"], "render_fps": 25}
     SCORE_MULTIPLIER = {"castle": 100, "territory": 30, "rampart": 10}
     TEAM = ("A", "B")
     FIELD_MIN, FIELD_MAX = 11, 25
@@ -1224,7 +1225,7 @@ class Game:
 
     def placeImage(self, img, i, j, workerNumber=None, scale=1.0):
         """
-        i, j番目に画像描画する関数
+        i, j番目に画像を描画する関数
         workerNumber: str 職人番号
         scale: float 画像の倍率
         """
@@ -1321,6 +1322,9 @@ class Game:
                 elif "pond" in cellInfo:
                     self.placeImage(self.POND_IMG, i, j)
                 elif "rampart_A" in cellInfo:
+                    # for t in range(20):
+                    #     time.sleep(0.1)
+                    #     self.placeImage(self.RAMPART_A_IMG, i, j, scale=t/10)
                     self.placeImage(self.RAMPART_A_IMG, i, j)
                 elif "rampart_B" in cellInfo:
                     self.placeImage(self.RAMPART_B_IMG, i, j)
@@ -1379,7 +1383,6 @@ class Game:
             pygame.display.set_caption("game")
         if self.clock is None:
             self.clock = pygame.time.Clock()
-
         self.drawAll(view)
         self.clock.tick(self.metadata["render_fps"])
 
@@ -1427,6 +1430,8 @@ class Game:
         actingWorker = 0
         while actingWorker < self.worker_count:
             for event in pygame.event.get():
+                print(event)
+                
                 if actingWorker >= self.worker_count:
                     break
                 mouseX, mouseY = pygame.mouse.get_pos()
@@ -1923,10 +1928,11 @@ class Game:
                 ):
                     actionable["move_expand_2"].append(index)
         actionable["move_target"] = self.get_target_move(worker)
+        print(worker.get_coordinate())
         for mode in action_priority:
             actions = actionable.get(mode)
             if actions:
-                print(worker.name, mode)
+                # print(worker.name, mode)
                 if worker.action_log:
                     for action_ in random.sample(actions, len(actions)):
                         compare_log = (

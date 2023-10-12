@@ -28,8 +28,9 @@ def main():
     while not terminated and not truncated:
         env.render()
         if env.current_team == "A":
-            actions = env.get_random_actions()
-            actions = env.check_actions(actions)
+            actions = env.get_actions("pygame")
+            # actions = env.get_random_actions()
+            # actions = env.check_actions(actions)
             # actions = [actions[0], 0, 0, 0, 0, 0]
             # print(env.ACTIONS[actions[0]])
         else:
@@ -37,7 +38,6 @@ def main():
             actions = env.check_actions(actions)
             # actions = env.random_act()
             # actions = [0, 0, 0, 0, 0, 0]
-            # actions = env.get_actions("pygame")
         # print(actions)
         observation, reward, terminated, truncated, info = env.step(actions)
         # print(
