@@ -2276,7 +2276,10 @@ class Game:
         self.update_territory()
         self.board = self.update_blank(self.board)
         self.load_plan()
+
         self.replace_count = 0
+        self.score_A, self.score_B = 0, 0
+        self.previous_score_A, self.previous_score_B = 0, 0
 
         self.max_turn = (
             self.max_steps if self.max_steps is not None else self.turns[self.width]
@@ -2302,10 +2305,10 @@ class Game:
             f"self.worker_count:{self.worker_count}, "
             + f"data['board']['mason']:{data['board']['mason']}"
         )
-        assert (
-            self.turn - 1 == data["turn"]
-        ), f"self.turn:{self.turn}, data['turn']:{data['turn']}"
-        # self.turn = data["turn"] + 1
+        # assert (
+        #     self.turn - 1 == data["turn"]
+        # ), f"self.turn:{self.turn}, data['turn']:{data['turn']}"
+        self.turn = data["turn"] + 1
         structures = np.pad(
             np.array(data["board"]["structures"]),
             [

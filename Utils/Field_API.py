@@ -22,7 +22,7 @@ class API:
             r = req.get(self.match_url, headers=self.header)
             if r.status_code == 200:
                 break
-            print(r.status_code)
+            print(r.status_code, r.text)
             time.sleep(0.1)
 
         matches = r.json()
@@ -37,7 +37,7 @@ class API:
             r = req.get(f"{self.match_url}/{path}", headers=self.header)
             if r.status_code == 200:
                 break
-            print(r.status_code)
+            print(r.status_code, r.text)
             time.sleep(0.1)
 
         field = r.json()
@@ -53,5 +53,5 @@ class API:
             r = req.post(f"{self.match_url}/{path}", headers=header, json=act)
             if r.status_code == 200:
                 break
-            print(r.status_code)
+            print(r.status_code, r.text)
             time.sleep(0.1)

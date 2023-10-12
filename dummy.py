@@ -19,7 +19,6 @@ def main():
     match = match[0]
     id_ = match["id"]
 
-    _ = env.reset()
     env.reset_from_api(match)
 
     terminated, truncated = [False] * 2
