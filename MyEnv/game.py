@@ -1577,6 +1577,18 @@ class Game:
                 pygame.display.update()
 
                 if event.type == KEYDOWN:
+                    keys = pygame.key.get_pressed()
+                    cellY = workerY
+                    cellX = workerX
+                    if keys[pygame.K_UP]:
+                        cellY -= 1
+                    if keys[pygame.K_DOWN]:
+                        cellY += 1
+                    if keys[pygame.K_LEFT]:
+                        cellX -= 1
+                    if keys[pygame.K_RIGHT]:
+                        cellX += 1
+                    print(cellY, cellX)
                     if event.key == pygame.K_1:
                         if not np.any(
                             np.all(
