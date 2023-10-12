@@ -12,8 +12,7 @@ def main():
     for field in fields:
         if Path(field).stem.split("_")[-1] not in data.keys():
             break
-    model_path = "./model"
-    model_name = "game"
+
     env = MyEnv.Game(
         csv_path=field,
         render_mode="human",

@@ -31,6 +31,7 @@ def main():
     terminated, truncated = [False] * 2
     while not terminated and not truncated:
         field = fa.get_field(id_)
+        print(field)
         server_turn = field["turn"]
         env.get_stat_from_api(field)
         print(f"turn:{server_turn}, score_A:{env.score_A}, score_B:{env.score_B}")

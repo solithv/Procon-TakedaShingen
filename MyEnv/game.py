@@ -1,7 +1,6 @@
 import copy
 import csv
 import json
-import time
 import os
 import pickle
 import random
@@ -835,6 +834,22 @@ class Game:
                 direction += value
         return direction
 
+    def get_target_direction(self, worker: Worker, y: int, x: int, split: int = 8):
+        """職人から任意のマスへの方向を取得
+
+        Args:
+            worker (Worker): 職人
+            y (int): 目標y座標
+            x (int): 目標x座標
+            split (int, optional): 分割数 8で1~8、4で1~4で方向を返す. Defaults to 8.
+        """
+
+        def get_action_direction(angle, split):
+            return int(np.round(angle * split / (2 * np.pi))) % split + 1
+
+        target_action_angle = np.arctan2(x - worker.x, worker.y - y)
+        return get_action_direction(target_action_angle, split)
+
     def get_action_position(self, worker: Worker, action: Union[str, int]):
         """行動対象の座標を取得
 
@@ -1530,9 +1545,9 @@ class Game:
                     territoryBLayer = self.compile_layers(
                         self.board, "territory_B", one_hot=True
                     )
-                    pondBoundaryLayer = self.compile_layers(
-                        self.board, "pond_boundary", one_hot=True
-                    )
+                    # pondBoundaryLayer = self.compile_layers(
+                    #     self.board, "pond_boundary", one_hot=True
+                    # )
                     openTerritoryALayer = self.compile_layers(
                         self.board, "open_territory_A", one_hot=True
                     )

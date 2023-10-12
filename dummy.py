@@ -29,7 +29,8 @@ def main():
         print(f"turn:{server_turn}, score_A:{env.score_A}, score_B:{env.score_B}")
         env.render()
         if env.current_team == "B":
-            actions = env.get_random_actions()
+            actions = env.random_act()
+            # actions = env.get_random_actions()
             fa.post_actions(env.make_post_data(actions), id_, True)
             print(env.make_post_data(actions))
             _, _, terminated, truncated, _ = env.step(actions)
