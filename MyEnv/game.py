@@ -1927,7 +1927,6 @@ class Game:
                 ):
                     actionable["move_expand_2"].append(index)
         actionable["move_target"] = self.get_target_move(worker)
-        print(worker.get_coordinate())
         for mode in action_priority:
             actions = actionable.get(mode)
             if actions:
