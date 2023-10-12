@@ -35,15 +35,16 @@ def main():
             # print(env.ACTIONS[actions[0]])
         else:
             actions = env.get_random_actions()
-            actions = env.check_actions(actions)
+            # actions = env.check_actions(actions)
             # actions = env.random_act()
             # actions = [0, 0, 0, 0, 0, 0]
-        # print(actions)
+            # actions = env.get_actions("pygame")
+        # print([env.ACTIONS[action] for action in actions])
         observation, reward, terminated, truncated, info = env.step(actions)
-        # print(
-        #     f"turn:{info['turn']}, team:{info['current_team']}, "
-        #     + f"score_A:{info['score_A']}, score_B:{info['score_B']}"
-        # )
+        print(
+            f"turn:{info['turn']}, team:{info['current_team']}, "
+            + f"score_A:{info['score_A']}, score_B:{info['score_B']}"
+        )
     print("game end")
     print(f"{env.replace_count} action replaced")
     env.end_game_render()

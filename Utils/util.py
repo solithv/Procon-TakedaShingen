@@ -5,6 +5,7 @@ import shutil
 import zipfile
 from pathlib import Path
 from typing import Iterable, Union
+import json
 
 import numpy as np
 
@@ -159,6 +160,7 @@ class Util:
                 if is_combine.get(basename) and delete:
                     file.unlink()
 
+    @staticmethod
     def dump_pond_map(csv_folder, save_name):
         csv_folder: Path = Path(csv_folder)
         assert csv_folder.is_dir()
@@ -181,3 +183,39 @@ class Util:
                             board[y, x] = 0
             pond_fileds[name] = board
         pickle.dump(pond_fileds, (csv_folder / f"{save_name}.pkl").open("wb"))
+
+    @staticmethod
+    def fix_dataset_shape(base_name, dataset_dir="./dataset"):
+        dat_file = Path(f"./dataset/{base_name}.dat")
+        zip_file = Path(f"./dataset/{base_name}.zip")
+        Util.combine_and_unpack(dataset_dir, base_name)
+        zip_file.unlink(True)
+
+        x = []
+        y = []
+        with dat_file.open() as f:
+            for line in f:
+                feature, target = json.loads(line).values()
+                feature = np.array(feature, dtype=np.int8)
+                if feature.shape[0] == 12:
+                    new_feature = np.concatenate([feature[:-3], feature[-2:]], axis=0)
+                else:
+                    new_feature = feature
+                target = np.array(target, dtype=np.int8)
+                x.append(new_feature)
+                y.append(target)
+
+        with dat_file.open("w") as f:
+            [
+                print(
+                    json.dumps(
+                        {
+                            "X": features.tolist(),
+                            "Y": targets.tolist(),
+                        }
+                    ),
+                    file=f,
+                )
+                for features, targets in zip(x, y)
+            ]
+        Util.compress_and_split(dat_file, output_dir=dataset_dir)

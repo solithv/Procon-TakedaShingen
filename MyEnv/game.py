@@ -403,22 +403,14 @@ class Game:
                 if (x == 0 or x == self.width - 1) and (y == 0 or y == self.width - 1):
                     return False
                 if mode == "last":
-                    if (
-                        self.board[self.CELL.index("pond_boundary"), y, x] != 1
-                        and worker.action_log
-                        and worker.action_log[-1][1] == (y, x)
-                        and not self.is_rampart_move(worker, y, x)
-                    ):
+                    if worker.action_log and worker.action_log[-1][1] == (y, x):
                         return False
                 else:
                     for log in worker.action_log[-lock_length:]:
-                        if (
-                            self.board[self.CELL.index("pond_boundary"), y, x] != 1
-                            and log[0] == "move"
-                            and log[2] == (y, x)
-                            and not self.is_rampart_move(worker, y, x)
-                        ):
+                        if log[0] == "move" and (log[1] == (y, x) or log[2] == (y, x)):
                             return False
+                if not self.is_rampart_move(worker, y, x):
+                    return False
                 if mode == "around":
                     field = self.get_around(self.board, y, x, side_length=3)
                     compiled: np.ndarray = np.sum(
@@ -592,32 +584,62 @@ class Game:
                         result = True
         return result
 
-    def is_rampart_move(self, worker: Worker, y: int, x: int, mode: str = "both"):
+    def is_rampart_move(
+        self,
+        worker: Worker,
+        y: int,
+        x: int,
+        build_mode: str = "both",
+        break_mode: str = "both",
+    ):
         """建築または敵の壁を破壊できる移動先か判定
 
         Args:
             worker (Worker): 職人
             y (int): y座標
             x (int): x座標
-            mode (str, optional): 建築判定モード. Defaults to "both".
+            build_mode (str, optional): 建築判定モード Noneで建築不可を条件に判定.
+                Defaults to "both".
+            break_mode (str, optional): 破壊判定モード Noneで破壊不可を条件に判定.
+                Defaults to "both".
 
         Returns:
             bool: 判定結果
         """
+        assert build_mode is not None or break_mode is not None
         test_worker = copy.deepcopy(worker)
-        test_worker.update_coordinate(y, x)
         pos = np.array([y, x], dtype=np.int8)
         if self.is_movable(worker, y, x):
-            return any(
-                self.is_buildable(test_worker, *(pos + direction), mode="both")
-                or self.is_breakable(test_worker, *(pos + direction), mode="opponent")
-                for direction in self.DIRECTIONS.values()
-            )
+            test_worker.update_coordinate(y, x)
+            if build_mode is not None and break_mode is not None:
+                return any(
+                    self.is_buildable(test_worker, *(pos + direction), mode=build_mode)
+                    or self.is_breakable(
+                        test_worker, *(pos + direction), mode=break_mode
+                    )
+                    for direction in self.DIRECTIONS.values()
+                )
+            elif break_mode is None:
+                return any(
+                    self.is_buildable(test_worker, *(pos + direction), mode=build_mode)
+                    and not self.is_breakable(
+                        test_worker, *(pos + direction), mode="both"
+                    )
+                    for direction in self.DIRECTIONS.values()
+                )
+            elif build_mode is None:
+                return any(
+                    not self.is_buildable(test_worker, *(pos + direction), mode="both")
+                    and self.is_breakable(
+                        test_worker, *(pos + direction), mode=break_mode
+                    )
+                    for direction in self.DIRECTIONS.values()
+                )
 
     def is_actionable(
         self,
         worker: Worker,
-        action: str,
+        action: Union[str, int],
         stay: bool = False,
         move_mode: str = None,
         build_mode: str = None,
@@ -628,7 +650,7 @@ class Game:
 
         Args:
             worker (Worker): 職人
-            action (str): 行動名
+            action (Union[str, int]): 行動名
             stay (bool, optional): 待機を許容するか. Defaults to False.
             move_mode (str, optional): 移動判定モード. Defaults to None.
             build_mode (str, optional): 建築判定モード. Defaults to None.
@@ -640,6 +662,8 @@ class Game:
         Returns:
             bool: 判定結果
         """
+        if isinstance(action, int):
+            action = self.ACTIONS[action]
         act_pos = self.get_action_position(worker, action)
         if "break" in action and self.is_breakable(worker, *act_pos, break_mode):
             return True
@@ -677,7 +701,8 @@ class Game:
         x: int,
         *layers: tuple[str],
         hot_is_ok: bool = False,
-        mode="any",
+        build_mode: str = "both",
+        break_mode: str = "both",
     ):
         """陣地を拡張するように移動できるか判定
 
@@ -688,18 +713,72 @@ class Game:
             layers (tuple[str]): 判定基準レイヤー名
             hot_is_ok (bool, optional): 判定基準レイヤーが1の時を条件とするか.
                 Defaults to False.
-            mode (str, optional): 建築判定モード. Defaults to "both".
+            build_mode (str, optional): 建築判定モード Noneで建築不可を条件に判定.
+                Defaults to "both".
+            break_mode (str, optional): 破壊判定モード Noneで破壊不可を条件に判定.
+                Defaults to "both".
 
         Returns:
             bool: 判定結果
         """
         compiled = self.compile_layers(self.board, *layers)
-        if self.is_rampart_move(worker, y, x, mode=mode):
+        if self.is_rampart_move(
+            worker, y, x, build_mode=build_mode, break_mode=break_mode
+        ):
             if hot_is_ok and compiled[y, x] == 1:
                 return True
             elif not hot_is_ok and compiled[y, x] == 0:
                 return True
         return False
+
+    def get_expand_move(self, worker: Worker, castle=False):
+        """2ターン先で建築、破壊できる移動先を探索
+
+        Args:
+            worker (Worker): 職人
+            castle (bool, optional): castle, pond_boundaryを優先. Defaults to False.
+
+        Returns:
+            list[int]: 行動の候補
+        """
+        actionable = []
+        test_worker: Worker = copy.deepcopy(worker)
+
+        for index, action in enumerate(self.ACTIONS[1:]):
+            if "move" in action and self.is_movable(
+                test_worker, *self.get_action_position(worker, index)
+            ):
+                test_worker.update_coordinate(*self.get_action_position(worker, index))
+                y, x = test_worker.get_coordinate()
+                for action_ in self.ACTIONS[1:]:
+                    if "move" in action_ and self.is_movable(
+                        test_worker, *self.get_action_position(test_worker, action_)
+                    ):
+                        if not castle and self.is_rampart_move(
+                            test_worker, y, x, break_mode="opponent"
+                        ):
+                            actionable.append(index)
+                            break
+                        around = self.get_around(
+                            self.board, y, x, side_length=3, raw=True
+                        )
+                        around = self.compile_layers(around, "castle", "pond_boundary")
+                        for y_, x_ in zip(*np.where(around == 1)):
+                            if y_ == x_ == 1:
+                                continue
+                            if self.is_rampart_move(
+                                test_worker,
+                                y + y_ - 1,
+                                x + x_ - 1,
+                                break_mode="opponent",
+                            ):
+                                actionable.append(index)
+                                break
+                    if "move" not in action:
+                        break
+            if "move" not in action:
+                break
+        return actionable
 
     def get_target_move(self, worker: Worker):
         """目標地点に向かう行動の候補を返す
@@ -708,7 +787,7 @@ class Game:
             worker (Worker): 職人
 
         Returns:
-            list[int]: 行動のリスト
+            list[int]: 行動の候補
         """
 
         def get_action_direction(angle, split=8):
@@ -1856,8 +1935,12 @@ class Game:
             "move_boundary",
             "build_outside",
             "build_inside",
+            "move_castle_build",
+            "move_obstruction_build",
             "move_castle",
             "move_obstruction",
+            "move_expand_castle",
+            "move_expand",
             "move_expand_1",
             "move_expand_2",
             "move_around",
@@ -1867,7 +1950,7 @@ class Game:
         )
         if worker.plan:
             action = worker.plan.popleft()
-            if self.is_actionable(worker, action):
+            if self.is_actionable(worker, self.ACTIONS[action]):
                 return action
             else:
                 worker.plan.clear()
@@ -1905,6 +1988,18 @@ class Game:
                     actionable["move_last"].append(index)
                 if self.is_movable(worker, *act_pos):
                     actionable["move"].append(index)
+                if self.is_expand_move(
+                    worker, *act_pos, "castle", hot_is_ok=True, break_mode=None
+                ):
+                    actionable["move_castle_build"].append(index)
+                if self.is_expand_move(
+                    worker,
+                    *act_pos,
+                    f"rampart_{worker.opponent_team}",
+                    hot_is_ok=True,
+                    break_mode=None,
+                ):
+                    actionable["move_obstruction_build"].append(index)
                 if self.is_expand_move(worker, *act_pos, "castle", hot_is_ok=True):
                     actionable["move_castle"].append(index)
                 if self.is_expand_move(
@@ -1925,10 +2020,11 @@ class Game:
                 ):
                     actionable["move_expand_2"].append(index)
         actionable["move_target"] = self.get_target_move(worker)
+        actionable["move_expand"] = self.get_expand_move(worker)
+        actionable["move_expand_castle"] = self.get_expand_move(worker, castle=True)
         for mode in action_priority:
             actions = actionable.get(mode)
             if actions:
-                # print(worker.name, mode)
                 if worker.action_log:
                     for action_ in random.sample(actions, len(actions)):
                         compare_log = (
@@ -2008,7 +2104,8 @@ class Game:
             y (int): y座標
             x (int): x座標
             side_length (int, optional): 取得領域. Defaults to 5.
-            raw (bool, optional): Falseなら職人の層を結合. Defaults to False.
+            raw (bool, optional): Falseなら職人の層を結合し、pond_boundaryを排除.
+                Defaults to False.
 
         Returns:
             np.ndarray: 取得した盤面
