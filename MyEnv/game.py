@@ -1463,8 +1463,6 @@ class Game:
                         for j in range(self.width):
                             if territoryALayer[i][j] == territoryBLayer[i][j] == 1:
                                 color = self.PURPLE
-                            elif pondBoundaryLayer[i][j] == 1:
-                                color = self.TURQUOISE
                             elif territoryALayer[i][j] == 1:
                                 color = self.RED
                             elif territoryBLayer[i][j] == 1:
