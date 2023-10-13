@@ -1,6 +1,7 @@
 import copy
 import csv
 import json
+import time
 import os
 import pickle
 import random
@@ -440,8 +441,6 @@ class Game:
                     self.extra_board[self.EXTRA_CELL.index("enter_disallowed"), y, x]
                     == 1
                 ):
-                    # debug
-                    # print(worker.name, y, x)
                     return False
                 if mode == "last":
                     if worker.action_log and worker.action_log[-1][1] == (y, x):
@@ -1511,6 +1510,26 @@ class Game:
         self.window_surface.blit(text, text_rect)
         pygame.display.update()
 
+    def drawAllRect(self, fill, fillmode: str = "color", cell: str = None):
+        for i in range(self.height):
+            for j in range(self.width):
+                if self.board[self.CELL.index(cell), i, j] == 1:
+                    if fillmode == "color":
+                        pygame.draw.rect(
+                            self.window_surface,
+                            fill,
+                            (
+                                j * self.cell_size,
+                                i * self.cell_size,
+                                self.cell_size,
+                                self.cell_size,
+                            ),
+                        )
+                    elif fillmode == "image":
+                        self.placeImage(fill, i, j)
+                        
+        pygame.display.update()
+
     def render_rgb_array(self):
         """
         描画を行う
@@ -1580,6 +1599,7 @@ class Game:
         showTerritory = False
         actions = []
         actingWorker = 0
+        prePositionSum = 0
         while actingWorker < self.worker_count:
             for event in pygame.event.get():
                 if actingWorker >= self.worker_count:
@@ -1596,6 +1616,17 @@ class Game:
                         if showTerritory:
                             self.drawAll(view)
                         showTerritory = not showTerritory
+                
+                positionSum = np.sum(self.board[self.CELL.index("territory_A")])
+                
+                print(prePositionSum - positionSum)
+                if prePositionSum - positionSum != 0:
+                    for t in range(3):
+                        self.drawAllRect(fill=self.RED, fillmode="color", cell="territory_A")
+                        time.sleep(0.1)
+                        self.drawAllRect(fill=self.BLANK_IMG, fillmode="image", cell="territory_A")
+                        time.sleep(0.1)
+                    self.drawAll(view)
 
                 if showTerritory:
                     territoryALayer = self.compile_layers(
@@ -1640,6 +1671,8 @@ class Game:
                             )
                     self.drawGrids()
                     continue
+                
+                prePositionSum = np.sum(self.board[self.CELL.index("territory_A")])
 
                 self.placeImage(
                     eval(f"self.WORKER_{self.current_team}_HOVER_IMG"),
@@ -2142,10 +2175,6 @@ class Game:
         for mode in action_priority:
             actions = actionable.get(mode)
             if actions:
-                # debug
-                # if worker.name == "worker_B5" or worker.name=="worker_A5":
-                #     if any("move" in self.ACTIONS[a] for a in actions):
-                #         print(worker.name, mode, actions)
                 if worker.action_log:
                     for action_ in random.sample(actions, len(actions)):
                         compare_log = (
