@@ -7,8 +7,6 @@ from Utils import API
 
 
 def main():
-    # model_path = "./model"
-    # model_name = "game"
     env = MyEnv.Game(
         max_steps=500,
         render_mode="human",
@@ -16,6 +14,8 @@ def main():
         preset_file=None,
     )
 
+    # model_path = "./model"
+    # model_name = "game"
     # nn = NNModel()
     # nn.load_model(model_path, model_name)
 
@@ -43,11 +43,13 @@ def main():
             print([env.ACTIONS[action] for action in actions])
             print(env.make_post_data(actions))
             fa.post_actions(env.make_post_data(actions), id_)
-            manual_actions = env.get_actions_from_pygame()
-            for i, m_action in enumerate(manual_actions):
-                if m_action != 0:
-                    actions[i] = m_action
-            fa.post_actions(env.make_post_data(actions), id_)
+
+            # manual_actions = env.get_actions_from_pygame()
+            # for i, m_action in enumerate(manual_actions):
+            #     if m_action != 0:
+            #         actions[i] = m_action
+            # fa.post_actions(env.make_post_data(actions), id_)
+
             _, _, terminated, truncated, _ = env.step(actions)
         else:
             _, _, terminated, truncated, _ = env.dummy_step()
