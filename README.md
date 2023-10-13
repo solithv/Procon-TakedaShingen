@@ -31,6 +31,12 @@ python annotator.py
 python train.py
 ```
 
+### プリセット作成
+
+```bash
+python planner.py
+```
+
 ### ローカルプレイ
 
 ```bash
