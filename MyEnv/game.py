@@ -415,12 +415,13 @@ class Game:
             not worker.is_action
             and 0 <= y < self.height
             and 0 <= x < self.width
-            and not self.compile_layers(
+            and self.compile_layers(
                 self.board,
                 f"rampart_{worker.opponent_team}",
                 "pond",
                 *[f"worker_{worker.opponent_team}{i}" for i in range(self.WORKER_MAX)],
             )[y, x]
+            != 1
             and (y, x) not in self.get_team_worker_coordinate(worker.team)
             and (y, x) not in self.worker_positions
         ):
@@ -479,13 +480,14 @@ class Game:
             not worker.is_action
             and 0 <= y < self.height
             and 0 <= x < self.width
-            and not self.compile_layers(
+            and self.compile_layers(
                 self.board,
                 "rampart_A",
                 "rampart_B",
                 "castle",
                 *[f"worker_{worker.opponent_team}{i}" for i in range(self.WORKER_MAX)],
             )[y, x]
+            != 1
         ):
             if mode is not None:
                 if (x == 0 or x == self.width - 1) and (y == 0 or y == self.width - 1):
@@ -536,7 +538,7 @@ class Game:
             not worker.is_action
             and 0 <= y < self.height
             and 0 <= x < self.width
-            and self.compile_layers(self.board, "rampart_A", "rampart_B")[y, x]
+            and self.compile_layers(self.board, "rampart_A", "rampart_B")[y, x] == 1
         ):
             if mode is not None:
                 if self.extra_board[self.EXTRA_CELL.index("pond_boundary"), y, x] == 1:
@@ -597,11 +599,11 @@ class Game:
         Return:
             bool: 判定結果
         """
-        test_worker = copy.deepcopy(worker)
-        test_worker.update_coordinate(y, x)
-        pos = np.array([y, x], dtype=np.int8)
         result = False
-        if self.is_movable(worker, y, x):
+        if self.is_movable(worker, y, x, mode="any"):
+            test_worker = copy.deepcopy(worker)
+            test_worker.update_coordinate(y, x)
+            pos = np.array([y, x], dtype=np.int8)
             for direction in self.DIRECTIONS.values():
                 target_y, target_x = pos + direction
                 if (
@@ -640,7 +642,7 @@ class Game:
         assert build_mode is not None or break_mode is not None
         test_worker = copy.deepcopy(worker)
         pos = np.array([y, x], dtype=np.int8)
-        if self.is_movable(worker, y, x):
+        if self.is_movable(worker, y, x, mode="any"):
             test_worker.update_coordinate(y, x)
             if build_mode is not None and break_mode is not None:
                 return any(
@@ -654,13 +656,15 @@ class Game:
                 return any(
                     self.is_buildable(test_worker, *(pos + direction), mode=build_mode)
                     and not self.is_breakable(
-                        test_worker, *(pos + direction), mode="both"
+                        test_worker, *(pos + direction), mode=break_mode
                     )
                     for direction in self.DIRECTIONS.values()
                 )
             elif build_mode is None:
                 return any(
-                    not self.is_buildable(test_worker, *(pos + direction), mode="both")
+                    not self.is_buildable(
+                        test_worker, *(pos + direction), mode=break_mode
+                    )
                     and self.is_breakable(
                         test_worker, *(pos + direction), mode=break_mode
                     )
@@ -777,13 +781,15 @@ class Game:
 
         for index, action in enumerate(self.ACTIONS[1:]):
             if "move" in action and self.is_movable(
-                test_worker, *self.get_action_position(worker, index)
+                test_worker, *self.get_action_position(worker, index), mode="any"
             ):
                 test_worker.update_coordinate(*self.get_action_position(worker, index))
                 y, x = test_worker.get_coordinate()
                 for action_ in self.ACTIONS[1:]:
                     if "move" in action_ and self.is_movable(
-                        test_worker, *self.get_action_position(test_worker, action_)
+                        test_worker,
+                        *self.get_action_position(test_worker, action_),
+                        mode="any",
                     ):
                         if not castle and self.is_rampart_move(
                             test_worker, y, x, break_mode="opponent"
@@ -1625,9 +1631,15 @@ class Game:
                 pygame.display.update()
 
                 if event.type == KEYDOWN:
-                    
                     keys = pygame.key.get_pressed()
-                    if (any([keys[pygame.K_LEFT], keys[pygame.K_RIGHT], keys[pygame.K_DOWN], keys[pygame.K_UP]])):
+                    if any(
+                        [
+                            keys[pygame.K_LEFT],
+                            keys[pygame.K_RIGHT],
+                            keys[pygame.K_DOWN],
+                            keys[pygame.K_UP],
+                        ]
+                    ):
                         # 最強
                         cellY = workerY
                         cellX = workerX
@@ -2011,6 +2023,7 @@ class Game:
             "move_boundary",
             "build_outside",
             "build_inside",
+            "build_both",
             "move_castle_build",
             "move_obstruction_build",
             "move_castle",

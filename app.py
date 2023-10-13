@@ -30,7 +30,7 @@ def main():
         if env.current_team == "A":
             # actions = env.get_actions("pygame")
             actions = env.get_random_actions()
-            # actions = env.check_actions(actions)
+            actions = env.check_actions(actions)
             # actions = [actions[0], 0, 0, 0, 0, 0]
             # print(env.ACTIONS[actions[0]])
         else:
