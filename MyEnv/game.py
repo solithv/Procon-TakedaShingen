@@ -452,8 +452,6 @@ class Game:
                     for log in worker.action_log[-lock_length:]:
                         if log[0] == "move" and (log[1] == (y, x) or log[2] == (y, x)):
                             return False
-                # if not self.is_rampart_move(worker, y, x):
-                #     return False
                 if mode == "around":
                     field = self.get_around(self.board, y, x, side_length=3)
                     compiled: np.ndarray = np.sum(
