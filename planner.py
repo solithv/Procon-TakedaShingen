@@ -6,14 +6,13 @@ from pathlib import Path
 
 
 def main():
-    fields = glob.glob("./field_data/A25.csv")
+    fields = glob.glob("./field_data/*.csv")
     with open("preset.json", "r") as f:
         data = json.load(f)
     for field in fields:
         if Path(field).stem.split("_")[-1] not in data.keys():
             break
-    model_path = "./model"
-    model_name = "game"
+
     env = MyEnv.Game(
         csv_path=field,
         render_mode="human",

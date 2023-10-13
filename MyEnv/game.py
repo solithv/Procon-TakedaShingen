@@ -1,7 +1,6 @@
 import copy
 import csv
 import json
-import time
 import os
 import pickle
 import random
@@ -195,6 +194,7 @@ class Game:
         """
         boardのpond_boundaryレイヤーを更新する
         """
+        # if self.pond_boundary_file is None or self.map_name is None:
         if self.pond_boundary_file is None:
             boundary = np.full((self.FIELD_MAX, self.FIELD_MAX), -1, dtype=np.int8)
             boundary[: self.height, :] = 0
@@ -311,7 +311,8 @@ class Game:
         for name, pond_map in self.unique_map.items():
             if np.array_equal(self.board[self.CELL.index("pond")], pond_map):
                 self.map_name = name
-                break
+                return
+        # self.map_name = None
 
     def compile_layers(
         self, board: np.ndarray, *layers: tuple[str], one_hot: bool = True
@@ -753,6 +754,22 @@ class Game:
             if key in self.ACTIONS[action]:
                 direction += value
         return direction
+
+    def get_target_direction(self, worker: Worker, y: int, x: int, split: int = 8):
+        """職人から任意のマスへの方向を取得
+
+        Args:
+            worker (Worker): 職人
+            y (int): 目標y座標
+            x (int): 目標x座標
+            split (int, optional): 分割数 8で1~8、4で1~4で方向を返す. Defaults to 8.
+        """
+
+        def get_action_direction(angle, split):
+            return int(np.round(angle * split / (2 * np.pi))) % split + 1
+
+        target_action_angle = np.arctan2(x - worker.x, worker.y - y)
+        return get_action_direction(target_action_angle, split)
 
     def get_action_position(self, worker: Worker, action: Union[str, int]):
         """行動対象の座標を取得
@@ -1427,7 +1444,6 @@ class Game:
         actingWorker = 0
         while actingWorker < self.worker_count:
             for event in pygame.event.get():
-                
                 if actingWorker >= self.worker_count:
                     break
                 mouseX, mouseY = pygame.mouse.get_pos()
@@ -1450,9 +1466,9 @@ class Game:
                     territoryBLayer = self.compile_layers(
                         self.board, "territory_B", one_hot=True
                     )
-                    pondBoundaryLayer = self.compile_layers(
-                        self.board, "pond_boundary", one_hot=True
-                    )
+                    # pondBoundaryLayer = self.compile_layers(
+                    #     self.board, "pond_boundary", one_hot=True
+                    # )
                     openTerritoryALayer = self.compile_layers(
                         self.board, "open_territory_A", one_hot=True
                     )
@@ -1463,8 +1479,8 @@ class Game:
                         for j in range(self.width):
                             if territoryALayer[i][j] == territoryBLayer[i][j] == 1:
                                 color = self.PURPLE
-                            elif pondBoundaryLayer[i][j] == 1:
-                                color = self.TURQUOISE
+                            # elif pondBoundaryLayer[i][j] == 1:
+                            #     color = self.TURQUOISE
                             elif territoryALayer[i][j] == 1:
                                 color = self.RED
                             elif territoryBLayer[i][j] == 1:
@@ -1563,7 +1579,7 @@ class Game:
                                 cellY,
                                 cellX,
                                 workerNumber=str(actingWorker),
-                                scale=t/11
+                                scale=t / 11,
                             )
                             self.drawGrids()
                             pygame.display.update()
@@ -1611,7 +1627,10 @@ class Game:
                         )
                         for t in range(12):
                             self.placeImage(
-                                eval(f"self.RAMPART_{self.current_team}_IMG"), cellY, cellX, scale=t/11
+                                eval(f"self.RAMPART_{self.current_team}_IMG"),
+                                cellY,
+                                cellX,
+                                scale=t / 11,
                             )
                             self.drawGrids()
                             pygame.display.update()
@@ -2185,14 +2204,16 @@ class Game:
             )
         self.board[:, self.height :, :] = -1
         self.board[:, :, self.width :] = -1
+        self.get_map_name()
         self.board[self.CELL.index("pond_boundary")] = self.load_pond_boundary()
 
         self.update_territory()
         self.board = self.update_blank(self.board)
-        self.replace_count = 0
-        self.get_map_name()
-        self.board = self.update_blank(self.board)
         self.load_plan()
+
+        self.replace_count = 0
+        self.score_A, self.score_B = 0, 0
+        self.previous_score_A, self.previous_score_B = 0, 0
 
         self.max_turn = (
             self.max_steps if self.max_steps is not None else self.turns[self.width]
@@ -2218,10 +2239,10 @@ class Game:
             f"self.worker_count:{self.worker_count}, "
             + f"data['board']['mason']:{data['board']['mason']}"
         )
-        assert (
-            self.turn - 1 == data["turn"]
-        ), f"self.turn:{self.turn}, data['turn']:{data['turn']}"
-        # self.turn = data["turn"] + 1
+        # assert (
+        #     self.turn - 1 == data["turn"]
+        # ), f"self.turn:{self.turn}, data['turn']:{data['turn']}"
+        self.turn = data["turn"] + 1
         structures = np.pad(
             np.array(data["board"]["structures"]),
             [
