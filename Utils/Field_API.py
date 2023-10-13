@@ -51,7 +51,7 @@ class API:
         header = self.header if not opponent else {"procon-token": "dummy-token"}
         while True:
             r = req.post(f"{self.match_url}/{path}", headers=header, json=act)
-            if r.status_code == 200:
+            if r.status_code in (200, 400):
                 break
             print("post_actions", r.status_code, r.text)
             time.sleep(0.1)
