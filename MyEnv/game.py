@@ -1340,10 +1340,12 @@ class Game:
             pygame.image.load(self.cwd + "/assets/rampart_B.png"), self.IMG_SCALER
         )
         self.RAMPART_A_BROKEN_IMG = pygame.transform.scale(
-            pygame.image.load(self.cwd + "/assets/rampart_A_broken.png"), self.IMG_SCALER
+            pygame.image.load(self.cwd + "/assets/rampart_A_broken.png"),
+            self.IMG_SCALER,
         )
         self.RAMPART_B_BROKEN_IMG = pygame.transform.scale(
-            pygame.image.load(self.cwd + "/assets/rampart_B_broken.png"), self.IMG_SCALER
+            pygame.image.load(self.cwd + "/assets/rampart_B_broken.png"),
+            self.IMG_SCALER,
         )
         self.WORKER_A_IMG = pygame.transform.scale(
             pygame.image.load(self.cwd + "/assets/worker_A.png"), self.IMG_SCALER
