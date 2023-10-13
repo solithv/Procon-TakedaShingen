@@ -1597,12 +1597,10 @@ class Game:
                 if event.type == KEYDOWN:
                     
                     keys = pygame.key.get_pressed()
-                    if (any([keys[pygame.K_LEFT], keys[pygame.K_RIGHT], keys[pygame.K_DOWN], keys[pygame.K_UP], keys[pygame.K_0]])):
+                    if (any([keys[pygame.K_LEFT], keys[pygame.K_RIGHT], keys[pygame.K_DOWN], keys[pygame.K_UP]])):
                         # 最強
                         cellY = workerY
                         cellX = workerX
-                        if keys[pygame.K_0]:
-                            actions.append(0)
                         if keys[pygame.K_UP]:
                             cellY -= 1
                         if keys[pygame.K_DOWN]:
@@ -1612,6 +1610,15 @@ class Game:
                         if keys[pygame.K_RIGHT]:
                             cellX += 1
                         
+                    if event.key == pygame.K_0:
+                        y, x = self.workers[self.current_team][actingWorker].get_coordinate()
+                        self.placeImage(self.BLANK_IMG, y, x)
+                        self.placeImage(self.WORKER_A_IMG, y, x, str(actingWorker))
+                        self.drawGrids()
+                        actions.append(0)
+                        actingWorker += 1
+                        
+                    # move
                     if event.key == pygame.K_1:
                         if not np.any(
                             np.all(
