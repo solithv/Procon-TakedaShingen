@@ -6,7 +6,7 @@ import MyEnv
 
 
 def main():
-    fields = glob.glob("./field_data/*C*.csv")
+    fields = glob.glob("./field_data/*C25.csv")
     # model_path = "./model"
     # model_name = "game"
     env = MyEnv.Game(
@@ -28,8 +28,8 @@ def main():
     while not terminated and not truncated:
         env.render()
         if env.current_team == "A":
-            actions = env.get_actions("pygame")
-            # actions = env.get_random_actions()
+            # actions = env.get_actions("pygame")
+            actions = env.get_random_actions()
             # actions = env.check_actions(actions)
             # actions = [actions[0], 0, 0, 0, 0, 0]
             # print(env.ACTIONS[actions[0]])

@@ -113,6 +113,7 @@ class Game:
         render_fps: int = None,
         unique_map_file: str = "./field_data/name_to_map.pkl",
         pond_boundary_file: str = "./field_data/boundaryData.json",
+        enter_disallowed_file: str = "./field_data/enterDisallowed.json",
         preset_file: str = "./preset.json",
     ):
         """init
@@ -156,6 +157,7 @@ class Game:
 
         self.pond_boundary_file = pond_boundary_file
         self.preset_file = preset_file
+        self.enter_disallowed_file = enter_disallowed_file
 
     def get_observation(self):
         """内部関数
@@ -210,6 +212,21 @@ class Game:
         with open(self.pond_boundary_file) as f:
             boundaries: dict[str, list] = json.load(f)
         return np.array(boundaries[self.map_name], dtype=np.int8)
+   
+    def load_enter_disallowed(self):
+        """
+        boardのenter_disallowedレイヤーを更新する
+        """
+        # if self.enter_disallowed_file is None or self.map_name is None:
+        if self.enter_disallowed_file is None:
+            enter_disallowed = np.full((self.FIELD_MAX, self.FIELD_MAX), -1, dtype=np.int8)
+            enter_disallowed[: self.height, :] = 0
+            enter_disallowed[:, : self.width] = 0
+            return enter_disallowed
+
+        with open(self.enter_disallowed_file) as f:
+            enter_disallowed_maps: dict[str, list] = json.load(f)
+        return np.array(enter_disallowed_maps[self.map_name], dtype=np.int8)
 
     def load_from_csv(self, path: Union[str, list[str]]):
         """
@@ -298,6 +315,7 @@ class Game:
         self.replace_count = 0
         self.get_map_name()
         self.extra_board[self.EXTRA_CELL.index("pond_boundary")] = self.load_pond_boundary()
+        self.extra_board[self.EXTRA_CELL.index("enter_disallowed")] = self.load_enter_disallowed()
         self.board = self.update_blank(self.board)
         self.load_plan()
 
@@ -408,6 +426,10 @@ class Game:
         ):
             if mode is not None:
                 if (x == 0 or x == self.width - 1) and (y == 0 or y == self.width - 1):
+                    return False
+                if self.extra_board[self.EXTRA_CELL.index("enter_disallowed"), y, x] == 1:
+                    # debug
+                    # print(worker.name, y, x)
                     return False
                 if mode == "last":
                     if worker.action_log and worker.action_log[-1][1] == (y, x):
@@ -2079,6 +2101,10 @@ class Game:
         for mode in action_priority:
             actions = actionable.get(mode)
             if actions:
+                # debug
+                # if worker.name == "worker_B5" or worker.name=="worker_A5":
+                #     if any("move" in self.ACTIONS[a] for a in actions):
+                #         print(worker.name, mode, actions)
                 if worker.action_log:
                     for action_ in random.sample(actions, len(actions)):
                         compare_log = (
@@ -2321,6 +2347,7 @@ class Game:
         self.board[:, :, self.width :] = -1
         self.get_map_name()
         self.extra_board[self.EXTRA_CELL.index("pond_boundary")] = self.load_pond_boundary()
+        self.extra_board[self.EXTRA_CELL.index("enter_disallowed")] = self.load_enter_disallowed()
 
         self.update_territory()
         self.board = self.update_blank(self.board)
