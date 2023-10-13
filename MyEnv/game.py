@@ -1831,7 +1831,12 @@ class Game:
                             workerNumber=str(actingWorker - 1),
                         )
                         print((f"self.RAMPART_{self.current_team}_BROKEN_IMG"))
-                        self.placeImage(eval(f"self.RAMPART_{self.current_team}_BROKEN_IMG"), cellY, cellX)
+                        self.placeImage(self.BLANK_IMG, cellY, cellX)
+                        self.placeImage(
+                            eval(f"self.RAMPART_{self.current_team}_BROKEN_IMG"),
+                            cellY,
+                            cellX,
+                        )
                         self.drawGrids()
                         pygame.display.update()
             self.drawTurnInfo(actingWorker=actingWorker + 1)
