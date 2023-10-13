@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 def main():
-    map_name = "B11"
+    map_name = "inv_B11"
     fields = "./field_data/{}.csv"
     with open("preset.json", "r") as f:
         data = json.load(f)
