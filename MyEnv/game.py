@@ -1668,7 +1668,7 @@ class Game:
                         if keys[pygame.K_RIGHT]:
                             cellX += 1
 
-                    if event.key == pygame.K_0:
+                    if event.key == pygame.K_BACKSLASH:
                         y, x = self.workers[self.current_team][
                             actingWorker
                         ].get_coordinate()
