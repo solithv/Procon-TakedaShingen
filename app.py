@@ -6,9 +6,9 @@ import MyEnv
 
 
 def main():
-    fields = glob.glob("./field_data/inv_A17.csv")
-    model_path = "./model"
-    model_name = "game"
+    fields = glob.glob("./field_data/*C25.csv")
+    # model_path = "./model"
+    # model_name = "game"
     env = MyEnv.Game(
         csv_path=fields,
         render_mode="human",
