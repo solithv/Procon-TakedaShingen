@@ -225,7 +225,12 @@ class Game:
 
         with open(self.enter_disallowed_file) as f:
             enter_disallowed_maps: dict[str, list] = json.load(f)
-        return np.array(enter_disallowed_maps[self.map_name], dtype=np.int8)
+        return np.array(
+            enter_disallowed_maps.get(
+                self.map_name, np.zeros_like(self.extra_board[0])
+            ),
+            dtype=np.int8,
+        )
 
     def load_from_csv(self, path: Union[str, list[str]]):
         """
@@ -1669,7 +1674,7 @@ class Game:
                         if keys[pygame.K_RIGHT]:
                             cellX += 1
 
-                    if event.key == pygame.K_0:
+                    if event.key == pygame.K_BACKSLASH:
                         y, x = self.workers[self.current_team][
                             actingWorker
                         ].get_coordinate()
