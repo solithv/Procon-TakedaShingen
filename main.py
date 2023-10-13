@@ -10,8 +10,7 @@ def main():
     env = MyEnv.Game(
         max_steps=500,
         render_mode="human",
-        use_pyautogui=True,
-        preset_file=None,
+        # use_pyautogui=True,
     )
 
     # model_path = "./model"
@@ -40,8 +39,6 @@ def main():
             # actions = nn.predict(env.get_around_workers())
             actions = env.get_random_actions()
             actions = env.check_actions(actions)
-            print([env.ACTIONS[action] for action in actions])
-            print(env.make_post_data(actions))
             fa.post_actions(env.make_post_data(actions), id_)
 
             # manual_actions = env.get_actions_from_pygame()

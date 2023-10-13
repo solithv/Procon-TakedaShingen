@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 def main():
-    map_name = "C13"
+    map_name = "B13"
     fields = "./field_data/{}.csv"
     with open("preset.json", "r") as f:
         data = json.load(f)
@@ -17,7 +17,7 @@ def main():
         env = MyEnv.Game(
             csv_path=fields.format(map_name),
             render_mode="human",
-            use_pyautogui=True,
+            # use_pyautogui=True,
             first_player=0,
             preset_file=None,
         )

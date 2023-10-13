@@ -6,14 +6,14 @@ import MyEnv
 
 
 def main():
-    fields = glob.glob("./field_data/inv_C13.csv")
+    fields = glob.glob("./field_data/B13.csv")
     # model_path = "./model"
     # model_name = "game"
     env = MyEnv.Game(
         csv_path=fields,
         render_mode="human",
-        use_pyautogui=True,
-        #preset_file=None,
+        # use_pyautogui=True,
+        # preset_file=None,
     )
 
     # nn = NNModel()

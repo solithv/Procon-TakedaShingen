@@ -88,7 +88,7 @@ class Game:
         "pond_boundary": "PB",
         "outside": "X",
     }
-    turns = {11: 30, 13: 54, 15: 80, 17: 100, 21: 150, 25: 200}
+    turns = {11: 30, 13: 60, 15: 100, 17: 100, 21: 150, 25: 200}
 
     BLACK = (0, 0, 0)
     WHITE = (255, 255, 255)
@@ -1530,7 +1530,7 @@ class Game:
                         )
                     elif fillmode == "image":
                         self.placeImage(fill, i, j)
-                        
+
         pygame.display.update()
 
     def render_rgb_array(self):
@@ -1619,9 +1619,9 @@ class Game:
                         if showTerritory:
                             self.drawAll(view)
                         showTerritory = not showTerritory
-                
+
                 territory = self.board[self.CELL.index("territory_A")]
-                
+
                 # territory animation
                 # if np.sum(preTerritory)- np.sum(territory) != 0:
                 #     diff = territory # nanka okasii
@@ -1675,7 +1675,7 @@ class Game:
                             )
                     self.drawGrids()
                     continue
-                
+
                 preTerritory = np.sum(self.board[self.CELL.index("territory_A")])
 
                 self.placeImage(
