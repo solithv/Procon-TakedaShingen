@@ -1512,10 +1512,11 @@ class Game:
         self.window_surface.blit(text, text_rect)
         pygame.display.update()
 
-    def drawAllRect(self, fill, fillmode: str = "color", cell: str = None):
+    def drawAllRect(self, fill, fillmode: str = "color", map: str = None):
+        # map: 2darray
         for i in range(self.height):
             for j in range(self.width):
-                if self.board[self.CELL.index(cell), i, j] == 1:
+                if map[i, j] == 1:
                     if fillmode == "color":
                         pygame.draw.rect(
                             self.window_surface,
@@ -1601,7 +1602,7 @@ class Game:
         showTerritory = False
         actions = []
         actingWorker = 0
-        prePositionSum = 0
+        preTerritory = 0
         while actingWorker < self.worker_count:
             for event in pygame.event.get():
                 if actingWorker >= self.worker_count:
@@ -1619,15 +1620,17 @@ class Game:
                             self.drawAll(view)
                         showTerritory = not showTerritory
                 
-                positionSum = np.sum(self.board[self.CELL.index("territory_A")])
+                territory = self.board[self.CELL.index("territory_A")]
                 
-                if prePositionSum - positionSum != 0:
-                    for t in range(3):
-                        self.drawAllRect(fill=self.RED, fillmode="color", cell="territory_A")
-                        time.sleep(0.1)
-                        self.drawAllRect(fill=self.BLANK_IMG, fillmode="image", cell="territory_A")
-                        time.sleep(0.1)
-                    self.drawAll(view)
+                # territory animation
+                # if np.sum(preTerritory)- np.sum(territory) != 0:
+                #     diff = territory # nanka okasii
+                #     for t in range(3):
+                #         self.drawAllRect(fill=self.RED, fillmode="color", map=diff)
+                #         time.sleep(0.1)
+                #         self.drawAllRect(fill=self.BLANK_IMG, fillmode="image", map=diff)
+                #         time.sleep(0.1)
+                #     self.drawAll(view)
 
                 if showTerritory:
                     territoryALayer = self.compile_layers(
@@ -1673,7 +1676,7 @@ class Game:
                     self.drawGrids()
                     continue
                 
-                prePositionSum = np.sum(self.board[self.CELL.index("territory_A")])
+                preTerritory = np.sum(self.board[self.CELL.index("territory_A")])
 
                 self.placeImage(
                     eval(f"self.WORKER_{self.current_team}_HOVER_IMG"),
@@ -1706,7 +1709,7 @@ class Game:
                         if keys[pygame.K_RIGHT]:
                             cellX += 1
 
-                    if event.key == pygame.K_BACKSLASH:
+                    if event.key in [pygame.K_BACKSLASH, pygame.K_RSHIFT, pygame.K_0]:
                         y, x = self.workers[self.current_team][
                             actingWorker
                         ].get_coordinate()
