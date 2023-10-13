@@ -2050,18 +2050,16 @@ class Game:
             "build_more_territory",
             "move_target",
             "break_more_territory",
-            "move_boundary",
             "build_outside",
             "build_inside",
             "build_both",
+            "move_boundary",
             "move_castle_build",
             "move_obstruction_build",
             "move_castle",
             "move_obstruction",
             "move_expand_castle",
             "move_expand",
-            "move_expand_1",
-            "move_expand_2",
             "move_around",
             "move_any",
             "move_last",
@@ -2125,19 +2123,6 @@ class Game:
                     worker, *act_pos, f"rampart_{worker.opponent_team}", hot_is_ok=True
                 ):
                     actionable["move_obstruction"].append(index)
-                if self.is_expand_move(
-                    worker,
-                    *act_pos,
-                    f"territory_{worker.team}",
-                    f"open_territory_{worker.team}",
-                ):
-                    actionable["move_expand_1"].append(index)
-                if self.is_expand_move(
-                    worker,
-                    *act_pos,
-                    f"open_territory_{worker.team}",
-                ):
-                    actionable["move_expand_2"].append(index)
         actionable["move_target"] = self.get_target_move(worker)
         actionable["move_expand"] = self.get_expand_move(worker)
         actionable["move_expand_castle"] = self.get_expand_move(worker, castle=True)
@@ -2186,6 +2171,58 @@ class Game:
             act.append(self.ACTIONS.index("stay"))
 
         return act
+
+    def old_get_random_actions(self, team: str = None):
+        """有効な行動をランダムで返す
+
+        Args:
+            team (str, optional): チームを指定. Defaults to None.
+
+        Returns:
+            list[int]: 行動のリスト
+        """
+        team = team if team is not None else self.current_team
+        [worker.turn_init() for worker in self.workers[team]]
+        self.worker_positions = [
+            worker.get_coordinate() for worker in self.workers[team]
+        ]
+        act = []
+        for worker in self.workers[team]:
+            act.append(self.old_get_random_action(worker))
+
+        while self.WORKER_MAX > len(act):
+            act.append(self.ACTIONS.index("stay"))
+
+        return act
+
+    def old_get_random_action(self, worker: Worker):
+        """職人ごとに有効な行動をランダムに返す
+
+        Args:
+            worker (Worker): 職人
+        """
+        worker.turn_init()
+        actionable = []
+        group = "break"
+        for action in reversed(self.ACTIONS):
+            if group != action.split("_")[0] and len(actionable):
+                break
+            group = action.split("_")[0]
+            if self.is_actionable(
+                worker, action, move_mode="around", build_mode="both", break_mode="both"
+            ):
+                actionable.append(self.ACTIONS.index(action))
+        if len(actionable) == 0:
+            for action in self.ACTIONS:
+                if self.is_actionable(
+                    worker, action, move_mode=None, build_mode="both", break_mode="both"
+                ):
+                    actionable.append(self.ACTIONS.index(action))
+
+        if len(actionable) > 0:
+            return random.choice(actionable)
+        else:
+            return self.ACTIONS.index("stay")
 
     def check_actions(self, actions: list[int], team: str = None, stay=False):
         """AIの行動を確認して無効なら上書き
