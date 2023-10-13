@@ -407,6 +407,8 @@ class Game:
                     if worker.action_log and worker.action_log[-1][1] == (y, x):
                         return False
                 else:
+                    if worker.action_log and worker.action_log[-1][1] == (y, x):
+                        return False
                     for log in worker.action_log[-lock_length:]:
                         if log[0] == "move" and (log[1] == (y, x) or log[2] == (y, x)):
                             return False
@@ -2265,7 +2267,8 @@ class Game:
             data (dict[str, Any]): 試合一覧取得APIから受け取った1試合分のデータ
         """
         self.id = data["id"]
-        self.current_player = 0 if data["first"] else 1
+        self.first_player = 0 if data["first"] else 1
+        self.current_player = self.first_player
         self.change_player(no_change=True)
         self.max_steps = data["turns"]
         self.SCORE_MULTIPLIER["castle"] = data["bonus"]["castle"]
@@ -2349,6 +2352,8 @@ class Game:
         #     self.turn - 1 == data["turn"]
         # ), f"self.turn:{self.turn}, data['turn']:{data['turn']}"
         self.turn = data["turn"] + 1
+        self.current_player = 1 - (self.turn % 2)
+        self.change_player(True)
         structures = np.pad(
             np.array(data["board"]["structures"]),
             [
