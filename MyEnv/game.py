@@ -35,10 +35,7 @@ class Game:
         *[f"worker_A{i}" for i in range(WORKER_MAX)],
         *[f"worker_B{i}" for i in range(WORKER_MAX)],
     )
-    EXTRA_CELL = (
-        "pond_boundary",
-        "enter_disallowed"
-    )
+    EXTRA_CELL = ("pond_boundary", "enter_disallowed")
     ACTIONS = (
         "stay",
         "move_N",
@@ -212,14 +209,16 @@ class Game:
         with open(self.pond_boundary_file) as f:
             boundaries: dict[str, list] = json.load(f)
         return np.array(boundaries[self.map_name], dtype=np.int8)
-   
+
     def load_enter_disallowed(self):
         """
         boardのenter_disallowedレイヤーを更新する
         """
         # if self.enter_disallowed_file is None or self.map_name is None:
         if self.enter_disallowed_file is None:
-            enter_disallowed = np.full((self.FIELD_MAX, self.FIELD_MAX), -1, dtype=np.int8)
+            enter_disallowed = np.full(
+                (self.FIELD_MAX, self.FIELD_MAX), -1, dtype=np.int8
+            )
             enter_disallowed[: self.height, :] = 0
             enter_disallowed[:, : self.width] = 0
             return enter_disallowed
@@ -314,8 +313,12 @@ class Game:
         )
         self.replace_count = 0
         self.get_map_name()
-        self.extra_board[self.EXTRA_CELL.index("pond_boundary")] = self.load_pond_boundary()
-        self.extra_board[self.EXTRA_CELL.index("enter_disallowed")] = self.load_enter_disallowed()
+        self.extra_board[
+            self.EXTRA_CELL.index("pond_boundary")
+        ] = self.load_pond_boundary()
+        self.extra_board[
+            self.EXTRA_CELL.index("enter_disallowed")
+        ] = self.load_enter_disallowed()
         self.board = self.update_blank(self.board)
         self.load_plan()
 
@@ -428,7 +431,10 @@ class Game:
             if mode is not None:
                 if (x == 0 or x == self.width - 1) and (y == 0 or y == self.width - 1):
                     return False
-                if self.extra_board[self.EXTRA_CELL.index("enter_disallowed"), y, x] == 1:
+                if (
+                    self.extra_board[self.EXTRA_CELL.index("enter_disallowed"), y, x]
+                    == 1
+                ):
                     # debug
                     # print(worker.name, y, x)
                     return False
@@ -441,8 +447,8 @@ class Game:
                     for log in worker.action_log[-lock_length:]:
                         if log[0] == "move" and (log[1] == (y, x) or log[2] == (y, x)):
                             return False
-                if not self.is_rampart_move(worker, y, x):
-                    return False
+                # if not self.is_rampart_move(worker, y, x):
+                #     return False
                 if mode == "around":
                     field = self.get_around(self.board, y, x, side_length=3)
                     compiled: np.ndarray = np.sum(
@@ -609,7 +615,9 @@ class Game:
                 if (
                     0 <= target_y < self.height
                     and 0 <= target_x < self.width
-                    and self.extra_board[self.EXTRA_CELL.index("pond_boundary"), target_y, target_x]
+                    and self.extra_board[
+                        self.EXTRA_CELL.index("pond_boundary"), target_y, target_x
+                    ]
                     == 1
                     and self.board[self.CELL.index("castle"), target_y, target_x] == 0
                 ):
@@ -802,7 +810,10 @@ class Game:
                         extra_around = self.get_around(
                             self.extra_board, y, x, side_length=3, raw=True
                         )
-                        around = around[self.CELL.index("castle")] + extra_around[self.EXTRA_CELL.index("pond_boundary")]
+                        around = (
+                            around[self.CELL.index("castle")]
+                            + extra_around[self.EXTRA_CELL.index("pond_boundary")]
+                        )
                         for y_, x_ in zip(*np.where(around == 1)):
                             if y_ == x_ == 1:
                                 continue
@@ -1651,15 +1662,17 @@ class Game:
                             cellX -= 1
                         if keys[pygame.K_RIGHT]:
                             cellX += 1
-                        
+
                     if event.key == pygame.K_0:
-                        y, x = self.workers[self.current_team][actingWorker].get_coordinate()
+                        y, x = self.workers[self.current_team][
+                            actingWorker
+                        ].get_coordinate()
                         self.placeImage(self.BLANK_IMG, y, x)
                         self.placeImage(self.WORKER_A_IMG, y, x, str(actingWorker))
                         self.drawGrids()
                         actions.append(0)
                         actingWorker += 1
-                        
+
                     # move
                     if event.key == pygame.K_1:
                         if not np.any(
@@ -2244,9 +2257,7 @@ class Game:
             axis=0,
         )[np.newaxis, :, :]
         b = np.where(b < 0, -1, b)
-        board = np.concatenate(
-            [board[: self.CELL.index("worker_A0")], a, b], axis=0
-        )
+        board = np.concatenate([board[: self.CELL.index("worker_A0")], a, b], axis=0)
         return board
 
     def get_around_workers(
@@ -2359,8 +2370,12 @@ class Game:
         self.board[:, self.height :, :] = -1
         self.board[:, :, self.width :] = -1
         self.get_map_name()
-        self.extra_board[self.EXTRA_CELL.index("pond_boundary")] = self.load_pond_boundary()
-        self.extra_board[self.EXTRA_CELL.index("enter_disallowed")] = self.load_enter_disallowed()
+        self.extra_board[
+            self.EXTRA_CELL.index("pond_boundary")
+        ] = self.load_pond_boundary()
+        self.extra_board[
+            self.EXTRA_CELL.index("enter_disallowed")
+        ] = self.load_enter_disallowed()
 
         self.update_territory()
         self.board = self.update_blank(self.board)
