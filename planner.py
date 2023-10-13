@@ -1,4 +1,3 @@
-import glob
 import json
 import numpy as np
 import MyEnv
@@ -29,9 +28,10 @@ def main():
         plannedActionsB = []
         terminated, truncated = [False] * 2
         worker_initial_positions = [
-            i.get_coordinate() for worker in env.workers.values() for i in worker
+            i.get_coordinate()
+            for worker in dict(sorted(env.workers.items(), key=lambda x: x[0])).values()
+            for i in worker
         ]
-
         while not terminated and not truncated:
             env.render()
             if env.current_team == "A":
@@ -44,12 +44,13 @@ def main():
 
                 with open("preset.json", "r") as f:
                     data = json.load(f)
-                print(plannedActionsA, plannedActionsB)
                 plannedActions = np.concatenate(
                     [np.array(plannedActionsA).T, np.array(plannedActionsB).T]
                 ).tolist()
-                preset = {}
+                preset = data.get(mapName, {})
                 for position, action in zip(worker_initial_positions, plannedActions):
+                    if any(w.get_coordinate() == position for w in env.workers["B"]):
+                        continue
                     preset[str(position)] = [i for i in action if i != 0]
 
                 data[mapName] = preset
