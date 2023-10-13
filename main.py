@@ -43,6 +43,11 @@ def main():
             print([env.ACTIONS[action] for action in actions])
             print(env.make_post_data(actions))
             fa.post_actions(env.make_post_data(actions), id_)
+            manual_actions = env.get_actions_from_pygame()
+            for i, m_action in enumerate(manual_actions):
+                if m_action != 0:
+                    actions[i] = m_action
+            fa.post_actions(env.make_post_data(actions), id_)
             _, _, terminated, truncated, _ = env.step(actions)
         else:
             _, _, terminated, truncated, _ = env.dummy_step()
