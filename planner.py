@@ -3,7 +3,6 @@ import numpy as np
 import MyEnv
 from pathlib import Path
 
-
 def main():
     map_name = "B13"
     fields = "./field_data/{}.csv"
