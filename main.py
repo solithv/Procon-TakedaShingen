@@ -31,7 +31,7 @@ def main():
     terminated, truncated = [False] * 2
     while not terminated and not truncated:
         field = fa.get_field(id_)
-        print(field)
+        print([field[k] for k in ("id", "turn", "logs")])
         server_turn = field["turn"]
         env.get_stat_from_api(field)
         print(f"turn:{server_turn}, score_A:{env.score_A}, score_B:{env.score_B}")
@@ -40,8 +40,9 @@ def main():
             # actions = nn.predict(env.get_around_workers())
             actions = env.get_random_actions()
             actions = env.check_actions(actions)
-            fa.post_actions(env.make_post_data(actions), id_)
+            print([env.ACTIONS[action] for action in actions])
             print(env.make_post_data(actions))
+            fa.post_actions(env.make_post_data(actions), id_)
             _, _, terminated, truncated, _ = env.step(actions)
         else:
             _, _, terminated, truncated, _ = env.dummy_step()
