@@ -32,9 +32,12 @@ class Game:
         "rampart_B",
         "castle",
         "pond",
-        "pond_boundary",
         *[f"worker_A{i}" for i in range(WORKER_MAX)],
         *[f"worker_B{i}" for i in range(WORKER_MAX)],
+    )
+    EXTRA_CELL = (
+        "pond_boundary",
+        "enter_disallowed"
     )
     ACTIONS = (
         "stay",
@@ -131,6 +134,9 @@ class Game:
         self.board = np.zeros(
             (len(self.CELL), self.FIELD_MAX, self.FIELD_MAX), dtype=np.int8
         )
+        self.extra_board = np.zeros(
+            (len(self.EXTRA_CELL), self.FIELD_MAX, self.FIELD_MAX), dtype=np.int8
+        )
         if render_fps:
             self.metadata["render_fps"] = render_fps
 
@@ -184,7 +190,7 @@ class Game:
             np.ndarray: blank層を更新した盤面
         """
         assert self.CELL.index("blank") != len(self.CELL) - 1
-        excludingList = ["blank", "pond_boundary"]
+        excludingList = ["blank"]
         mask = [cell not in excludingList for cell in self.CELL]
         board[self.CELL.index("blank")] = np.where(board[mask].any(axis=0), 0, 1)
         board = np.where(np.any(board < 0, axis=0), -1, board)
@@ -291,7 +297,7 @@ class Game:
         )
         self.replace_count = 0
         self.get_map_name()
-        self.board[self.CELL.index("pond_boundary")] = self.load_pond_boundary()
+        self.extra_board[self.EXTRA_CELL.index("pond_boundary")] = self.load_pond_boundary()
         self.board = self.update_blank(self.board)
         self.load_plan()
 
@@ -511,7 +517,7 @@ class Game:
             and self.compile_layers(self.board, "rampart_A", "rampart_B")[y, x]
         ):
             if mode is not None:
-                if self.board[self.CELL.index("pond_boundary"), y, x] == 1:
+                if self.extra_board[self.EXTRA_CELL.index("pond_boundary"), y, x] == 1:
                     return False
                 if mode == "opponent":
                     return (
@@ -551,7 +557,7 @@ class Game:
         if (
             0 <= y < self.height
             and 0 <= x < self.width
-            and self.board[self.CELL.index("pond_boundary"), y, x] == 1
+            and self.extra_board[self.EXTRA_CELL.index("pond_boundary"), y, x] == 1
         ):
             return self.is_buildable(worker, y, x, mode="both")
 
@@ -579,7 +585,7 @@ class Game:
                 if (
                     0 <= target_y < self.height
                     and 0 <= target_x < self.width
-                    and self.board[self.CELL.index("pond_boundary"), target_y, target_x]
+                    and self.extra_board[self.EXTRA_CELL.index("pond_boundary"), target_y, target_x]
                     == 1
                     and self.board[self.CELL.index("castle"), target_y, target_x] == 0
                 ):
@@ -765,7 +771,10 @@ class Game:
                         around = self.get_around(
                             self.board, y, x, side_length=3, raw=True
                         )
-                        around = self.compile_layers(around, "castle", "pond_boundary")
+                        extra_around = self.get_around(
+                            self.extra_board, y, x, side_length=3, raw=True
+                        )
+                        around = around[self.CELL.index("castle")] + extra_around[self.EXTRA_CELL.index("pond_boundary")]
                         for y_, x_ in zip(*np.where(around == 1)):
                             if y_ == x_ == 1:
                                 continue
@@ -1547,9 +1556,6 @@ class Game:
                     territoryBLayer = self.compile_layers(
                         self.board, "territory_B", one_hot=True
                     )
-                    # pondBoundaryLayer = self.compile_layers(
-                    #     self.board, "pond_boundary", one_hot=True
-                    # )
                     openTerritoryALayer = self.compile_layers(
                         self.board, "open_territory_A", one_hot=True
                     )
@@ -2200,7 +2206,7 @@ class Game:
         )[np.newaxis, :, :]
         b = np.where(b < 0, -1, b)
         board = np.concatenate(
-            [board[: self.CELL.index("pond_boundary")], a, b], axis=0
+            [board[: self.CELL.index("worker_A0")], a, b], axis=0
         )
         return board
 
@@ -2314,7 +2320,7 @@ class Game:
         self.board[:, self.height :, :] = -1
         self.board[:, :, self.width :] = -1
         self.get_map_name()
-        self.board[self.CELL.index("pond_boundary")] = self.load_pond_boundary()
+        self.extra_board[self.EXTRA_CELL.index("pond_boundary")] = self.load_pond_boundary()
 
         self.update_territory()
         self.board = self.update_blank(self.board)
