@@ -6,7 +6,7 @@ import MyEnv
 
 
 def main():
-    fields = glob.glob("./field_data/B11.csv")
+    fields = glob.glob("./field_data/*C25.csv")
     # model_path = "./model"
     # model_name = "game"
     env = MyEnv.Game(
