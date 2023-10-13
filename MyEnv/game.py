@@ -1621,7 +1621,6 @@ class Game:
                 
                 positionSum = np.sum(self.board[self.CELL.index("territory_A")])
                 
-                print(prePositionSum - positionSum)
                 if prePositionSum - positionSum != 0:
                     for t in range(3):
                         self.drawAllRect(fill=self.RED, fillmode="color", cell="territory_A")
