@@ -1339,6 +1339,12 @@ class Game:
         self.RAMPART_B_IMG = pygame.transform.scale(
             pygame.image.load(self.cwd + "/assets/rampart_B.png"), self.IMG_SCALER
         )
+        self.RAMPART_A_BROKEN_IMG = pygame.transform.scale(
+            pygame.image.load(self.cwd + "/assets/rampart_A_broken.png"), self.IMG_SCALER
+        )
+        self.RAMPART_B_BROKEN_IMG = pygame.transform.scale(
+            pygame.image.load(self.cwd + "/assets/rampart_B_broken.png"), self.IMG_SCALER
+        )
         self.WORKER_A_IMG = pygame.transform.scale(
             pygame.image.load(self.cwd + "/assets/worker_A.png"), self.IMG_SCALER
         )
@@ -1822,7 +1828,13 @@ class Game:
                             workerX,
                             workerNumber=str(actingWorker - 1),
                         )
+                        print((f"self.RAMPART_{self.current_team}_BROKEN_IMG"))
                         self.placeImage(self.BLANK_IMG, cellY, cellX)
+                        self.placeImage(
+                            eval(f"self.RAMPART_{self.current_team}_BROKEN_IMG"),
+                            cellY,
+                            cellX,
+                        )
                         self.drawGrids()
                         pygame.display.update()
             self.drawTurnInfo(actingWorker=actingWorker + 1)
