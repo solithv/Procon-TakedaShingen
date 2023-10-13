@@ -1,21 +1,23 @@
 import time
 
 import MyEnv
-from NN import NNModel
 from Utils import API
+
+# from NN import NNModel
 
 
 def main():
-    model_path = "./model"
-    model_name = "game"
+    # model_path = "./model"
+    # model_name = "game"
     env = MyEnv.Game(
         max_steps=500,
         render_mode="human",
         use_pyautogui=True,
+        preset_file=None,
     )
 
-    nn = NNModel()
-    nn.load_model(model_path, model_name)
+    # nn = NNModel()
+    # nn.load_model(model_path, model_name)
 
     fa = API()
     match = fa.get_match()
@@ -24,20 +26,20 @@ def main():
     match = match[0]
     id_ = match["id"]
 
-    _ = env.reset()
     env.reset_from_api(match)
 
     terminated, truncated = [False] * 2
     while not terminated and not truncated:
         field = fa.get_field(id_)
+        print(field)
         server_turn = field["turn"]
         env.get_stat_from_api(field)
         print(f"turn:{server_turn}, score_A:{env.score_A}, score_B:{env.score_B}")
         env.render()
         if env.current_team == "A":
-            actions = nn.predict(env.get_around_workers())
+            # actions = nn.predict(env.get_around_workers())
+            actions = env.get_random_actions()
             actions = env.check_actions(actions)
-            # actions = env.get_random_actions()
             fa.post_actions(env.make_post_data(actions), id_)
             print(env.make_post_data(actions))
             _, _, terminated, truncated, _ = env.step(actions)

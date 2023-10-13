@@ -8,6 +8,8 @@ def main():
     env = MyEnv.Game(
         max_steps=500,
         render_mode=None,
+        pond_boundary_file=None,
+        preset_file=None,
     )
 
     fa = API()
@@ -17,7 +19,6 @@ def main():
     match = match[0]
     id_ = match["id"]
 
-    _ = env.reset()
     env.reset_from_api(match)
 
     terminated, truncated = [False] * 2
@@ -29,6 +30,7 @@ def main():
         env.render()
         if env.current_team == "B":
             actions = env.random_act()
+            # actions = env.get_random_actions()
             fa.post_actions(env.make_post_data(actions), id_, True)
             print(env.make_post_data(actions))
             _, _, terminated, truncated, _ = env.step(actions)
