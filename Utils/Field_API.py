@@ -49,9 +49,13 @@ class API:
         引数(jsonファイル , 試合id)
         """
         header = self.header if not opponent else {"procon-token": "dummy-token"}
+        retry_count = 0
         while True:
             r = req.post(f"{self.match_url}/{path}", headers=header, json=act)
-            if r.status_code in (200, 400):
+            if r.status_code == 200:
                 break
             print("post_actions", r.status_code, r.text)
             time.sleep(0.1)
+            if r.status_code == 400 and retry_count > 10:
+                break
+            retry_count += 1

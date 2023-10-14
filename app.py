@@ -6,13 +6,13 @@ import MyEnv
 
 
 def main():
-    fields = glob.glob("./field_data/*B25.csv")
+    fields = glob.glob("./field_data/*B11.csv")
     # model_path = "./model"
     # model_name = "game"
     env = MyEnv.Game(
         csv_path=fields,
         render_mode="human",
-        use_pyautogui=True,
+        # use_pyautogui=True,
         preset_file=None,
     )
 
@@ -28,23 +28,23 @@ def main():
     while not terminated and not truncated:
         env.render()
         if env.current_team == "A":
-            actions = env.get_actions("pygame")
-            # actions = env.get_random_actions()
-            # actions = env.check_actions(actions)
+            # actions = env.get_actions("pygame")
+            actions = env.get_random_actions()
+            actions = env.check_actions(actions)
             # actions = [actions[0], 0, 0, 0, 0, 0]
             # print(env.ACTIONS[actions[0]])
         else:
             actions = env.get_random_actions()
-            # actions = env.check_actions(actions)
+            actions = env.check_actions(actions)
             # actions = env.random_act()
             # actions = [0, 0, 0, 0, 0, 0]
             # actions = env.get_actions("pygame")
-        # print([env.ACTIONS[action] for action in actions])
+        # print(actions)
         observation, reward, terminated, truncated, info = env.step(actions)
-        print(
-            f"turn:{info['turn']}, team:{info['current_team']}, "
-            + f"score_A:{info['score_A']}, score_B:{info['score_B']}"
-        )
+        # print(
+        #     f"turn:{info['turn']}, team:{info['current_team']}, "
+        #     + f"score_A:{info['score_A']}, score_B:{info['score_B']}"
+        # )
     print("game end")
     print(f"{env.replace_count} action replaced")
     env.end_game_render()
