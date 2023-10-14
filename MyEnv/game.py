@@ -88,7 +88,7 @@ class Game:
         "pond_boundary": "PB",
         "outside": "X",
     }
-    turns = {11: 30, 13: 54, 15: 80, 17: 100, 21: 150, 25: 200}
+    turns = {11: 30, 13: 60, 15: 80, 17: 100, 21: 150, 25: 200}
 
     BLACK = (0, 0, 0)
     WHITE = (255, 255, 255)
@@ -1622,7 +1622,9 @@ class Game:
                 
                 # territory animation
                 # if np.sum(preTerritory)- np.sum(territory) != 0:
-                #     diff = territory # nanka okasii
+                #     print("preTerritory\n\n", preTerritory)
+                #     print("territory\n\n", territory)
+                #     diff = territory - preTerritory # nanka okasii
                 #     for t in range(3):
                 #         self.drawAllRect(fill=self.RED, fillmode="color", map=diff)
                 #         time.sleep(0.1)
@@ -1674,7 +1676,7 @@ class Game:
                     self.drawGrids()
                     continue
                 
-                preTerritory = np.sum(self.board[self.CELL.index("territory_A")])
+                preTerritory = self.board[self.CELL.index("territory_A")]
 
                 self.placeImage(
                     eval(f"self.WORKER_{self.current_team}_HOVER_IMG"),
