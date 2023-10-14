@@ -2498,7 +2498,9 @@ class Game:
         #     self.turn - 1 == data["turn"]
         # ), f"self.turn:{self.turn}, data['turn']:{data['turn']}"
         self.turn = data["turn"] + 1
-        self.current_player = 1 - (self.turn % 2)
+        self.current_player = (
+            self.first_player if (self.turn % 2) else 1 - self.first_player
+        )
         self.change_player(True)
         structures = np.pad(
             np.array(data["board"]["structures"]),

@@ -6,14 +6,14 @@ import MyEnv
 
 
 def main():
-    fields = glob.glob("./field_data/B13.csv")
+    fields = glob.glob("./field_data/*B11.csv")
     # model_path = "./model"
     # model_name = "game"
     env = MyEnv.Game(
         csv_path=fields,
         render_mode="human",
         # use_pyautogui=True,
-        # preset_file=None,
+        preset_file=None,
     )
 
     # nn = NNModel()
@@ -39,7 +39,7 @@ def main():
             # actions = env.random_act()
             # actions = [0, 0, 0, 0, 0, 0]
             # actions = env.get_actions("pygame")
-        print(actions)
+        # print(actions)
         observation, reward, terminated, truncated, info = env.step(actions)
         # print(
         #     f"turn:{info['turn']}, team:{info['current_team']}, "

@@ -26,6 +26,7 @@ def main():
     id_ = match["id"]
 
     env.reset_from_api(match)
+    env.first_player = 1 - env.first_player
     env.render()
     print("id:", id_)
     # input()
@@ -43,7 +44,6 @@ def main():
             actions = env.get_random_actions()
             actions = env.check_actions(actions)
             print(env.make_post_data(actions))
-            env.current_player
             fa.post_actions(env.make_post_data(actions), id_)
 
             # manual_actions = env.get_actions_from_pygame()
