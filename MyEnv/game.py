@@ -1,7 +1,6 @@
 import copy
 import csv
 import json
-import time
 import os
 import pickle
 import random
@@ -33,10 +32,10 @@ class Game:
         "rampart_B",
         "castle",
         "pond",
+        "pond_boundary",
         *[f"worker_A{i}" for i in range(WORKER_MAX)],
         *[f"worker_B{i}" for i in range(WORKER_MAX)],
     )
-    EXTRA_CELL = ("pond_boundary", "enter_disallowed")
     ACTIONS = (
         "stay",
         "move_N",
@@ -111,7 +110,6 @@ class Game:
         render_fps: int = None,
         unique_map_file: str = "./field_data/name_to_map.pkl",
         pond_boundary_file: str = "./field_data/boundaryData.json",
-        enter_disallowed_file: str = "./field_data/enterDisallowed.json",
         preset_file: str = "./preset.json",
     ):
         """init
@@ -133,9 +131,6 @@ class Game:
         self.board = np.zeros(
             (len(self.CELL), self.FIELD_MAX, self.FIELD_MAX), dtype=np.int8
         )
-        self.extra_board = np.zeros(
-            (len(self.EXTRA_CELL), self.FIELD_MAX, self.FIELD_MAX), dtype=np.int8
-        )
         if render_fps:
             self.metadata["render_fps"] = render_fps
 
@@ -155,7 +150,6 @@ class Game:
 
         self.pond_boundary_file = pond_boundary_file
         self.preset_file = preset_file
-        self.enter_disallowed_file = enter_disallowed_file
 
     def get_observation(self):
         """内部関数
@@ -190,7 +184,7 @@ class Game:
             np.ndarray: blank層を更新した盤面
         """
         assert self.CELL.index("blank") != len(self.CELL) - 1
-        excludingList = ["blank"]
+        excludingList = ["blank", "pond_boundary"]
         mask = [cell not in excludingList for cell in self.CELL]
         board[self.CELL.index("blank")] = np.where(board[mask].any(axis=0), 0, 1)
         board = np.where(np.any(board < 0, axis=0), -1, board)
@@ -210,28 +204,6 @@ class Game:
         with open(self.pond_boundary_file) as f:
             boundaries: dict[str, list] = json.load(f)
         return np.array(boundaries[self.map_name], dtype=np.int8)
-
-    def load_enter_disallowed(self):
-        """
-        boardのenter_disallowedレイヤーを更新する
-        """
-        # if self.enter_disallowed_file is None or self.map_name is None:
-        if self.enter_disallowed_file is None:
-            enter_disallowed = np.full(
-                (self.FIELD_MAX, self.FIELD_MAX), -1, dtype=np.int8
-            )
-            enter_disallowed[: self.height, :] = 0
-            enter_disallowed[:, : self.width] = 0
-            return enter_disallowed
-
-        with open(self.enter_disallowed_file) as f:
-            enter_disallowed_maps: dict[str, list] = json.load(f)
-        return np.array(
-            enter_disallowed_maps.get(
-                self.map_name, np.zeros_like(self.extra_board[0])
-            ),
-            dtype=np.int8,
-        )
 
     def load_from_csv(self, path: Union[str, list[str]]):
         """
@@ -319,12 +291,7 @@ class Game:
         )
         self.replace_count = 0
         self.get_map_name()
-        self.extra_board[
-            self.EXTRA_CELL.index("pond_boundary")
-        ] = self.load_pond_boundary()
-        self.extra_board[
-            self.EXTRA_CELL.index("enter_disallowed")
-        ] = self.load_enter_disallowed()
+        self.board[self.CELL.index("pond_boundary")] = self.load_pond_boundary()
         self.board = self.update_blank(self.board)
         self.load_plan()
 
@@ -424,33 +391,27 @@ class Game:
             not worker.is_action
             and 0 <= y < self.height
             and 0 <= x < self.width
-            and self.compile_layers(
+            and not self.compile_layers(
                 self.board,
                 f"rampart_{worker.opponent_team}",
                 "pond",
                 *[f"worker_{worker.opponent_team}{i}" for i in range(self.WORKER_MAX)],
             )[y, x]
-            != 1
             and (y, x) not in self.get_team_worker_coordinate(worker.team)
             and (y, x) not in self.worker_positions
         ):
             if mode is not None:
                 if (x == 0 or x == self.width - 1) and (y == 0 or y == self.width - 1):
                     return False
-                if (
-                    self.extra_board[self.EXTRA_CELL.index("enter_disallowed"), y, x]
-                    == 1
-                ):
-                    return False
                 if mode == "last":
                     if worker.action_log and worker.action_log[-1][1] == (y, x):
                         return False
                 else:
-                    if worker.action_log and worker.action_log[-1][1] == (y, x):
-                        return False
                     for log in worker.action_log[-lock_length:]:
                         if log[0] == "move" and (log[1] == (y, x) or log[2] == (y, x)):
                             return False
+                if not self.is_rampart_move(worker, y, x):
+                    return False
                 if mode == "around":
                     field = self.get_around(self.board, y, x, side_length=3)
                     compiled: np.ndarray = np.sum(
@@ -488,14 +449,13 @@ class Game:
             not worker.is_action
             and 0 <= y < self.height
             and 0 <= x < self.width
-            and self.compile_layers(
+            and not self.compile_layers(
                 self.board,
                 "rampart_A",
                 "rampart_B",
                 "castle",
                 *[f"worker_{worker.opponent_team}{i}" for i in range(self.WORKER_MAX)],
             )[y, x]
-            != 1
         ):
             if mode is not None:
                 if (x == 0 or x == self.width - 1) and (y == 0 or y == self.width - 1):
@@ -546,10 +506,10 @@ class Game:
             not worker.is_action
             and 0 <= y < self.height
             and 0 <= x < self.width
-            and self.compile_layers(self.board, "rampart_A", "rampart_B")[y, x] == 1
+            and self.compile_layers(self.board, "rampart_A", "rampart_B")[y, x]
         ):
             if mode is not None:
-                if self.extra_board[self.EXTRA_CELL.index("pond_boundary"), y, x] == 1:
+                if self.board[self.CELL.index("pond_boundary"), y, x] == 1:
                     return False
                 if mode == "opponent":
                     return (
@@ -589,7 +549,7 @@ class Game:
         if (
             0 <= y < self.height
             and 0 <= x < self.width
-            and self.extra_board[self.EXTRA_CELL.index("pond_boundary"), y, x] == 1
+            and self.board[self.CELL.index("pond_boundary"), y, x] == 1
         ):
             return self.is_buildable(worker, y, x, mode="both")
 
@@ -607,19 +567,17 @@ class Game:
         Return:
             bool: 判定結果
         """
+        test_worker = copy.deepcopy(worker)
+        test_worker.update_coordinate(y, x)
+        pos = np.array([y, x], dtype=np.int8)
         result = False
-        if self.is_movable(worker, y, x, mode="any"):
-            test_worker = copy.deepcopy(worker)
-            test_worker.update_coordinate(y, x)
-            pos = np.array([y, x], dtype=np.int8)
+        if self.is_movable(worker, y, x):
             for direction in self.DIRECTIONS.values():
                 target_y, target_x = pos + direction
                 if (
                     0 <= target_y < self.height
                     and 0 <= target_x < self.width
-                    and self.extra_board[
-                        self.EXTRA_CELL.index("pond_boundary"), target_y, target_x
-                    ]
+                    and self.board[self.CELL.index("pond_boundary"), target_y, target_x]
                     == 1
                     and self.board[self.CELL.index("castle"), target_y, target_x] == 0
                 ):
@@ -652,7 +610,7 @@ class Game:
         assert build_mode is not None or break_mode is not None
         test_worker = copy.deepcopy(worker)
         pos = np.array([y, x], dtype=np.int8)
-        if self.is_movable(worker, y, x, mode="any"):
+        if self.is_movable(worker, y, x):
             test_worker.update_coordinate(y, x)
             if build_mode is not None and break_mode is not None:
                 return any(
@@ -666,15 +624,13 @@ class Game:
                 return any(
                     self.is_buildable(test_worker, *(pos + direction), mode=build_mode)
                     and not self.is_breakable(
-                        test_worker, *(pos + direction), mode=break_mode
+                        test_worker, *(pos + direction), mode="both"
                     )
                     for direction in self.DIRECTIONS.values()
                 )
             elif build_mode is None:
                 return any(
-                    not self.is_buildable(
-                        test_worker, *(pos + direction), mode=break_mode
-                    )
+                    not self.is_buildable(test_worker, *(pos + direction), mode="both")
                     and self.is_breakable(
                         test_worker, *(pos + direction), mode=break_mode
                     )
@@ -791,15 +747,13 @@ class Game:
 
         for index, action in enumerate(self.ACTIONS[1:]):
             if "move" in action and self.is_movable(
-                test_worker, *self.get_action_position(worker, index), mode="any"
+                test_worker, *self.get_action_position(worker, index)
             ):
                 test_worker.update_coordinate(*self.get_action_position(worker, index))
                 y, x = test_worker.get_coordinate()
                 for action_ in self.ACTIONS[1:]:
                     if "move" in action_ and self.is_movable(
-                        test_worker,
-                        *self.get_action_position(test_worker, action_),
-                        mode="any",
+                        test_worker, *self.get_action_position(test_worker, action_)
                     ):
                         if not castle and self.is_rampart_move(
                             test_worker, y, x, break_mode="opponent"
@@ -809,13 +763,7 @@ class Game:
                         around = self.get_around(
                             self.board, y, x, side_length=3, raw=True
                         )
-                        extra_around = self.get_around(
-                            self.extra_board, y, x, side_length=3, raw=True
-                        )
-                        around = (
-                            around[self.CELL.index("castle")]
-                            + extra_around[self.EXTRA_CELL.index("pond_boundary")]
-                        )
+                        around = self.compile_layers(around, "castle", "pond_boundary")
                         for y_, x_ in zip(*np.where(around == 1)):
                             if y_ == x_ == 1:
                                 continue
@@ -1338,14 +1286,6 @@ class Game:
         self.RAMPART_B_IMG = pygame.transform.scale(
             pygame.image.load(self.cwd + "/assets/rampart_B.png"), self.IMG_SCALER
         )
-        self.RAMPART_A_BROKEN_IMG = pygame.transform.scale(
-            pygame.image.load(self.cwd + "/assets/rampart_A_broken.png"),
-            self.IMG_SCALER,
-        )
-        self.RAMPART_B_BROKEN_IMG = pygame.transform.scale(
-            pygame.image.load(self.cwd + "/assets/rampart_B_broken.png"),
-            self.IMG_SCALER,
-        )
         self.WORKER_A_IMG = pygame.transform.scale(
             pygame.image.load(self.cwd + "/assets/worker_A.png"), self.IMG_SCALER
         )
@@ -1512,26 +1452,6 @@ class Game:
         self.window_surface.blit(text, text_rect)
         pygame.display.update()
 
-    def drawAllRect(self, fill, fillmode: str = "color", cell: str = None):
-        for i in range(self.height):
-            for j in range(self.width):
-                if self.board[self.CELL.index(cell), i, j] == 1:
-                    if fillmode == "color":
-                        pygame.draw.rect(
-                            self.window_surface,
-                            fill,
-                            (
-                                j * self.cell_size,
-                                i * self.cell_size,
-                                self.cell_size,
-                                self.cell_size,
-                            ),
-                        )
-                    elif fillmode == "image":
-                        self.placeImage(fill, i, j)
-                        
-        pygame.display.update()
-
     def render_rgb_array(self):
         """
         描画を行う
@@ -1601,7 +1521,6 @@ class Game:
         showTerritory = False
         actions = []
         actingWorker = 0
-        prePositionSum = 0
         while actingWorker < self.worker_count:
             for event in pygame.event.get():
                 if actingWorker >= self.worker_count:
@@ -1618,16 +1537,6 @@ class Game:
                         if showTerritory:
                             self.drawAll(view)
                         showTerritory = not showTerritory
-                
-                positionSum = np.sum(self.board[self.CELL.index("territory_A")])
-                
-                if prePositionSum - positionSum != 0:
-                    for t in range(3):
-                        self.drawAllRect(fill=self.RED, fillmode="color", cell="territory_A")
-                        time.sleep(0.1)
-                        self.drawAllRect(fill=self.BLANK_IMG, fillmode="image", cell="territory_A")
-                        time.sleep(0.1)
-                    self.drawAll(view)
 
                 if showTerritory:
                     territoryALayer = self.compile_layers(
@@ -1636,6 +1545,9 @@ class Game:
                     territoryBLayer = self.compile_layers(
                         self.board, "territory_B", one_hot=True
                     )
+                    # pondBoundaryLayer = self.compile_layers(
+                    #     self.board, "pond_boundary", one_hot=True
+                    # )
                     openTerritoryALayer = self.compile_layers(
                         self.board, "open_territory_A", one_hot=True
                     )
@@ -1672,8 +1584,6 @@ class Game:
                             )
                     self.drawGrids()
                     continue
-                
-                prePositionSum = np.sum(self.board[self.CELL.index("territory_A")])
 
                 self.placeImage(
                     eval(f"self.WORKER_{self.current_team}_HOVER_IMG"),
@@ -1685,38 +1595,6 @@ class Game:
                 pygame.display.update()
 
                 if event.type == KEYDOWN:
-                    keys = pygame.key.get_pressed()
-                    if any(
-                        [
-                            keys[pygame.K_LEFT],
-                            keys[pygame.K_RIGHT],
-                            keys[pygame.K_DOWN],
-                            keys[pygame.K_UP],
-                        ]
-                    ):
-                        # 最強
-                        cellY = workerY
-                        cellX = workerX
-                        if keys[pygame.K_UP]:
-                            cellY -= 1
-                        if keys[pygame.K_DOWN]:
-                            cellY += 1
-                        if keys[pygame.K_LEFT]:
-                            cellX -= 1
-                        if keys[pygame.K_RIGHT]:
-                            cellX += 1
-
-                    if event.key == pygame.K_BACKSLASH:
-                        y, x = self.workers[self.current_team][
-                            actingWorker
-                        ].get_coordinate()
-                        self.placeImage(self.BLANK_IMG, y, x)
-                        self.placeImage(self.WORKER_A_IMG, y, x, str(actingWorker))
-                        self.drawGrids()
-                        actions.append(0)
-                        actingWorker += 1
-
-                    # move
                     if event.key == pygame.K_1:
                         if not np.any(
                             np.all(
@@ -1757,7 +1635,6 @@ class Game:
                                 stay=True,
                             ):
                                 continue
-                            print("1pressed")
                             actions.append(action)
                         for t in range(12):
                             self.placeImage(self.BLANK_IMG, workerY, workerX)
@@ -1862,13 +1739,7 @@ class Game:
                             workerX,
                             workerNumber=str(actingWorker - 1),
                         )
-                        print((f"self.RAMPART_{self.current_team}_BROKEN_IMG"))
                         self.placeImage(self.BLANK_IMG, cellY, cellX)
-                        self.placeImage(
-                            eval(f"self.RAMPART_{self.current_team}_BROKEN_IMG"),
-                            cellY,
-                            cellX,
-                        )
                         self.drawGrids()
                         pygame.display.update()
             self.drawTurnInfo(actingWorker=actingWorker + 1)
@@ -2082,16 +1953,17 @@ class Game:
             "build_more_territory",
             "move_target",
             "break_more_territory",
+            "move_boundary",
             "build_outside",
             "build_inside",
-            "build_both",
-            "move_boundary",
             "move_castle_build",
             "move_obstruction_build",
             "move_castle",
             "move_obstruction",
             "move_expand_castle",
             "move_expand",
+            "move_expand_1",
+            "move_expand_2",
             "move_around",
             "move_any",
             "move_last",
@@ -2155,6 +2027,19 @@ class Game:
                     worker, *act_pos, f"rampart_{worker.opponent_team}", hot_is_ok=True
                 ):
                     actionable["move_obstruction"].append(index)
+                if self.is_expand_move(
+                    worker,
+                    *act_pos,
+                    f"territory_{worker.team}",
+                    f"open_territory_{worker.team}",
+                ):
+                    actionable["move_expand_1"].append(index)
+                if self.is_expand_move(
+                    worker,
+                    *act_pos,
+                    f"open_territory_{worker.team}",
+                ):
+                    actionable["move_expand_2"].append(index)
         actionable["move_target"] = self.get_target_move(worker)
         actionable["move_expand"] = self.get_expand_move(worker)
         actionable["move_expand_castle"] = self.get_expand_move(worker, castle=True)
@@ -2199,58 +2084,6 @@ class Game:
             act.append(self.ACTIONS.index("stay"))
 
         return act
-
-    def old_get_random_actions(self, team: str = None):
-        """有効な行動をランダムで返す
-
-        Args:
-            team (str, optional): チームを指定. Defaults to None.
-
-        Returns:
-            list[int]: 行動のリスト
-        """
-        team = team if team is not None else self.current_team
-        [worker.turn_init() for worker in self.workers[team]]
-        self.worker_positions = [
-            worker.get_coordinate() for worker in self.workers[team]
-        ]
-        act = []
-        for worker in self.workers[team]:
-            act.append(self.old_get_random_action(worker))
-
-        while self.WORKER_MAX > len(act):
-            act.append(self.ACTIONS.index("stay"))
-
-        return act
-
-    def old_get_random_action(self, worker: Worker):
-        """職人ごとに有効な行動をランダムに返す
-
-        Args:
-            worker (Worker): 職人
-        """
-        worker.turn_init()
-        actionable = []
-        group = "break"
-        for action in reversed(self.ACTIONS):
-            if group != action.split("_")[0] and len(actionable):
-                break
-            group = action.split("_")[0]
-            if self.is_actionable(
-                worker, action, move_mode="around", build_mode="both", break_mode="both"
-            ):
-                actionable.append(self.ACTIONS.index(action))
-        if len(actionable) == 0:
-            for action in self.ACTIONS:
-                if self.is_actionable(
-                    worker, action, move_mode=None, build_mode="both", break_mode="both"
-                ):
-                    actionable.append(self.ACTIONS.index(action))
-
-        if len(actionable) > 0:
-            return random.choice(actionable)
-        else:
-            return self.ACTIONS.index("stay")
 
     def check_actions(self, actions: list[int], team: str = None, stay=False):
         """AIの行動を確認して無効なら上書き
@@ -2339,7 +2172,9 @@ class Game:
             axis=0,
         )[np.newaxis, :, :]
         b = np.where(b < 0, -1, b)
-        board = np.concatenate([board[: self.CELL.index("worker_A0")], a, b], axis=0)
+        board = np.concatenate(
+            [board[: self.CELL.index("pond_boundary")], a, b], axis=0
+        )
         return board
 
     def get_around_workers(
@@ -2405,8 +2240,7 @@ class Game:
             data (dict[str, Any]): 試合一覧取得APIから受け取った1試合分のデータ
         """
         self.id = data["id"]
-        self.first_player = 0 if data["first"] else 1
-        self.current_player = self.first_player
+        self.current_player = 0 if data["first"] else 1
         self.change_player(no_change=True)
         self.max_steps = data["turns"]
         self.SCORE_MULTIPLIER["castle"] = data["bonus"]["castle"]
@@ -2452,12 +2286,7 @@ class Game:
         self.board[:, self.height :, :] = -1
         self.board[:, :, self.width :] = -1
         self.get_map_name()
-        self.extra_board[
-            self.EXTRA_CELL.index("pond_boundary")
-        ] = self.load_pond_boundary()
-        self.extra_board[
-            self.EXTRA_CELL.index("enter_disallowed")
-        ] = self.load_enter_disallowed()
+        self.board[self.CELL.index("pond_boundary")] = self.load_pond_boundary()
 
         self.update_territory()
         self.board = self.update_blank(self.board)
@@ -2495,8 +2324,6 @@ class Game:
         #     self.turn - 1 == data["turn"]
         # ), f"self.turn:{self.turn}, data['turn']:{data['turn']}"
         self.turn = data["turn"] + 1
-        self.current_player = 1 - (self.turn % 2)
-        self.change_player(True)
         structures = np.pad(
             np.array(data["board"]["structures"]),
             [
