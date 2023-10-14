@@ -23,7 +23,7 @@ class API:
             if r.status_code == 200:
                 break
             print("get_match", r.status_code, r.text)
-            time.sleep(0.1)
+            time.sleep(0.3)
 
         matches = r.json()
         return matches["matches"]
@@ -38,7 +38,7 @@ class API:
             if r.status_code == 200:
                 break
             print("get_field", r.status_code, r.text)
-            time.sleep(0.1)
+            time.sleep(0.3)
 
         field = r.json()
         return field
@@ -54,8 +54,8 @@ class API:
             r = req.post(f"{self.match_url}/{path}", headers=header, json=act)
             if r.status_code == 200:
                 break
-            print("post_actions", r.status_code, r.text)
-            time.sleep(0.1)
             if r.status_code == 400 and retry_count > 10:
                 break
+            print("post_actions", r.status_code, r.text)
+            time.sleep(0.3)
             retry_count += 1

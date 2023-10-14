@@ -27,8 +27,12 @@ def main():
 
     env.reset_from_api(match)
     env.render()
+    env.render("ansi")
     print("id:", id_)
-    # input()
+    field = fa.get_field(id_)
+    if field["turn"] != 0:
+        print("delete preset")
+        env.delete_preset()
 
     terminated, truncated = [False] * 2
     while not terminated and not truncated:
@@ -38,12 +42,12 @@ def main():
         env.get_stat_from_api(field)
         print(f"turn:{server_turn}, score_A:{env.score_A}, score_B:{env.score_B}")
         env.render()
+        env.render("ansi")
         if env.current_team == "A":
             # actions = nn.predict(env.get_around_workers())
             actions = env.get_random_actions()
-            actions = env.check_actions(actions)
-            print(env.make_post_data(actions))
-            env.current_player
+            # actions = env.check_actions(actions)
+            # print(env.make_post_data(actions))
             fa.post_actions(env.make_post_data(actions), id_)
 
             # manual_actions = env.get_actions_from_pygame()
@@ -57,7 +61,7 @@ def main():
             _, _, terminated, truncated, _ = env.dummy_step()
 
         while server_turn == fa.get_field(id_)["turn"]:
-            time.sleep(0.5)
+            time.sleep(0.75)
     time.sleep(match["turnSeconds"])
     env.get_stat_from_api(fa.get_field(id_))
     print("game end")
