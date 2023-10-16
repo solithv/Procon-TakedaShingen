@@ -497,50 +497,33 @@ class Game:
             )[y, x]
             != 1
         ):
-            if (x == 0 or x == self.width - 1) and (y == 0 or y == self.width - 1):
+            if mode is not None:
+                if (x == 0 or x == self.width - 1) and (y == 0 or y == self.width - 1):
+                    return False
+                if (
+                    self.board[self.CELL.index(f"open_territory_{worker.team}"), y, x]
+                    == 1
+                ):
+                    return False
+                territory = copy.deepcopy(
+                    self.board[self.CELL.index(f"rampart_{worker.team}")]
+                )
+                territory[y, x] = 1
+                new_territory = self.fill_area(territory).sum()
+                current_territory = self.board[
+                    self.CELL.index(f"territory_{worker.team}")
+                ].sum()
+                if new_territory >= current_territory:
+                    if mode == "outside":
+                        return not self.is_inside(worker, y, x)
+                    elif mode == "inside":
+                        return self.is_inside(worker, y, x)
+                    elif mode == "both":
+                        return True
+                if new_territory > current_territory:
+                    if mode == "more":
+                        return True
                 return False
-            if self.board[self.CELL.index(f"open_territory_{worker.team}"), y, x] == 1:
-                return False
-            territory = copy.deepcopy(
-                self.board[self.CELL.index(f"rampart_{worker.team}")]
-            )
-            territory[y, x] = 1
-            new_territory = self.fill_area(territory).sum()
-            current_territory = self.board[
-                self.CELL.index(f"territory_{worker.team}")
-            ].sum()
-            if new_territory >= current_territory:
-                if mode == "outside":
-                    return not self.is_inside(worker, y, x)
-                elif mode == "inside":
-                    return self.is_inside(worker, y, x)
-                elif mode == "both":
-                    return True
-            if new_territory > current_territory:
-                if mode == "more":
-                    return True
-            return False
-        else:
-            return False
-
-    def is_castle(self, worker: Worker, y: int, x: int):
-        """内部関数
-        建築可能判定
-
-        Args:
-            worker (Worker): 職人
-            y (int): y座標
-            x (int): x座標
-
-        Returns:
-            bool: 判定結果
-        """
-
-        wy, wx = worker.get_coordinate()
-        if (
-            self.is_buildable(worker, y, x)
-            and self.board[self.CELL.index("castle"), wy, wx] == 1
-        ):
             return True
         else:
             return False
@@ -2105,7 +2088,7 @@ class Game:
             "build_outside",
             "build_inside",
             "build_both",
-            "build_castle" "move_boundary",
+            "move_boundary",
             "move_castle_build",
             "move_obstruction_build",
             "move_castle",
@@ -2146,8 +2129,6 @@ class Game:
                     actionable["build_inside"].append(index)
                 if self.is_buildable(worker, *act_pos, mode="both"):
                     actionable["build_both"].append(index)
-                if self.is_castle(worker, *act_pos):
-                    actionable["build_castle"].append(index)
             elif "move" in action:
                 if self.is_boundary_move(worker, *act_pos):
                     actionable["move_boundary"].append(index)
