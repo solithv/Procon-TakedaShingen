@@ -17,7 +17,7 @@ def main():
     # Noneでマップサイズに応じて可変
     max_steps = None
     annotator = Annotator(
-        glob.glob(os.path.join(csv_dir, "A17.csv")),
+        glob.glob(os.path.join(csv_dir, "*.csv")),
         output_dir,
         filename,
         size=7,
